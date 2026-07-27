@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push: { branches: ['**'] }
+  pull_request:
+
+env:
+  DATABASE_URL: postgresql://kubi_migrator:devmigrator@localhost:5432/kubi_dev
+  APP_DATABASE_URL: postgresql://kubi_app:devapp@localhost:5432/kubi_dev
+  TEST_DATABASE_URL: postgresql://kubi_migrator:devmigrator@localhost:5432/kubi_test
+  TEST_APP_DATABASE_URL: postgresql://kubi_app:devapp@localhost:5432/kubi_test
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: kubi_migrator
+          POSTGRES_PASSWORD: devmigrator
+          POSTGRES_DB: kubi_dev
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U kubi_migrator"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.33.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Provision least-privilege roles
+        run: |
+          PGPASSWORD=devmigrator psql -h localhost -U kubi_migrator -d kubi_dev \
+            -c "CREATE ROLE kubi_app LOGIN PASSWORD 'devapp';" \
+            -c "CREATE DATABASE kubi_test OWNER kubi_migrator;"
+
+      - name: Lint
+        run: pnpm exec eslint .
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit -p packages/contracts/tsconfig.json
+
+      - name: Migrate (forward)
+        run: |
+          pnpm exec prisma migrate deploy
+          DATABASE_URL="$TEST_DATABASE_URL" pnpm exec prisma migrate deploy
+
+      - name: Assert kubi_app holds no BYPASSRLS
+        run: |
+          RESULT=$(PGPASSWORD=devmigrator psql -h localhost -U kubi_migrator -d kubi_dev -tAc \
+            "SELECT rolbypassrls FROM pg_roles WHERE rolname='kubi_app';")
+          if [ "$RESULT" != "f" ]; then echo "kubi_app has BYPASSRLS"; exit 1; fi
+
+      - run: pnpm exec prisma generate
+
+      - name: Unit + generated suites
+        run: pnpm exec vitest run --config vitest.config.ts
+
+      - name: Integration (RLS)
+        run: pnpm exec vitest run --config vitest.integration.config.ts
+
+      - name: RLS architecture gate
+        run: pnpm exec tsx scripts/rls-spike.ts
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.33.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Dependency audit
+        run: pnpm audit --audit-level high
+      - name: Secret scan (full history)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

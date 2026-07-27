@@ -1,0 +1,75 @@
+// KuBi — Phase 1 Step 5.
+// Foundation entities ONLY: organization and clinic, per the approved plan.
+// No clinical, workflow or RBAC entities are modelled in Phase 1.
+//
+// Tenancy (ADR-003): every tenant-scoped table carries BOTH organization_id and
+// clinic_id. Row-level security policies key on organisation first, clinic
+// second. See prisma/migrations/*/rls.sql.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Top-level tenant. ADR-003 keeps this distinct from Clinic so that
+/// multi-organisation SaaS remains possible without a core redesign.
+model Organization {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code      String   @unique
+  name      String
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  clinics  Clinic[]
+  patients Patient[]
+
+  @@map("organizations")
+}
+
+/// Second tenancy level. Physical operating site.
+model Clinic {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  code           String
+  name           String
+  /// IANA timezone. All trigger evaluation is clinic-local and DST-aware.
+  timezone       String   @default("Asia/Kolkata")
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("clinics")
+}
+
+/// Present in Phase 1 ONLY as the RLS spike fixture (Step 6).
+///
+/// ADR-002: patient identity is ORGANISATION-wide with a single org-wide UHID.
+/// clinic_id here records the clinic of REGISTRATION, not an access boundary —
+/// visibility across clinics is a permission (patient:view_all_clinics), which
+/// is why this table exercises both tenancy levels and is the correct fixture
+/// for proving two-level RLS.
+///
+/// No clinical fields are modelled. Phase 1 control 14.
+model Patient {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  clinicId       String   @map("clinic_id") @db.Uuid
+  uhid           String
+  displayLabel   String   @map("display_label")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, uhid])
+  @@index([organizationId, clinicId])
+  @@map("patients")
+}
