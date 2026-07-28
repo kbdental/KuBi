@@ -57,6 +57,7 @@
     "jose": "^6.2.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@kubi/contracts": "workspace:*"
   }
 }

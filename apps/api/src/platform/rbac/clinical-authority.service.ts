@@ -13,6 +13,7 @@
  * translation is out of Phase 2 scope (no gates exist yet).
  */
 import type { TenantPrisma } from '../tenancy/rls-context.js';
+import type { Clock } from '../../shared/clock.js';
 
 export interface ClinicalAuthorityStatus {
   granted: boolean;
@@ -54,11 +55,13 @@ export interface GrantClinicalAuthorityInput {
  */
 export async function grantClinicalAuthority(
   tx: TenantPrisma,
+  clock: Clock,
   input: GrantClinicalAuthorityInput,
 ): Promise<void> {
   if (!input.reason || input.reason.trim().length < 8) {
     throw new Error('grantClinicalAuthority requires a specific, non-trivial reason.');
   }
+  const now = clock.now();
   await tx.clinicalAuthority.upsert({
     where: { employeeId: input.employeeId },
     create: {
@@ -67,7 +70,7 @@ export async function grantClinicalAuthority(
       granted: true,
       licenseNumber: input.licenseNumber,
       grantedBy: input.grantedBy,
-      grantedAt: new Date(), // ok: audited timestamp written server-side at grant time, not a business rule evaluation
+      grantedAt: now,
       reason: input.reason,
       revokedBy: null,
       revokedAt: null,
@@ -76,7 +79,7 @@ export async function grantClinicalAuthority(
       granted: true,
       licenseNumber: input.licenseNumber,
       grantedBy: input.grantedBy,
-      grantedAt: new Date(),
+      grantedAt: now,
       reason: input.reason,
       revokedBy: null,
       revokedAt: null,
@@ -86,11 +89,12 @@ export async function grantClinicalAuthority(
 
 export async function revokeClinicalAuthority(
   tx: TenantPrisma,
+  clock: Clock,
   employeeId: string,
   revokedBy: string,
 ): Promise<void> {
   await tx.clinicalAuthority.update({
     where: { employeeId },
-    data: { granted: false, revokedBy, revokedAt: new Date() },
+    data: { granted: false, revokedBy, revokedAt: clock.now() },
   });
 }

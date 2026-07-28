@@ -17,7 +17,13 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         {
-          selector: "NewExpression[callee.name='Date']",
+          // Zero-argument form only: `new Date()` reads the ambient system
+          // clock, which is what makes behaviour untestable. `new Date(x)`
+          // deriving a value from an already-injected `clock.now()` is a
+          // pure computation and is fine — banning it too would force every
+          // service to smuggle a second, unused "now" through the Clock
+          // port just to satisfy the linter.
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
           message: 'Do not call `new Date()`. Inject the Clock port (Phase 0.5 §18) so time-triggered behaviour is testable.',
         },
         {

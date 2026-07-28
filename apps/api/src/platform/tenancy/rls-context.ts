@@ -164,11 +164,17 @@ export async function withTenantContext<T>(
  *   - always sets `cross_clinic = true` for that org, since a system-level
  *     actor by definition is not scoped to one clinic.
  *
- * It is invoked from exactly two call sites in the whole codebase
- * (`ProvisioningService`, `BreakGlassService`), both of which write their own
- * audit event around the call. It must never be reachable from a request
- * handler that an ordinary permission grant can trigger — there is no
- * permission in the D1 catalogue that maps to it.
+ * Invoked from three call sites: `ProvisioningService`, `BreakGlassService`
+ * (each of which writes its own audit event around the call), and
+ * `session-context.service.ts`'s `resolveSession` — which is the
+ * chicken-and-egg case of reading a user's OWN EmployeeRole grants in order
+ * to compute the TenancyContext that every subsequent request in that
+ * session will use. That read is scoped to the org already asserted by the
+ * (signed, unforgeable) access token, so it cannot cross organisations; it
+ * carries no elevated write capability and is not itself a permission
+ * bypass. It must never be reachable from a request handler that an
+ * ordinary permission grant can trigger for anyone OTHER than themselves —
+ * there is no permission in the D1 catalogue that maps to it.
  */
 export async function withSystemContext<T>(
   client: TenantPrisma,

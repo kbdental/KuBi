@@ -31,6 +31,9 @@ export interface AuditEntry {
 }
 
 export async function writeAudit(tx: TenantPrisma, entry: AuditEntry): Promise<void> {
+  // exactOptionalPropertyTypes forbids assigning `undefined` to Prisma's Json
+  // input types — the key must be OMITTED, not set to undefined, when there
+  // is no value. Conditional spread does that; a ternary to `undefined` does not.
   await tx.auditLog.create({
     data: {
       organizationId: entry.organizationId,
@@ -40,8 +43,8 @@ export async function writeAudit(tx: TenantPrisma, entry: AuditEntry): Promise<v
       action: entry.action,
       entityType: entry.entityType,
       entityId: entry.entityId ?? null,
-      oldValue: entry.oldValue === undefined ? undefined : (entry.oldValue as never),
-      newValue: entry.newValue === undefined ? undefined : (entry.newValue as never),
+      ...(entry.oldValue !== undefined ? { oldValue: entry.oldValue as never } : {}),
+      ...(entry.newValue !== undefined ? { newValue: entry.newValue as never } : {}),
       reason: entry.reason ?? null,
       correlationId: entry.correlationId ?? null,
     },
