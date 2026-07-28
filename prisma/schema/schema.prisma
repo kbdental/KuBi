@@ -27,6 +27,18 @@ model Organization {
 
   clinics  Clinic[]
   patients Patient[]
+  users                  User[]
+  employees              Employee[]
+  clinicalAuthorities    ClinicalAuthority[]
+  roles                  Role[]
+  rolePermissions        RolePermission[]
+  employeeRoles          EmployeeRole[]
+  functionalAssignments  FunctionalAssignment[]
+  employeeCompetencies   EmployeeCompetency[]
+  configValues           ConfigValue[]
+  auditLogs              AuditLog[]
+  breakGlassGrants       BreakGlassGrant[]
+  refreshTokens          RefreshToken[]
 
   @@map("organizations")
 }
@@ -72,4 +84,336 @@ model Patient {
   @@unique([organizationId, uhid])
   @@index([organizationId, clinicId])
   @@map("patients")
+}
+
+// =============================================================================
+// PHASE 2 — Identity, Access, Organization & RBAC foundation
+//
+// Authority is kept on SEVEN distinct axes throughout (Phase 0 §09, CLAUDE.md
+// non-negotiable 5): User, Employee, Role, Permission, Clinical Authority,
+// Functional Assignment, and Record Relation (the last is resolved in code —
+// ActorRefKind.RECORD_RELATION — not a table, because it is a relationship to
+// whatever record is being acted on, not a standing grant).
+// =============================================================================
+
+/// Authentication identity. Owns credentials, sessions, MFA — and NOTHING else.
+/// Deliberately separate from Employee: a user account carries no clinical or
+/// organisational meaning by itself (Phase 0 §09).
+model User {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  email          String
+  passwordHash   String   @map("password_hash")
+  /// Reserved for TOTP MFA. Not enforced in Phase 2 — see technical debt TD-9.
+  mfaEnabled     Boolean  @default(false) @map("mfa_enabled")
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  employee      Employee?
+  refreshTokens RefreshToken[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@map("users")
+}
+
+/// The HR record. May exist with NO user account — a visiting hygienist can be
+/// a Doer without ever logging in (Phase 0 §09). `userId` is nullable and
+/// unique: at most one user per employee, at most one employee per user.
+model Employee {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId        String   @map("organization_id") @db.Uuid
+  userId                String?  @unique @map("user_id") @db.Uuid
+  code                  String
+  displayLabel          String   @map("display_label")
+  /// Self-referencing: drives escalation targeting (REPORTING_MANAGER_OF), not
+  /// authorization. A manager cannot necessarily do their report's job.
+  reportingManagerId    String?  @map("reporting_manager_id") @db.Uuid
+  status                String   @default("ACTIVE")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization          Organization           @relation(fields: [organizationId], references: [id])
+  user                  User?                  @relation(fields: [userId], references: [id])
+  reportingManager      Employee?              @relation("EmployeeReports", fields: [reportingManagerId], references: [id])
+  reports               Employee[]             @relation("EmployeeReports")
+  clinicalAuthority     ClinicalAuthority?
+  roles                 EmployeeRole[]
+  functionalAssignments FunctionalAssignment[]
+  competencies          EmployeeCompetency[]
+  breakGlassGrants      BreakGlassGrant[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("employees")
+}
+
+/// A SEPARATE, revocable, auditable attribute — never implied by role.
+/// "System Administrator status must not automatically provide clinical
+/// authority" (FRS §3) is mechanised here: nothing about being an admin, a
+/// manager, or an owner creates a row in this table. Only an explicit,
+/// reasoned grant does, and it is independently revocable.
+model ClinicalAuthority {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  employeeId     String    @unique @map("employee_id") @db.Uuid
+  granted        Boolean   @default(false)
+  licenseNumber  String?   @map("license_number")
+  grantedBy      String?   @map("granted_by") @db.Uuid
+  grantedAt      DateTime? @map("granted_at") @db.Timestamptz(6)
+  revokedBy      String?   @map("revoked_by") @db.Uuid
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(6)
+  reason         String?
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  employee     Employee     @relation(fields: [employeeId], references: [id])
+
+  @@index([organizationId])
+  @@map("clinical_authorities")
+}
+
+/// A named bundle of permissions. Org-scoped (Phase 0.5 §08: roles are
+/// deliberately NOT clinic-configurable — per-clinic permission drift is how
+/// audit trails become unexplainable). `isSystemRole` protects the 13
+/// canonical FRS §3 roles from deletion; organisations may add custom roles
+/// later without touching the canonical set.
+model Role {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  code           String
+  name           String
+  isSystemRole   Boolean  @default(true) @map("is_system_role")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  permissions  RolePermission[]
+  employees    EmployeeRole[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("roles")
+}
+
+/// The permission CATALOGUE. Global reference data, not tenant data — every
+/// organisation shares the same permission codes (resource:action), which is
+/// what makes cross-org comparison and product-wide upgrades possible. NOT
+/// row-level-secured: it is non-sensitive, immutable-by-convention metadata.
+model Permission {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  resource  String
+  action    String
+  /// `resource:action`. Stable for the life of the product — appears in audit
+  /// records, so renaming rewrites history and is forbidden after release.
+  code      String   @unique
+  /// PermissionClass: STANDARD | CLINICAL | SAFETY_OVERRIDE | ADMIN | BREAK_GLASS
+  class     String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Denormalized from role.organizationId — RLS on this table needs a direct
+  /// column rather than a policy subquery through Role.
+  organizationId String   @map("organization_id") @db.Uuid
+  roleId         String   @map("role_id") @db.Uuid
+  permissionId   String   @map("permission_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  role         Role         @relation(fields: [roleId], references: [id])
+  permission   Permission   @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+  @@index([organizationId])
+  @@map("role_permissions")
+}
+
+/// The employee<->role link. THIS is where multi-role, clinic-scoped,
+/// effective-dated assignment lives (Epic E01: "assign multiple clinic-
+/// specific roles... effective dates... audit log").
+///
+/// `clinicId = NULL` means an org-wide (cross-clinic) grant — the same
+/// semantics as `TenancyContext.crossClinic`. A non-null clinicId scopes the
+/// grant to exactly that clinic.
+model EmployeeRole {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  clinicId       String?   @map("clinic_id") @db.Uuid
+  employeeId     String    @map("employee_id") @db.Uuid
+  roleId         String    @map("role_id") @db.Uuid
+  effectiveFrom  DateTime  @default(now()) @map("effective_from") @db.Timestamptz(6)
+  effectiveTo    DateTime? @map("effective_to") @db.Timestamptz(6)
+  grantedBy      String?   @map("granted_by") @db.Uuid
+  grantedAt      DateTime  @default(now()) @map("granted_at") @db.Timestamptz(6)
+  revokedBy      String?   @map("revoked_by") @db.Uuid
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(6)
+  reason         String?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  employee     Employee     @relation(fields: [employeeId], references: [id])
+  role         Role         @relation(fields: [roleId], references: [id])
+
+  @@index([organizationId, clinicId])
+  @@index([employeeId])
+  @@map("employee_roles")
+}
+
+/// A named clinic responsibility held by one or more employees, INDEPENDENT
+/// of role (Phase 0.5 D2 finding: "Equipment Owner", "Implant Coordinator",
+/// "Trainer", "Qualified Assessor", "Qualified Verifier" are per-clinic
+/// assignments, not roles — making them roles would multiply the role count
+/// and still fail to express "the owner of THIS asset").
+///
+/// `scopeRef` optionally narrows the assignment to one record (e.g. one
+/// asset's Equipment Owner) rather than a clinic-wide responsibility.
+model FunctionalAssignment {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  clinicId       String    @map("clinic_id") @db.Uuid
+  employeeId     String    @map("employee_id") @db.Uuid
+  /// FunctionalAssignmentType — see packages/contracts.
+  assignmentType String    @map("assignment_type")
+  scopeRef       String?   @map("scope_ref")
+  effectiveFrom  DateTime  @default(now()) @map("effective_from") @db.Timestamptz(6)
+  effectiveTo    DateTime? @map("effective_to") @db.Timestamptz(6)
+  grantedBy      String?   @map("granted_by") @db.Uuid
+  grantedAt      DateTime  @default(now()) @map("granted_at") @db.Timestamptz(6)
+  revokedBy      String?   @map("revoked_by") @db.Uuid
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  employee     Employee     @relation(fields: [employeeId], references: [id])
+
+  @@index([organizationId, clinicId])
+  @@index([employeeId])
+  @@map("functional_assignments")
+}
+
+/// The authorization SEAM for competency (owner Additional Principle 2 /
+/// ADR-014). The Assignment engine's gate G-09 reads this table from Phase 2
+/// onward even though the Training & Competency MODULE (assessment workflow,
+/// UI) is Phase 3. Absence of a row for a required skill resolves to
+/// NOT_CONFIGURED, never PASS.
+model EmployeeCompetency {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  employeeId     String    @map("employee_id") @db.Uuid
+  skillCode      String    @map("skill_code")
+  /// CompetencyLevel: NOT_TRAINED | TRAINED | SUPERVISED | INDEPENDENT | TRAINER
+  level          String
+  validFrom      DateTime  @default(now()) @map("valid_from") @db.Timestamptz(6)
+  validUntil     DateTime? @map("valid_until") @db.Timestamptz(6)
+  assessedBy     String?   @map("assessed_by") @db.Uuid
+  assessedAt     DateTime  @default(now()) @map("assessed_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  employee     Employee     @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, skillCode])
+  @@index([organizationId])
+  @@map("employee_competencies")
+}
+
+/// Minimal configuration registry — enough to satisfy the P-2/D-01 condition
+/// that jurisdiction-specific policy be configurable, not hard-coded, without
+/// building the full Phase 0.5 §15 94-key registry (that is Phase 3+ work,
+/// once the activities/procedures it configures actually exist).
+model ConfigValue {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  clinicId       String?     @map("clinic_id") @db.Uuid
+  /// ConfigScope: ORGANIZATION | CLINIC (ACTIVITY/PROCEDURE/ROLE/SYSTEM unused
+  /// until their owning entities exist).
+  scope          String
+  key            String
+  valueJson      Json @map("value_json") @db.JsonB
+  updatedBy      String?     @map("updated_by") @db.Uuid
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, clinicId, key])
+  @@index([organizationId])
+  @@map("config_values")
+}
+
+/// Append-only. Change-data-capture half of the two-mechanism audit
+/// architecture (Phase 0 §14) — actor, before/after, reason, correlation id.
+/// UPDATE and DELETE are revoked from kubi_app at the grant level AND refused
+/// by a trigger, so neither an application bug nor a hand-written migration
+/// can rewrite history (see migration 0003_identity_rbac.sql).
+model AuditLog {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String       @map("organization_id") @db.Uuid
+  clinicId        String?      @map("clinic_id") @db.Uuid
+  actorUserId     String?      @map("actor_user_id") @db.Uuid
+  actorEmployeeId String?      @map("actor_employee_id") @db.Uuid
+  action          String
+  entityType      String       @map("entity_type")
+  entityId        String?      @map("entity_id") @db.Uuid
+  oldValue        Json? @map("old_value") @db.JsonB
+  newValue        Json? @map("new_value") @db.JsonB
+  reason          String?
+  correlationId   String?      @map("correlation_id")
+  occurredAt      DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, occurredAt])
+  @@map("audit_logs")
+}
+
+/// Time-boxed, reason-required, separately-audited elevation. The ENTIRE
+/// escape hatch (Phase 0 §09) — there is no `if (isAdmin) return true` path
+/// anywhere in the codebase; break-glass is the only route past an ordinary
+/// permission denial, and it is itself gated by a BREAK_GLASS-class
+/// permission that no standing role may hold.
+model BreakGlassGrant {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  employeeId     String    @map("employee_id") @db.Uuid
+  permissionCode String    @map("permission_code")
+  reason         String
+  requestedBy    String    @map("requested_by") @db.Uuid
+  approvedBy     String?   @map("approved_by") @db.Uuid
+  activatedAt    DateTime  @default(now()) @map("activated_at") @db.Timestamptz(6)
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedBy      String?   @map("revoked_by") @db.Uuid
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  employee     Employee     @relation(fields: [employeeId], references: [id])
+
+  @@index([organizationId])
+  @@map("break_glass_grants")
+}
+
+/// Rotating refresh tokens. Only the hash is stored; rotation forms a chain
+/// via `replacedByTokenId` so reuse of a superseded token is detectable.
+model RefreshToken {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String    @map("organization_id") @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  tokenHash         String    @unique @map("token_hash")
+  issuedAt          DateTime  @default(now()) @map("issued_at") @db.Timestamptz(6)
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
+  replacedByTokenId String?   @map("replaced_by_token_id") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("refresh_tokens")
 }

@@ -1,0 +1,10 @@
+{
+  "name": "@kubi/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@kubi/contracts": "workspace:*"
+  },
+  "scripts": { "typecheck": "tsc --noEmit -p tsconfig.json", "build": "echo skip" }
+}

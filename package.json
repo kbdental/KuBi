@@ -39,7 +39,8 @@
       "@prisma/client",
       "@prisma/engines",
       "prisma",
-      "esbuild"
+      "esbuild",
+      "argon2"
     ],
     "overrides": {
       "brace-expansion": ">=5.0.8",
@@ -47,5 +48,15 @@
       "vite": ">=6.4.3"
     }
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@nestjs/common": "^11.1.28",
+    "@nestjs/core": "^11.1.28",
+    "@nestjs/platform-fastify": "^11.1.28",
+    "argon2": "^0.45.1",
+    "jose": "^6.2.4",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4.4.3"
+  }
 }

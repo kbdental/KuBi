@@ -627,6 +627,36 @@ export const Provenance = {
 } as const;
 export type Provenance = (typeof Provenance)[keyof typeof Provenance];
 
+// ---------------------------------------------------------------------------
+// Phase 2 — functional assignments
+// ---------------------------------------------------------------------------
+
+/**
+ * NEW — Phase 2. The 9 FUNCTIONAL_ASSIGNMENT tokens identified in Phase 0.5
+ * D2 as per-clinic responsibilities, distinct from standing roles. Deriving
+ * activity Doer/Checker/Owner grants FROM these is Workflow/Assignment engine
+ * work (Phase 3+); Phase 2 only establishes the data model and evaluator.
+ */
+export const FunctionalAssignmentType = {
+  EQUIPMENT_OWNER: 'EQUIPMENT_OWNER',
+  IMPLANT_COORDINATOR: 'IMPLANT_COORDINATOR',
+  TRAINER: 'TRAINER',
+  QUALIFIED_ASSESSOR: 'QUALIFIED_ASSESSOR',
+  APPROVER: 'APPROVER',
+  RECEPTION_LEAD: 'RECEPTION_LEAD',
+  CLINICAL_LEAD: 'CLINICAL_LEAD',
+  /**
+   * OD-03 Q4: represented as a functional/competency-based authorization,
+   * NOT a generic RBAC role. `scopeRef` on FunctionalAssignment may narrow
+   * this to a specific equipment category; absence of a category-specific
+   * grant means the evaluator returns NOT_CONFIGURED, never PASS.
+   */
+  QUALIFIED_VERIFIER: 'QUALIFIED_VERIFIER',
+  ASSIGNED_ASSISTANT: 'ASSIGNED_ASSISTANT',
+} as const;
+export type FunctionalAssignmentType =
+  (typeof FunctionalAssignmentType)[keyof typeof FunctionalAssignmentType];
+
 /** Registry of every enum in this file, for the contract-drift test. */
 export const ENUM_REGISTER = {
   EvaluationResult, EnforcementMode, GateDecision, OverrideAuthority,
@@ -637,5 +667,5 @@ export const ENUM_REGISTER = {
   NotificationPriority, NotificationChannel, ConsentType, AppointmentStatus,
   ProcedureCategory, AllergySeverity, FollowupOutcome, AssetStatus,
   SterilizationStage, CycleResult, LabCaseStatus, StockTransactionType,
-  ConfigScope, Provenance,
+  ConfigScope, Provenance, FunctionalAssignmentType,
 } as const;
