@@ -22,7 +22,7 @@ import { checkPermission } from './platform/rbac/permission-evaluation.service.j
 import { withSystemContext } from './platform/tenancy/rls-context.js';
 import {
   startTask, respondToChecklist, completeTask, verifyTask, reportProblem,
-  evaluateGate, TaskAuthorizationError, PROBLEM_KINDS,
+  evaluateGate, TaskAuthorizationError, GateBlockedError, PROBLEM_KINDS,
 } from './platform/workflow/task.service.js';
 import { writeAudit, AuditAction } from './platform/audit/audit.service.js';
 import { ActivityStatus, ExceptionStatus } from '@kubi/contracts';
@@ -82,6 +82,12 @@ export async function buildServer(): Promise<FastifyInstance> {
   app.setErrorHandler((err: Error, _req, reply) => {
     const status = (err as { statusCode?: number }).statusCode
       ?? (err instanceof TaskAuthorizationError ? 403 : 500);
+    // A blocked gate is not a failure of the request — the clinic simply
+    // isn't ready. 409 so the screen can offer the two honest ways forward.
+    if (err instanceof GateBlockedError) {
+      reply.status(409).send({ error: err.message, canOverride: err.overridable });
+      return;
+    }
     if (status >= 500) logger.error({ errorName: err.name }, 'request failed');
     // Errors say what went wrong and what to do — no stack, no jargon.
     reply.status(status).send({ error: err.message });
@@ -220,6 +226,7 @@ export async function buildServer(): Promise<FastifyInstance> {
           };
         }),
         cantConfirm: gate?.blocks ? gate.message : null,
+        canOverrideBlock: gate?.blocks ? gate.overridable : false,
         blockedBy: blocker?.headline ?? null,
         problemKinds: PROBLEM_KINDS,
       };
@@ -244,11 +251,15 @@ export async function buildServer(): Promise<FastifyInstance> {
       })),
       taps: z.number().int().optional(),
       durationMs: z.number().int().optional(),
+      // Present only when a gate blocked and the person recorded why it is
+      // safe to proceed. The service decides whether that is permitted.
+      overrideReason: z.string().min(1).max(500).optional(),
     }).parse(req.body);
 
     const result = await withTenantContext(prisma, s.tenancy, async (tx) => {
       await respondToChecklist(tx, clock, id, s.employeeId!, body.responses);
-      return completeTask(tx, clock, id, s.employeeId!);
+      return completeTask(tx, clock, id, s.employeeId!,
+        body.overrideReason ? { reason: body.overrideReason } : undefined);
     });
 
     await track(s, 'task_complete', {

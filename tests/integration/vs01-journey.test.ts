@@ -132,6 +132,50 @@ describe('VS-01 journey — through the API', () => {
     expect(after.blockedBy).toMatch(/Oxygen cylinder/);
   });
 
+  it('the blocking gate is enforced by the server, not by the screen', async () => {
+    // OD-20 configures emergency readiness as BLOCK_OVERRIDABLE, and the
+    // requirement has no backing module yet, so it evaluates NOT_CONFIGURED.
+    // AP-1 says that must not read as PASS -- which is worth nothing unless
+    // the SERVER refuses. Calling complete directly, with no UI involved:
+    const cookie = await login(`priya_${suffix}@synthetic.test`);
+    const day = (await app.inject({ method: 'GET', url: '/api/v1/my-day', headers: { cookie } })).json();
+    const all = [...day.buckets.OVERDUE, ...day.buckets.NOW, ...day.buckets.NEXT, ...day.buckets.LATER];
+    const task = all.find((t: { title: string }) => t.title === 'Check the emergency kit');
+
+    const sheet = (await app.inject({
+      method: 'GET', url: `/api/v1/tasks/${task.id}`, headers: { cookie },
+    })).json();
+    const responses = sheet.items.map((i: { id: string }) => ({ itemId: i.id, checked: true }));
+
+    const blocked = await app.inject({
+      method: 'POST', url: `/api/v1/tasks/${task.id}/complete`, headers: { cookie },
+      payload: { responses },
+    });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().error).toMatch(/can't confirm the emergency kit list yet/);
+    expect(blocked.json().canOverride).toBe(true);
+    // Still plain language on the refusal path too.
+    expect(blocked.json().error).not.toMatch(/NOT_CONFIGURED|UNKNOWN|gate/i);
+
+    // Going ahead requires saying why, and that never happens quietly.
+    const forced = await app.inject({
+      method: 'POST', url: `/api/v1/tasks/${task.id}/complete`, headers: { cookie },
+      payload: { responses, overrideReason: 'SYNTHETIC: spare kit checked by hand against the paper list' },
+    });
+    expect(forced.statusCode).toBe(200);
+    expect(forced.json().status).toBe('COMPLETED');
+
+    // The override is visible to the manager without anyone reporting it.
+    const rahul = await login(`rahul_${suffix}@synthetic.test`);
+    const attention = (await app.inject({
+      method: 'GET', url: '/api/v1/attention', headers: { cookie: rahul },
+    })).json();
+    const override = attention.find((a: { headline: string }) => /emergency kit/i.test(a.headline)
+      && /finished before/i.test(a.headline));
+    expect(override).toBeDefined();
+    expect(override.detail).toMatch(/checked by hand/);
+  });
+
   it('the problem reaches Rahul automatically, and he resolves it', async () => {
     const cookie = await login(`rahul_${suffix}@synthetic.test`);
     taps.rahul += 1;

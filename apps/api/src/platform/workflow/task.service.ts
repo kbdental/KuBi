@@ -20,6 +20,20 @@ export class TaskAuthorizationError extends Error {
   constructor(message: string) { super(message); this.name = 'TaskAuthorizationError'; }
 }
 
+/**
+ * A gate said this task cannot be finished yet. Distinct from an authorization
+ * failure: the person is allowed to do this work, the clinic is not ready for
+ * it. `overridable` tells the caller whether a reason could unblock it.
+ */
+export class GateBlockedError extends Error {
+  readonly overridable: boolean;
+  constructor(message: string, overridable: boolean) {
+    super(message);
+    this.name = 'GateBlockedError';
+    this.overridable = overridable;
+  }
+}
+
 /** What the UI shows for a gate that could not be evaluated. Never "UNKNOWN". */
 export interface GateStatus {
   requirement: string;
@@ -131,6 +145,7 @@ export interface CompleteResult {
 
 export async function completeTask(
   tx: TenantPrisma, clock: Clock, instanceId: string, employeeId: string,
+  override?: { reason: string },
 ): Promise<CompleteResult> {
   const inst = await tx.activityInstance.findUniqueOrThrow({
     where: { id: instanceId },
@@ -142,6 +157,49 @@ export async function completeTask(
 
   const now = clock.now();
   const def = inst.definition;
+
+  // The gate is enforced HERE, not in the screen that renders it. `cantConfirm`
+  // on the task sheet is a courtesy; this is the rule. Without this check a
+  // direct API call finishes a task whose gate blocks -- which is precisely
+  // the enforcement hole the journey test closes for authorization.
+  const gate = await evaluateGate(
+    tx, inst.organizationId, inst.clinicId, def.gateRequirement, def.gateEnforcement,
+  );
+  if (gate?.blocks) {
+    if (!gate.overridable) {
+      // BLOCK_HARD has no override path at all -- not a permission someone
+      // could be granted, not a reason someone could type. ADR-004.
+      throw new GateBlockedError(
+        `${gate.message}. This has to be sorted out before the task can be finished.`,
+        false,
+      );
+    }
+    if (!override?.reason?.trim()) {
+      throw new GateBlockedError(
+        `${gate.message}. Report a problem, or record why it is safe to go ahead.`,
+        true,
+      );
+    }
+    // Going ahead anyway is a management act, and it is never silent: it is
+    // audited AND raised as Attention, so a manager sees it even if nobody
+    // reports it. OD-20 chose BLOCK_OVERRIDABLE precisely so this path exists.
+    await writeAudit(tx, {
+      organizationId: inst.organizationId, clinicId: inst.clinicId,
+      actorEmployeeId: employeeId, action: 'GATE_OVERRIDDEN',
+      entityType: 'activity_instance', entityId: instanceId,
+      reason: override.reason,
+      newValue: { requirement: gate.requirement, result: gate.result },
+    });
+    await raiseAttentionItem(tx, clock, {
+      organizationId: inst.organizationId, clinicId: inst.clinicId,
+      code: 'OPN.GATE_OVERRIDE.PROCEEDED_WITHOUT_CONFIRMATION',
+      severity: def.priority,
+      headline: `${def.title} was finished before ${gate.message.replace(/^We can't confirm /, '')}`,
+      detail: override.reason,
+      sourceInstanceId: inst.id,
+      ownerRoleCode: 'CLINIC_MANAGER',
+    });
+  }
 
   // Out-of-range VALUE readings raise Attention (OD-21) but do not block.
   const outOfRange: CompleteResult['outOfRangeValues'] = [];
