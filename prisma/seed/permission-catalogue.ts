@@ -116,6 +116,18 @@ export const PERMISSION_CATALOGUE: readonly PermissionSeed[] = [
   p('break_glass_grant', 'activate', A, 'NEW — creating a time-boxed grant is itself an ADMIN act, held only by OWNER_DIRECTOR/CLINIC_HEAD'),
   p('break_glass_grant', 'revoke', A, 'NEW'),
 
+  // -- work, checks and attention (VS-01 activity engine) -----------------
+  p('activity_definition', 'view', S, 'VS-01 — the standards library'),
+  p('activity_instance', 'view', S, 'VS-01 — own tasks; narrowed further by record relation'),
+  p('activity_instance', 'view_clinic', S, 'VS-01 — all tasks at this clinic'),
+  p('activity_instance', 'start', S, 'VS-01 — assignee only, enforced by record relation'),
+  p('activity_instance', 'complete', S, 'VS-01 — assignee only'),
+  p('activity_instance', 'report_problem', S, 'VS-01 — everyone. Reporting must never be gated'),
+  p('activity_instance', 'verify', S, 'VS-01 — per the definition checker rule; blocked when verifier = doer'),
+  p('checklist', 'respond', S, 'VS-01 — assignee only'),
+  p('attention_item', 'view', S, 'VS-01 — Attention list, scoped to the caller'),
+  p('attention_item', 'resolve', S, 'VS-01 — accountable owner, manager and above'),
+
   // -- patient (table exists since Phase 1; no clinical workflow built) ----
   p('patient', 'view', S, 'Phase 0.5 D1 clinical.patient — clinic-scoped read only; no clinical fields exist yet'),
   p('patient', 'view_all_clinics', A, 'ADR-002/D-02 — the org-wide visibility permission that OD-05 governs'),

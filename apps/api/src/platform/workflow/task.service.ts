@@ -98,7 +98,7 @@ export async function startTask(
 
 export async function respondToChecklist(
   tx: TenantPrisma, clock: Clock, instanceId: string, employeeId: string,
-  responses: Array<{ itemId: string; checked: boolean; numericValue?: number }>,
+  responses: Array<{ itemId: string; checked: boolean; numericValue?: number | undefined }>,
 ) {
   const inst = await tx.activityInstance.findUniqueOrThrow({ where: { id: instanceId } });
   if (inst.assigneeEmployeeId !== employeeId) {

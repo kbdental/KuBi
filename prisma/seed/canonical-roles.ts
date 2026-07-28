@@ -22,11 +22,14 @@
  *     `role_permissions_forbid_break_glass` makes that structural, not just
  *     a seeding choice.
  *
- * Roles with no Phase 2 grants (RECEPTION beyond patient:view, INVENTORY_
- * COORDINATOR, LAB_COORDINATOR, HOUSEKEEPING, CONDUCT-adjacent) are seeded
- * with an empty permission set: their real permissions arrive with the
- * domain module that defines them (Phase 2+). Seeding placeholder grants for
- * work that doesn't exist would misrepresent what is actually enforced.
+ * Every operational role holds DOES_WORK, because every one of them can be
+ * assigned an activity. Roles whose DOMAIN permissions do not exist yet
+ * (inventory, lab, quality) hold only that: their module-specific grants
+ * arrive with the module. Seeding placeholder grants for work that does not
+ * exist would misrepresent what is actually enforced.
+ *
+ * SYSTEM_ADMINISTRATOR deliberately does NOT hold DOES_WORK — it is a
+ * technical role, not an operational one, and clinic work is not its job.
  */
 import { RoleCode } from '@kubi/contracts';
 import { permissionCode } from './permission-catalogue.js';
@@ -39,11 +42,34 @@ export interface RoleSeed {
 
 const c = permissionCode;
 
+/**
+ * Every operational role can see and do their OWN work, and report a problem.
+ * Narrowing to "own" is a RECORD-RELATION check in the service layer, not a
+ * separate permission — holding activity_instance:complete does not let you
+ * complete somebody else's task.
+ */
+const DOES_WORK: readonly string[] = [
+  c('activity_definition', 'view'),
+  c('activity_instance', 'view'),
+  c('activity_instance', 'start'),
+  c('activity_instance', 'complete'),
+  c('activity_instance', 'report_problem'),
+  c('checklist', 'respond'),
+  c('attention_item', 'view'),
+];
+
+/** Roles that act as an independent CHECK on someone else's work. */
+const VERIFIES: readonly string[] = [c('activity_instance', 'verify')];
+
+/** Roles that own and close PROBLEMS. */
+const RESOLVES: readonly string[] = [c('attention_item', 'resolve'), c('activity_instance', 'view_clinic')];
+
 export const CANONICAL_ROLES: readonly RoleSeed[] = [
   {
     code: RoleCode.OWNER_DIRECTOR,
     name: 'Owner / Director',
     grants: [
+      ...DOES_WORK, ...VERIFIES, ...RESOLVES,
       c('organization', 'view'), c('organization', 'update'), c('organization', 'configure'),
       c('clinic', 'view'), c('clinic', 'create'), c('clinic', 'update'), c('clinic', 'archive'), c('clinic', 'configure'),
       c('config_value', 'view'), c('config_value', 'set'), c('config_value', 'view_history'),
@@ -64,6 +90,7 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     // OD-01: management authority only. Deliberately excludes clinical_authority
     // grant/revoke, competency:assess, and any implied clinical grant.
     grants: [
+      ...DOES_WORK, ...VERIFIES, ...RESOLVES,
       c('organization', 'view'),
       c('clinic', 'view'), c('clinic', 'update'), c('clinic', 'configure'),
       c('config_value', 'view'), c('config_value', 'set'), c('config_value', 'view_history'),
@@ -83,6 +110,7 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     // Governs OTHER people's clinical authority; does not imply the Clinical
     // Director's OWN ClinicalAuthority row, which provisioning grants explicitly.
     grants: [
+      ...DOES_WORK, ...VERIFIES, ...RESOLVES,
       c('employee', 'view'),
       c('clinical_authority', 'view'), c('clinical_authority', 'grant'), c('clinical_authority', 'revoke'),
       c('functional_assignment', 'view'), c('functional_assignment', 'grant'), c('functional_assignment', 'revoke'),
@@ -95,6 +123,7 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     code: RoleCode.TREATING_DOCTOR,
     name: 'Treating / Associate Doctor',
     grants: [
+      ...DOES_WORK, ...VERIFIES,
       c('employee', 'view'),
       c('competency', 'view'),
       c('patient', 'view'),
@@ -104,6 +133,7 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     code: RoleCode.CLINIC_MANAGER,
     name: 'Clinic Manager',
     grants: [
+      ...DOES_WORK, ...VERIFIES, ...RESOLVES,
       c('clinic', 'view'),
       c('employee', 'view'), c('employee', 'update'),
       c('functional_assignment', 'view'), c('functional_assignment', 'grant'), c('functional_assignment', 'revoke'),
@@ -115,22 +145,31 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
   {
     code: RoleCode.RECEPTION,
     name: 'Reception',
-    grants: [c('patient', 'view')],
+    grants: [
+      ...DOES_WORK,
+      c('patient', 'view'),
+    ],
   },
   {
     code: RoleCode.SENIOR_ASSISTANT,
     name: 'Senior Assistant',
-    grants: [c('patient', 'view')],
+    grants: [
+      ...DOES_WORK, ...VERIFIES,
+      c('patient', 'view'),
+    ],
   },
-  { code: RoleCode.DENTAL_ASSISTANT, name: 'Dental Assistant', grants: [c('patient', 'view')] },
-  { code: RoleCode.INVENTORY_COORDINATOR, name: 'Inventory Coordinator', grants: [] },
-  { code: RoleCode.LAB_COORDINATOR, name: 'Lab Coordinator', grants: [] },
+  { code: RoleCode.DENTAL_ASSISTANT, name: 'Dental Assistant', grants: [...DOES_WORK, c('patient', 'view')] },
+  { code: RoleCode.INVENTORY_COORDINATOR, name: 'Inventory Coordinator', grants: [...DOES_WORK] },
+  { code: RoleCode.LAB_COORDINATOR, name: 'Lab Coordinator', grants: [...DOES_WORK] },
   {
     code: RoleCode.QUALITY_COMPLIANCE,
     name: 'Quality / Compliance',
-    grants: [c('audit_log', 'view'), c('audit_log', 'view_clinic')],
+    grants: [
+      ...DOES_WORK,
+      c('audit_log', 'view'), c('audit_log', 'view_clinic'),
+    ],
   },
-  { code: RoleCode.HOUSEKEEPING, name: 'Housekeeping', grants: [] },
+  { code: RoleCode.HOUSEKEEPING, name: 'Housekeeping', grants: [...DOES_WORK] },
   {
     code: RoleCode.SYSTEM_ADMINISTRATOR,
     name: 'System Administrator',
