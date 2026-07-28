@@ -6,7 +6,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['**/*.ts'],
+    files: ['**/*.ts', '**/*.tsx'],
     rules: {
       // Phase 0.5 §18: an injectable clock, everywhere. Roughly half of KuBi's
       // behaviour is time-triggered and is untestable if `new Date()` is called
@@ -38,7 +38,23 @@ export default tseslint.config(
   {
     // The clock rule cannot apply to the clock itself, nor to test fixtures and
     // one-off scripts that are not part of the runtime.
-    files: ['apps/api/src/shared/clock.ts', 'tests/**/*.ts', 'scripts/**/*.ts', 'prisma/seed/**/*.ts'],
+    files: ['apps/api/src/shared/clock.ts', 'tests/**/*.ts', 'tests/**/*.tsx', 'scripts/**/*.ts', 'prisma/seed/**/*.ts'],
+    rules: { 'no-restricted-syntax': 'off' },
+  },
+  {
+    // Plain Node scripts, run directly with `node`. Not part of the runtime.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+    rules: { 'no-restricted-syntax': 'off' },
+  },
+  {
+    // The browser IS the clock, for display only. "Overdue by 20 min" is
+    // rendering, not behaviour: nothing branches on it and there is no
+    // server-side decision to make testable. The Clock port exists so
+    // time-TRIGGERED behaviour can be tested, and none of that lives here —
+    // every such decision was already made by the server before the screen
+    // was handed a value to render.
+    files: ['apps/web/src/**/*.tsx', 'apps/web/src/**/*.ts'],
     rules: { 'no-restricted-syntax': 'off' },
   },
 );

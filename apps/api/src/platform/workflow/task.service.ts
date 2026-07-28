@@ -194,8 +194,11 @@ export async function completeTask(
       organizationId: inst.organizationId, clinicId: inst.clinicId,
       code: 'OPN.GATE_OVERRIDE.PROCEEDED_WITHOUT_CONFIRMATION',
       severity: def.priority,
-      headline: `${def.title} was finished before ${gate.message.replace(/^We can't confirm /, '')}`,
-      detail: override.reason,
+      // Built as a sentence, not spliced out of the gate message -- chopping
+      // the front off "We can't confirm X yet" produces a headline that reads
+      // like broken English on the one screen that has to be trusted.
+      headline: `${def.title} — finished before everything could be confirmed`,
+      detail: `${gate.message}. Reason given: ${override.reason}`,
       sourceInstanceId: inst.id,
       ownerRoleCode: 'CLINIC_MANAGER',
     });
