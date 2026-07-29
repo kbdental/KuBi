@@ -77,9 +77,27 @@ export interface OpeningStatus {
   complete: boolean;
 }
 
+/**
+ * Where the clinic is, right now. `null` for someone who can see every clinic
+ * — they have no single "here".
+ */
+export interface ClinicContext {
+  name: string;
+  /** The clinic's timezone. Every time on screen is formatted with this. */
+  timezone: string;
+  /** null when there is no opening set today. Absent is not ready. */
+  phase: 'OPENING' | 'OPEN' | null;
+  opening: OpeningStatus | null;
+  /** The clinic's own configured opening time for today. */
+  readyBy: string | null;
+  /** Always null until appointment integration lands. Never guessed. */
+  firstPatientAt: string | null;
+}
+
 export interface MyDay {
   buckets: Record<BucketName, TaskRow[]>;
   attentionCount: number;
+  clinic: ClinicContext | null;
   opening: OpeningStatus | null;
 }
 

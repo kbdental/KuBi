@@ -357,6 +357,15 @@ describe('VS-01 journey — through the API', () => {
     const cookie = await login(`priya_${suffix}@synthetic.test`);
     const day = (await app.inject({ method: 'GET', url: '/api/v1/my-day', headers: { cookie } })).json();
 
+    // Where the CLINIC is — the question a person actually asks on arrival.
+    expect(day.clinic).not.toBeNull();
+    expect(day.clinic.name).toBeTruthy();
+    expect(day.clinic.timezone).toBe('Asia/Kolkata');   // times are clinic-local
+    expect(day.clinic.phase).toBe('OPENING');
+    expect(day.clinic.readyBy).toBeTruthy();            // from clinic configuration
+    // Never guessed: there are no appointments yet, so there is no first patient.
+    expect(day.clinic.firstPatientAt).toBeNull();
+
     expect(day.opening).not.toBeNull();
     expect(day.opening.total).toBe(5);          // the whole clinic's set, not Priya's share
     expect(day.opening.done).toBeGreaterThan(0);

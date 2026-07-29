@@ -17,6 +17,8 @@ import { TaskSheetScreen } from '../../apps/web/src/screens/task-sheet.js';
 import { Attention } from '../../apps/web/src/screens/attention.js';
 import { Checks } from '../../apps/web/src/screens/checks.js';
 import { SignIn } from '../../apps/web/src/screens/sign-in.js';
+import { ClinicHeader } from '../../apps/web/src/screens/clinic-header.js';
+import { CurrentTask } from '../../apps/web/src/screens/current-task.js';
 import type { MyDay, TaskSheet, AttentionRow, CheckRow } from '../../apps/web/src/api.js';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -46,6 +48,7 @@ const day: MyDay = {
     NEXT: [], LATER: [],
   },
   attentionCount: 1,
+  clinic: null,
   opening: { total: 5, done: 3, complete: false },
 };
 
@@ -83,8 +86,10 @@ const checks: CheckRow[] = [{
 
 describe('the screens speak clinic language, never the engine’s', () => {
   it('Today shows the work without jargon', () => {
-    render(<Today day={day} onOpenTask={() => {}} />);
-    expect(screen.getByText('Open the clinic')).toBeDefined();
+    // The most urgent unblocked task is lifted out into "Happening now", so
+    // the list below holds what is still to come.
+    render(<Today day={day} onOpenTask={() => {}} onRefresh={() => {}} />);
+    expect(screen.getByText('Check the emergency kit')).toBeDefined();
     expect(visibleText()).not.toMatch(NEVER_ON_SCREEN);
   });
 
@@ -256,6 +261,106 @@ describe('Checks makes disagreeing as easy as agreeing', () => {
   });
 });
 
+describe('where the clinic is', () => {
+  const clinic = {
+    name: 'KB Dental Andheri',
+    timezone: 'Asia/Kolkata',
+    phase: 'OPENING' as const,
+    opening: { total: 5, done: 3, complete: false },
+    readyBy: new Date(Date.now() + 13 * 60_000).toISOString(),
+    firstPatientAt: null,
+  };
+
+  it('answers where I am, what phase, whether we are ready, and how long is left', () => {
+    render(<ClinicHeader clinic={clinic} />);
+    expect(screen.getByText('KB Dental Andheri')).toBeDefined();   // where
+    expect(screen.getByText(/Good (morning|afternoon|evening)/)).toBeDefined();
+    expect(screen.getByText('Clinic opening')).toBeDefined();      // what phase
+    expect(screen.getByText('3 of 5 areas ready')).toBeDefined();  // are we ready
+    expect(screen.getByText('13 minutes left')).toBeDefined();     // how long
+    expect(visibleText()).not.toMatch(NEVER_ON_SCREEN);
+  });
+
+  it('says when the clinic is running late, rather than counting down past zero', () => {
+    const late = { ...clinic, readyBy: new Date(Date.now() - 20 * 60_000).toISOString() };
+    render(<ClinicHeader clinic={late} />);
+    expect(screen.getByText('20 minutes late')).toBeDefined();
+  });
+
+  it('reads the clinic’s own clock, not the viewer’s', () => {
+    // A manager looking from home, or a tablet on the wrong zone, must still
+    // see the clinic's time. 03:30 UTC is 09:00 in Kolkata.
+    const at = { ...clinic, readyBy: '2026-07-29T03:30:00.000Z' };
+    render(<ClinicHeader clinic={at} />);
+    expect(screen.getByText('09:00 AM')).toBeDefined();
+  });
+
+  it('never implies readiness when there is no opening set today', () => {
+    const closed = { ...clinic, phase: null, opening: null, readyBy: null };
+    render(<ClinicHeader clinic={closed} />);
+    expect(screen.getByText('No opening scheduled today')).toBeDefined();
+    expect(screen.queryByText('Clinic open')).toBeNull();
+    expect(screen.queryByText(/areas ready/)).toBeNull();
+  });
+
+  it('shows no first-patient time while appointments are not integrated', () => {
+    // The most trusted wrong number on the screen would be an invented one.
+    render(<ClinicHeader clinic={clinic} />);
+    expect(screen.queryByText('First patient')).toBeNull();
+  });
+
+  it('shows a first-patient countdown once that time is real', () => {
+    const withPatient = {
+      ...clinic,
+      firstPatientAt: new Date(Date.now() + 13 * 60_000).toISOString(),
+    };
+    render(<ClinicHeader clinic={withPatient} />);
+    expect(screen.getByText('First patient')).toBeDefined();
+  });
+});
+
+describe('the thing happening now is already open', () => {
+  const inline: TaskSheet = {
+    ...sheet,
+    id: 'cur',
+    title: 'Open the clinic',
+    cantConfirm: null,
+    canOverrideBlock: false,
+    items: [
+      { id: 'a', label: 'Main entrance open', requiresValue: false, unit: null, checked: false, value: null },
+      { id: 'b', label: 'Floors unlocked', requiresValue: false, unit: null, checked: false, value: null },
+    ],
+  };
+
+  it('opens the current task on Today, so starting work costs no taps', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      new Response(JSON.stringify(inline), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      }));
+
+    render(<CurrentTask taskId="cur" onOpenFull={() => {}} onDone={() => {}} />);
+    await waitFor(() => expect(screen.getByText('Open the clinic')).toBeDefined());
+    // The checklist is on screen without anyone having pressed anything.
+    expect(screen.getByText('Main entrance open')).toBeDefined();
+    expect(screen.getByText('0 of 2 done')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Finish' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('hands anything that needs explaining to the full screen, rather than cramping it', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      new Response(
+        JSON.stringify({ ...inline, cantConfirm: "We can't confirm the emergency kit list yet" }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ));
+
+    render(<CurrentTask taskId="cur" onOpenFull={() => {}} onDone={() => {}} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open this' })).toBeDefined());
+    // Still the one thing in front of you — it just does not pretend to be simple.
+    expect(screen.getByText('Happening now')).toBeDefined();
+    expect(screen.queryByText('Main entrance open')).toBeNull();
+  });
+});
+
 describe('the review decisions, on screen', () => {
   it('Q4: severity reads as what is being asked of you', () => {
     const rows: AttentionRow[] = [
@@ -280,20 +385,20 @@ describe('the review decisions, on screen', () => {
 
   it('confirms the clinic is open only when the opening set is actually complete', () => {
     const done: MyDay = { ...day, opening: { total: 5, done: 5, complete: true } };
-    render(<Today day={done} onOpenTask={() => {}} />);
-    expect(screen.getByText('The clinic is open')).toBeDefined();
+    render(<Today day={done} onOpenTask={() => {}} onRefresh={() => {}} />);
+    expect(screen.getByText('Opening is done')).toBeDefined();
   });
 
   it('says nothing about opening when it is only partly done', () => {
     const partly: MyDay = { ...day, opening: { total: 5, done: 3, complete: false } };
-    render(<Today day={partly} onOpenTask={() => {}} />);
-    expect(screen.queryByText('The clinic is open')).toBeNull();
+    render(<Today day={partly} onOpenTask={() => {}} onRefresh={() => {}} />);
+    expect(screen.queryByText('Opening is done')).toBeNull();
   });
 
   it('says nothing about opening when there is no opening set at all', () => {
     // Absent is not complete. A closed day must never read as "open".
     const none: MyDay = { ...day, opening: null };
-    render(<Today day={none} onOpenTask={() => {}} />);
-    expect(screen.queryByText('The clinic is open')).toBeNull();
+    render(<Today day={none} onOpenTask={() => {}} onRefresh={() => {}} />);
+    expect(screen.queryByText('Opening is done')).toBeNull();
   });
 });

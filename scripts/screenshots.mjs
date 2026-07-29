@@ -208,7 +208,8 @@ await completeViaApi('priya', 'Get treatment rooms ready');
   await shot(page, '18-me');
 
   await page.getByRole('button', { name: 'Today' }).first().click();
-  await page.waitForSelector('.screen-title');
+  // Today leads with the clinic header now, not a page heading.
+  await page.waitForSelector('.clinic, .empty-big');
   await shot(page, '19-today-empty');
   await ctx.close();
 }

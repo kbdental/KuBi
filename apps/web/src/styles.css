@@ -66,6 +66,46 @@ button, input, textarea, select { font: inherit; color: inherit; }
   min-width: 20px; padding: 1px 6px; font-size: 12px; line-height: 18px;
 }
 
+/* ---- where the clinic is -------------------------------------------------- */
+
+.clinic {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 18px 20px; margin-bottom: 24px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.clinic.is-open { border-color: #bcdcc8; background: #f6fbf8; }
+
+.clinic-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.clinic-name { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+.clinic-greeting { color: var(--ink-soft); font-size: 16px; margin-top: 2px; }
+.clinic-clock {
+  font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em; white-space: nowrap;
+}
+
+.clinic-phase { display: flex; flex-direction: column; gap: 9px; }
+.clinic-phase-name {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.clinic.is-open .clinic-phase-name { color: var(--ok); }
+
+.clinic-progress { display: flex; align-items: center; gap: 12px; }
+.clinic-track {
+  flex: 1; height: 8px; border-radius: 999px; background: #e4e9ef; overflow: hidden;
+}
+.clinic-fill { height: 100%; background: var(--ok); border-radius: 999px; }
+.clinic-count { font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.clinic-when {
+  display: flex; align-items: baseline; gap: 10px;
+  border-top: 1px solid var(--line); padding-top: 14px;
+}
+.clinic-when-label { color: var(--ink-soft); font-size: 15px; }
+.clinic-when-time { font-size: 19px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.clinic-when-left { margin-left: auto; color: var(--ink-soft); font-size: 15px; }
+.clinic-when-left.is-late { color: var(--safety); font-weight: 650; }
+
 /* ---- cards and rows ------------------------------------------------------- */
 
 .group { margin-bottom: 26px; }
@@ -91,6 +131,20 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .row-go { color: var(--ink-soft); font-size: 22px; line-height: 1; }
 .row.is-overdue { border-color: #f0c2c4; }
 .row.is-blocked { background: var(--warn-tint); border-color: #ecd9a8; }
+
+/* ---- the thing happening right now ---------------------------------------- */
+
+.current {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 18px 18px 16px; margin-bottom: 26px;
+}
+.current-label {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--ink-soft); margin-bottom: 6px;
+}
+.current-title {
+  font-size: 21px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 14px;
+}
 
 /* ---- the checklist -------------------------------------------------------- */
 

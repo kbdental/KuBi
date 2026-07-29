@@ -25,7 +25,7 @@ import {
   evaluateGate, TaskAuthorizationError, GateBlockedError, PROBLEM_KINDS,
 } from './platform/workflow/task.service.js';
 import { writeAudit, AuditAction } from './platform/audit/audit.service.js';
-import { clinicLocalDate } from './platform/workflow/scheduler.service.js';
+import { clinicLocalDate, clinicLocalTimeToUtc } from './platform/workflow/scheduler.service.js';
 import { ActivityStatus, ExceptionStatus } from '@kubi/contracts';
 
 const clock = systemClock;
@@ -42,24 +42,45 @@ function bucketFor(dueAt: Date, status: string, now: Date): Bucket {
 }
 
 /**
- * Today's opening set at this person's clinic, as counts only.
+ * Where the CLINIC is, right now — not where this person's task list is.
  *
- * "The clinic is open" is a clinic-level fact — one person finishing their own
- * three tasks does not mean it happened — so this looks at the whole opening
- * set for today's clinic-local date. It returns numbers and nothing else: no
- * titles, no assignees, no names (Q6).
+ * The whole point: someone arriving should know where they are, what phase the
+ * clinic is in, whether it is ready, and how long is left, before they think
+ * about anything they personally have to do.
  *
- * Returns null when there is no opening set today (a non-working day, or
- * before generation has run). Absent is not the same as complete, and must
- * never render as "the clinic is open".
+ * Everything here is a clinic-level fact for today's clinic-local date. One
+ * person finishing their own three tasks does not mean the clinic opened.
+ * Counts and times only — no titles, no assignees, no names (Q6).
+ *
+ * `phase` is null when there is no opening set today (a non-working day, or
+ * before generation has run). Absent is not the same as ready, and must never
+ * render as "the clinic is open".
  */
-async function openingStatus(
+async function clinicContext(
   tx: Parameters<Parameters<typeof withTenantContext>[2]>[0],
   clinicIds: readonly string[],
   now: Date,
-): Promise<{ total: number; done: number; complete: boolean } | null> {
+): Promise<{
+  name: string;
+  /**
+   * The CLINIC's timezone. Every time on screen is formatted with this, not
+   * with the viewer's browser zone -- "ready by 09:00" must mean nine o'clock
+   * at the clinic, whoever is looking and from wherever.
+   */
+  timezone: string;
+  phase: 'OPENING' | 'OPEN' | null;
+  opening: { total: number; done: number; complete: boolean } | null;
+  readyBy: Date | null;
+  /**
+   * When the first patient is expected. Always null until appointment
+   * integration lands — the field exists so the screen is built against the
+   * real shape, and it is never populated with a guess.
+   */
+  firstPatientAt: Date | null;
+} | null> {
   const clinicId = clinicIds[0];
-  if (clinicIds.length !== 1 || !clinicId) return null; // cross-clinic has no single "today"
+  // Someone who can see every clinic has no single "here" to report.
+  if (clinicIds.length !== 1 || !clinicId) return null;
 
   const clinic = await tx.clinic.findUnique({ where: { id: clinicId } });
   if (!clinic) return null;
@@ -69,12 +90,28 @@ async function openingStatus(
     where: { clinicId, periodKey },
     select: { status: true },
   });
-  if (rows.length === 0) return null;
+
+  const base = { name: clinic.name, timezone: clinic.timezone, firstPatientAt: null };
+  if (rows.length === 0) return { ...base, phase: null, opening: null, readyBy: null };
 
   const done = rows.filter(
     (r) => r.status === ActivityStatus.COMPLETED || r.status === ActivityStatus.VERIFIED,
   ).length;
-  return { total: rows.length, done, complete: done === rows.length };
+  const complete = done === rows.length;
+
+  // The deadline is the clinic's own configured opening time, read from
+  // configuration rather than assumed (D-01, OD-19).
+  const cfg = await tx.configValue.findFirst({
+    where: { organizationId: clinic.organizationId, clinicId, key: 'clinic.opening_time' },
+  });
+  const openingTime = (cfg?.valueJson as { value?: string } | null)?.value ?? null;
+
+  return {
+    ...base,
+    phase: complete ? 'OPEN' : 'OPENING',
+    opening: { total: rows.length, done, complete },
+    readyBy: openingTime ? clinicLocalTimeToUtc(periodKey, openingTime, clinic.timezone) : null,
+  };
 }
 
 async function requireSession(req: FastifyRequest): Promise<ResolvedSession> {
@@ -188,6 +225,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       return {
         buckets: { OVERDUE: [], NOW: [], NEXT: [], LATER: [] },
         attentionCount: 0,
+        clinic: null,
         opening: null,
       };
     }
@@ -222,7 +260,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       // Counts only. No titles, no assignees, nothing about who did what:
       // seeing that opening is complete is not the same as being allowed to
       // read other people's tasks, and Q6 keeps names off the screen anyway.
-      const opening = await openingStatus(tx, s.tenancy.clinicIds, now);
+      const clinic = await clinicContext(tx, s.tenancy.clinicIds, now);
 
       const buckets: Record<Bucket, unknown[]> = { OVERDUE: [], NOW: [], NEXT: [], LATER: [] };
       for (const i of instances) {
@@ -237,7 +275,7 @@ export async function buildServer(): Promise<FastifyInstance> {
           blockedBy: blocker ? blocker.headline : null,
         });
       }
-      return { buckets, attentionCount, opening };
+      return { buckets, attentionCount, clinic, opening: clinic?.opening ?? null };
     });
 
     await track(s, 'view_today');

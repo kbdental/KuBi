@@ -28,7 +28,7 @@ const STAGES = [
   {
     id: 'the-day',
     title: 'The day',
-    lead: 'Priya signs in and the work is simply there — no menu, no search, no choosing. Sections are named the way someone would say them out loud. Tabs appear only when they have something behind them, so an assistant who checks nobody’s work never sees a Checks tab.',
+    lead: 'The screen answers where the clinic is before it says anything about one person\'s tasks — clinic, time, phase, how many areas are ready, how long is left. Under that, the thing happening now is already open: the morning starts with work, not with a menu. Everything still to come is listed below. Every time shown is the <em>clinic\'s</em> time, not the viewer\'s.',
     shots: [
       ['03-today', 'Today, with work waiting'],
       ['07-today-after', 'After finishing one'],
@@ -131,6 +131,7 @@ const FIXED = [
   ['Severity pill overlapped the back button', 'The back control was inline, so the pill landed on top of it.'],
   ['Empty day said the same thing twice', '“Nothing waiting.” above “You’re all clear”.'],
   ['Two warnings saying one thing', 'After the server refused, the original “can’t confirm” banner stayed up alongside the refusal, stacking three notices on one screen.'],
+  ['Times shown in the wrong timezone', 'Every time rendered in the viewer’s browser zone, so the clinic’s 09:00 opening displayed as 03:30. Now formatted in the clinic’s own timezone everywhere — a manager checking from home sees clinic time.'],
 ];
 
 const shotHtml = ([file, caption]) => `
@@ -308,19 +309,21 @@ const html = `<title>KuBi VS-01 — Usability Review</title>
 <div class="wrap">
   <header class="masthead">
     <p class="eyebrow">KuBi · Vertical Slice 01 · Clinic Opening</p>
-    <h1>Your review, applied</h1>
+    <h1>Where the clinic is</h1>
     <p class="standfirst">
-      All six decisions are in, plus the three additions you asked for.
-      Recaptured from the running system against synthetic data — this is what
-      a person meets now, not what was proposed. One decision created a
-      knock-on that needs your call; it is called out below.
+      Today now opens with the clinic, not with a task list: which clinic, what
+      time, what phase, how ready, how long is left. Underneath it, the thing
+      being done right now is already open — no tap to get into it. All six
+      review decisions are in as well. Recaptured from the running system
+      against synthetic data.
     </p>
     <ul class="facts">
       <li><b>6</b> decisions applied</li>
-      <li><b>3</b> additions built</li>
+      <li>opening a task: <b>0</b> taps</li>
+      <li>a 5-item checklist: <b>7 → 6</b></li>
       <li><b>19</b> screens recaptured</li>
-      <li><b>97</b> tests passing</li>
-      <li><b>1</b> thing needs your call</li>
+      <li><b>105</b> tests passing</li>
+      <li><b>2</b> things need your call</li>
     </ul>
   </header>
 
@@ -367,6 +370,33 @@ const html = `<title>KuBi VS-01 — Usability Review</title>
       until emergency inventory is built, which is arguably the honest state
       of the clinic. Costs you the completion confirmation for now.
     </p>
+    <h2 style="margin-top:44px">Seven taps, challenged</h2>
+    <p class="lead">
+      Worth separating what is work from what is overhead. Opening the clinic
+      is a five-item checklist, and it cost 7 taps.
+    </p>
+    <p class="lead">
+      <strong>Five of those are the work.</strong> Each tick is a person
+      asserting that something is actually true. Collapsing them into one
+      "all good" button would get to 3 taps immediately and would also turn
+      the checklist into a signature — the exact failure the Checks screen
+      exists to prevent. Those five stay.
+    </p>
+    <p class="lead">
+      <strong>Two were overhead:</strong> one tap to open the task, one to
+      finish it. The first is now gone — the current task is open on Today
+      when you arrive. That is <strong>6</strong>, and every remaining tap
+      means something.
+    </p>
+    <p class="lead">
+      Getting to <strong>5</strong> means removing Finish, by committing when
+      the last item is ticked. That is genuinely possible, and it changes what
+      the last tick means: from "this item is true" to "this item is true and
+      I am done". I would want a short undo window with it, which is a real
+      state reversal rather than a UI change — so it is your call, not one to
+      slip in. Say the word and it is a small piece of work.
+    </p>
+
     <h2 style="margin-top:44px">How to give feedback</h2>
     <p class="lead">
       VS-01 is still frozen except for defect fixes. The test is one question:

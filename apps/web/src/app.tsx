@@ -91,7 +91,7 @@ export function App() {
   return (
     <div className="app">
       {place === 'TODAY' && (
-        <Today day={data.day} onOpenTask={(id) => void open(id)} />
+        <Today day={data.day} onOpenTask={(id) => void open(id)} onRefresh={reload} />
       )}
       {place === 'ATTENTION' && <Attention items={data.attention} onResolved={reload} />}
       {place === 'CHECKS' && <Checks items={data.checks} onDone={reload} />}

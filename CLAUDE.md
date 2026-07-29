@@ -23,6 +23,19 @@ EXCEPTION → ESCALATION → CORRECTION → CAPA → KPI → IMPROVEMENT.
 6. **Synthetic data only.** No production data or credentials in any
    non-production environment, ever.
 
+## The design principle (owner, VS-01 review)
+
+> KuBi should feel less like completing tasks and more like running a clinic.
+> Every screen should reinforce where the clinic is in its day, not just what
+> an individual needs to click next.
+
+Design against "what does Priya do between 9:00 and 10:00?", never "which
+screen does Priya open?". Say where the clinic is before what one person owes;
+put the current work in front of them rather than a menu; make every remaining
+tap mean something. Never imply a state you do not have — no opening set is not
+"ready", and absent appointment data is not a guessed first-patient time.
+See docs/design-principle.md.
+
 ## Architectural constraints
 
 - **Every tenant-scoped query runs inside `prisma.$transaction`.** RLS context
