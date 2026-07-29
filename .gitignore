@@ -13,3 +13,4 @@ coverage/
 
 # Generated from docs/screens/ by scripts/build-usability-review.mjs
 docs/vs-01-usability-review.html
+docs/vs-02-owner-review-pack.html
