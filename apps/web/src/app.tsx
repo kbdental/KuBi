@@ -86,11 +86,13 @@ export function App() {
   if (openTask) {
     return (
       <div className="app">
-        <TaskSheetScreen
-          sheet={openTask}
-          onBack={() => setOpenTask(null)}
-          onFinished={() => { setOpenTask(null); reload(); }}
-        />
+        <main className="main">
+          <TaskSheetScreen
+            sheet={openTask}
+            onBack={() => setOpenTask(null)}
+            onFinished={() => { setOpenTask(null); reload(); }}
+          />
+        </main>
       </div>
     );
   }
@@ -107,6 +109,34 @@ export function App() {
 
   return (
     <div className="app">
+      <nav className="nav">
+        <div className="nav-brand">
+          <span className="nav-mark">KuBi</span>
+          {data.day.clinic && <span className="nav-clinic">{data.day.clinic.name}</span>}
+        </div>
+        <div className="nav-items">
+          <Tab id="TODAY" label="Today" now={place} go={setPlace} />
+          {data.schedule.rows.length > 0 && (
+            <Tab id="CLINIC" label="Clinic" now={place} go={setPlace} />
+          )}
+          <Tab
+            id="ATTENTION"
+            label="Attention"
+            now={place}
+            go={setPlace}
+            count={data.attention.length}
+          />
+          {showChecks && (
+            <Tab id="CHECKS" label="Checks" now={place} go={setPlace} count={data.checks.length} />
+          )}
+          <Tab id="ME" label="Me" now={place} go={setPlace} />
+        </div>
+        <div className="nav-who">
+          <span className="nav-who-name">{data.me.displayLabel}</span>
+        </div>
+      </nav>
+
+      <main className="main">
       {place === 'TODAY' && (
         <Today day={data.day} onOpenTask={(id) => void open(id)} onRefresh={reload} />
       )}
@@ -128,24 +158,7 @@ export function App() {
       {place === 'ME' && (
         <MeScreen me={data.me} onSignedOut={() => { setData(null); setPlace('TODAY'); }} />
       )}
-
-      <nav className="tabs">
-        <Tab id="TODAY" label="Today" now={place} go={setPlace} />
-        {data.schedule.rows.length > 0 && (
-          <Tab id="CLINIC" label="Clinic" now={place} go={setPlace} />
-        )}
-        <Tab
-          id="ATTENTION"
-          label="Attention"
-          now={place}
-          go={setPlace}
-          count={data.attention.length}
-        />
-        {showChecks && (
-          <Tab id="CHECKS" label="Checks" now={place} go={setPlace} count={data.checks.length} />
-        )}
-        <Tab id="ME" label="Me" now={place} go={setPlace} />
-      </nav>
+      </main>
     </div>
   );
 }

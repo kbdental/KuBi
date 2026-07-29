@@ -76,6 +76,7 @@ export function Clinic({
         </div>
       )}
 
+      <div className="visit-list">
       {rows.map((row) => {
         const step = NEXT_STEP[row.status];
         const done = row.status === 'COMPLETED' || row.status === 'CANCELLED' || row.status === 'NO_SHOW';
@@ -125,6 +126,7 @@ export function Clinic({
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

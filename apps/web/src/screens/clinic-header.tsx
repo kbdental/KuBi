@@ -111,6 +111,7 @@ export function ClinicHeader({ clinic }: { clinic: ClinicContext }) {
         </div>
       )}
 
+      <div className="clinic-facts">
       {/* The deadline is the clinic's own configured opening time. Once the
           clinic is open there is nothing left to count down to. */}
       {ready && !open && (
@@ -146,6 +147,7 @@ export function ClinicHeader({ clinic }: { clinic: ClinicContext }) {
           </div>
         );
       })()}
+      </div>
     </header>
   );
 }

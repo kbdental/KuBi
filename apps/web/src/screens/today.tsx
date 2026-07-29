@@ -50,9 +50,21 @@ export function Today({
       {/* Where the clinic is, before what any one person has to do. */}
       {day.clinic && <ClinicHeader clinic={day.clinic} />}
 
-      {current && (
-        <CurrentTask key={current.id} taskId={current.id} onOpenFull={onOpenTask} onDone={onRefresh} />
-      )}
+      {/* Two columns on a laptop, stacked on a phone. The thing being done
+          gets the wider side; what is still to come sits alongside instead of
+          being pushed below the fold on a screen with room to spare. */}
+      <div className="today-columns">
+        <div className="today-main">
+          {current && (
+            <CurrentTask
+              key={current.id}
+              taskId={current.id}
+              onOpenFull={onOpenTask}
+              onDone={onRefresh}
+            />
+          )}
+        </div>
+        <div className="today-side">
 
       {/* When there is nothing, the empty state below says so. Saying it twice
           in two different ways reads as a system repeating itself. */}
@@ -86,6 +98,8 @@ export function Today({
           </section>
         );
       })}
+        </div>
+      </div>
     </div>
   );
 }

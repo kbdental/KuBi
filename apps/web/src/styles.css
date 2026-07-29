@@ -64,32 +64,42 @@ body {
    default — which reads as "terminal", not "clinic". */
 button, input, textarea, select { font: inherit; color: inherit; }
 
-/* ---- layout --------------------------------------------------------------- */
+/* ---- the shell ------------------------------------------------------------
+ *
+ * One layout, two shapes. On a phone the navigation is a bar along the bottom
+ * where a thumb reaches; on a laptop it is a sidebar, and the content spreads
+ * into the room it has instead of pretending to be a phone.
+ *
+ * The same markup serves both: a phone-shaped app blown up to fill a monitor
+ * is the thing that makes software look unfinished.
+ * ------------------------------------------------------------------------- */
 
 .app { display: flex; flex-direction: column; min-height: 100%; }
-.screen { flex: 1; padding: 20px 18px 96px; max-width: 720px; width: 100%; margin: 0 auto; }
+.main { flex: 1; min-width: 0; }
+.screen { padding: 20px 18px 104px; max-width: 760px; width: 100%; margin: 0 auto; }
 .screen-title { font-size: 28px; font-weight: 700; margin: 4px 0 3px; letter-spacing: -0.022em; }
 .screen-sub { color: var(--ink-soft); margin: 0 0 22px; font-size: 16px; }
 
-/* ---- the bar of places you can go ---------------------------------------- */
+.nav-brand, .nav-who { display: none; }
 
-.tabs {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  display: flex;
-  background: rgba(255, 255, 255, .92);
+/* ---- phone: a bar along the bottom ---------------------------------------- */
+
+.nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
+  background: rgba(255, 255, 255, .93);
   backdrop-filter: saturate(1.6) blur(12px);
   -webkit-backdrop-filter: saturate(1.6) blur(12px);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
 }
+.nav-items { display: flex; }
 .tab {
   flex: 1; min-height: 60px; border: 0; background: none;
   padding: 8px 4px 9px; cursor: pointer; color: var(--ink-faint);
   display: flex; flex-direction: column; align-items: center; gap: 3px;
-  transition: color .15s ease;
+  transition: color .15s ease, background .15s ease;
 }
 .tab[aria-current='page'] { color: var(--accent); }
-.tab:active { transform: translateY(0.5px); }
 .tab-icon { position: relative; display: grid; place-items: center; height: 24px; }
 .tab-label { font-size: 11.5px; font-weight: 600; letter-spacing: 0.01em; }
 .tab-count {
@@ -98,6 +108,61 @@ button, input, textarea, select { font: inherit; color: inherit; }
   min-width: 18px; height: 18px; padding: 0 5px;
   font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
   box-shadow: 0 0 0 2px var(--card);
+}
+
+/* ---- laptop: a sidebar, and content that uses the width ------------------- */
+
+@media (min-width: 900px) {
+  .app { flex-direction: row; align-items: stretch; }
+
+  .nav {
+    position: sticky; top: 0; left: auto; right: auto; bottom: auto;
+    height: 100vh; width: 252px; flex: 0 0 252px;
+    display: flex; flex-direction: column;
+    background: var(--card); backdrop-filter: none;
+    border-top: 0; border-right: 1px solid var(--line);
+    padding: 22px 14px 16px;
+  }
+
+  .nav-brand { display: block; padding: 0 10px 22px; }
+  .nav-mark {
+    display: block; font-size: 23px; font-weight: 750; letter-spacing: -0.035em;
+    color: var(--accent);
+  }
+  .nav-clinic {
+    display: block; font-size: 13px; color: var(--ink-faint); margin-top: 3px;
+    line-height: 1.3;
+  }
+
+  .nav-items { flex-direction: column; gap: 2px; flex: 1; }
+  .tab {
+    flex: 0 0 auto; flex-direction: row; justify-content: flex-start;
+    gap: 12px; min-height: 44px; padding: 9px 10px; border-radius: 10px;
+  }
+  .tab:hover { background: #f2f5f7; color: var(--ink); }
+  .tab[aria-current='page'] { background: var(--accent-soft); color: var(--accent); }
+  .tab-label { font-size: 15px; font-weight: 600; letter-spacing: -0.008em; }
+  /* In a row the badge belongs at the end of the line, not stuck on the icon.
+     `display: contents` dissolves the icon wrapper so both the glyph and the
+     badge become children of the row itself. */
+  .tab-icon { display: contents; }
+  /* Dissolving the wrapper puts the badge before the label in source order,
+     so the row is re-ordered explicitly: glyph, label, then the count. */
+  .tab-icon > svg { order: 1; }
+  .tab-label { order: 2; }
+  .tab-count {
+    order: 3; position: static; margin-left: auto; box-shadow: none;
+    min-width: 21px; height: 20px; line-height: 20px; font-size: 11.5px;
+  }
+
+  .nav-who {
+    display: block; border-top: 1px solid var(--line); padding: 13px 10px 2px;
+  }
+  .nav-who-name { font-size: 13.5px; color: var(--ink-soft); font-weight: 550; }
+
+  .main { overflow-x: hidden; }
+  .screen { max-width: 1120px; padding: 30px 34px 44px; }
+  .screen-title { font-size: 31px; }
 }
 
 /* ---- where the clinic is -------------------------------------------------- */
@@ -152,6 +217,27 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .clinic-when-time { font-size: 19px; font-weight: 680; letter-spacing: -0.02em; }
 .clinic-when-left { margin-left: auto; color: var(--ink-faint); font-size: 14.5px; }
 .clinic-when-left.is-late { color: var(--safety); font-weight: 680; }
+
+/* ---- Today, in two columns where there is room --------------------------- */
+
+.today-columns { display: block; }
+.today-main, .today-side { min-width: 0; }
+
+@media (min-width: 1080px) {
+  /* Side by side rather than stacked: on a wide screen the three facts about
+     the clinic read as one glance instead of a column to scan. */
+  .clinic-when { border-top: 0; padding-top: 0; }
+  .clinic-facts {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+    border-top: 1px solid var(--line); padding-top: 14px;
+  }
+  .clinic.is-open .clinic-facts { border-top-color: var(--accent-line); }
+
+  .today-columns {
+    display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 26px; align-items: start;
+  }
+}
 
 /* ---- cards and rows ------------------------------------------------------- */
 
@@ -301,6 +387,15 @@ button, input, textarea, select { font: inherit; color: inherit; }
 /* A status pill must never wrap -- a three-line pill reads as a bug. */
 .pill { white-space: nowrap; }
 
+/* On a wide screen the day is a board, not a single tall column. */
+@media (min-width: 1080px) {
+  .visit-list {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+    gap: 12px; align-items: start;
+  }
+  .visit { margin-bottom: 0; }
+}
+
 /* ---- notices -------------------------------------------------------------- */
 
 .notice {
@@ -409,40 +504,17 @@ label.field-label {
   background: transparent; border: 1px solid rgba(255, 255, 255, 0.24); color: #cfd6de;
   border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; min-height: 34px;
 }
-.demo-app {
-  max-width: 480px; margin: 0 auto; background: var(--page);
-  min-height: calc(100vh - 96px);
-}
-/* The tab bar is fixed to the viewport; keep it inside the phone-width column. */
-.demo-app .tabs { max-width: 480px; margin: 0 auto; }
+/* The app is genuinely responsive now, so the demo does not dress it up as a
+   phone — it fills whatever it is opened on. On a laptop the bar and the app
+   share the viewport exactly, worked out by the layout rather than by
+   guessing the bar's height. */
+.demo-app { min-height: calc(100vh - 96px); }
 
-/* On a laptop the app would otherwise float in a void. Give the page a ground
-   so it reads as a device being looked at, not a broken website. */
-@media (min-width: 760px) {
-  body {
-    background:
-      radial-gradient(1100px 620px at 50% -12%, #eef2f5 0%, transparent 62%),
-      #dde4ea;
-  }
-  /* A real device viewport: fixed height, scrolling inside, tab bar pinned to
-     the frame. Without this the bar falls below the fold on a laptop and the
-     app stops looking like an app. */
-  .demo-app {
-    box-shadow: 0 1px 3px rgba(16, 26, 34, .10), 0 26px 60px -22px rgba(16, 26, 34, .34);
-    border-radius: 24px; overflow: hidden;
-    margin: 24px auto;
-    /* The base rule sets a min-height for phones; it would win over this and
-       push the frame past the fold, so it is cleared here deliberately. */
-    min-height: 0;
-    height: min(900px, calc(100vh - 150px));
-    display: flex; flex-direction: column;
-  }
+@media (min-width: 900px) {
+  #root { display: flex; flex-direction: column; height: 100vh; }
+  .demo-bar { flex: 0 0 auto; }
+  .demo-app { flex: 1; min-height: 0; display: flex; }
   .demo-app .app { flex: 1; min-height: 0; }
-  .demo-app .screen { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 28px; }
-  .demo-app .tabs {
-    position: relative; border-radius: 0;
-    width: 100%; max-width: none; left: auto; right: auto;
-  }
-  /* The sign-in screen is not inside .app, so it needs the same treatment. */
-  .demo-app .signin { overflow-y: auto; }
+  .demo-app .nav { height: 100%; position: relative; top: auto; }
+  .demo-app .main { overflow-y: auto; }
 }
