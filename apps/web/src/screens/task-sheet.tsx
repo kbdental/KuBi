@@ -94,7 +94,8 @@ export function TaskSheetScreen({
     }
   }
 
-  const everythingTicked = sheet.items.every((i) => ticks[i.id]);
+  const ticked = sheet.items.filter((i) => ticks[i.id]).length;
+  const everythingTicked = ticked === sheet.items.length;
 
   if (panel === 'DONE' && result) {
     return <Finished sheet={sheet} result={result} onBack={onFinished} />;
@@ -136,7 +137,9 @@ export function TaskSheetScreen({
         </div>
       )}
 
-      {sheet.cantConfirm && (
+      {/* Once the server has refused, its message says this and more. Showing
+          both stacks two warnings that mean the same thing. */}
+      {sheet.cantConfirm && !refusal && (
         <div className="notice notice-warn">
           <div className="notice-title">{sheet.cantConfirm}</div>
           Tell us what you can see, and we&rsquo;ll take it from there.
@@ -154,6 +157,28 @@ export function TaskSheetScreen({
         <div className="notice notice-calm">
           When you finish, someone else will confirm this. We&rsquo;ll ask them — you don&rsquo;t
           need to find anyone.
+        </div>
+      )}
+
+      {/* Usability review: show progress through the list. On a five-item
+          checklist a person can count for themselves — the value is on the
+          longer ones, and in knowing the tick registered. */}
+      {sheet.items.length > 0 && (
+        <div className="progress">
+          <div
+            className="progress-track"
+            role="progressbar"
+            aria-valuenow={ticked}
+            aria-valuemin={0}
+            aria-valuemax={sheet.items.length}
+            aria-label="Checklist progress"
+          >
+            <div
+              className="progress-fill"
+              style={{ width: `${(ticked / sheet.items.length) * 100}%` }}
+            />
+          </div>
+          <span className="progress-count">{ticked} of {sheet.items.length} done</span>
         </div>
       )}
 

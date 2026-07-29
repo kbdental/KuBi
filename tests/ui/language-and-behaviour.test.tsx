@@ -46,6 +46,7 @@ const day: MyDay = {
     NEXT: [], LATER: [],
   },
   attentionCount: 1,
+  opening: { total: 5, done: 3, complete: false },
 };
 
 const sheet: TaskSheet = {
@@ -95,7 +96,7 @@ describe('the screens speak clinic language, never the engine’s', () => {
 
   it('Attention renders severity as words a person would say', () => {
     render(<Attention items={attention} onResolved={() => {}} />);
-    expect(screen.getByText('Patient safety')).toBeDefined();
+    expect(screen.getByText('Patient Safety')).toBeDefined();
     expect(visibleText()).not.toMatch(NEVER_ON_SCREEN);
   });
 
@@ -186,7 +187,7 @@ describe('Attention answers the five questions a person actually has', () => {
   it('shows what happened, how serious, whose it is, and by when', () => {
     render(<Attention items={attention} onResolved={() => {}} />);
     expect(screen.getByText('Oxygen cylinder is not working')).toBeDefined(); // what
-    expect(screen.getByText('Patient safety')).toBeDefined();                  // how serious
+    expect(screen.getByText('Patient Safety')).toBeDefined();                  // how serious
     expect(screen.getByText('Yours')).toBeDefined();                           // whose
     expect(screen.getByText(/Needed within \d+ min/)).toBeDefined();           // by when
   });
@@ -200,17 +201,99 @@ describe('Attention answers the five questions a person actually has', () => {
 });
 
 describe('Checks makes disagreeing as easy as agreeing', () => {
-  it('offers both answers on the first screen', () => {
+  /** The check screen loads what was recorded; stub it for these. */
+  function stubDetail(items = [
+    { id: 'i1', label: 'Every room clean', checked: true, value: null, unit: null },
+    { id: 'i2', label: 'Instruments laid out', checked: false, value: null, unit: null },
+  ]) {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      new Response(
+        JSON.stringify({
+          id: 'c', title: 'Get treatment rooms ready', standard: null,
+          completedAt: new Date().toISOString(), items,
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ));
+  }
+
+  it('offers both answers, once the work is on screen', async () => {
+    stubDetail();
     render(<Checks items={checks} onDone={() => {}} />);
     fireEvent.click(screen.getByText('Get treatment rooms ready'));
+    await waitFor(() => expect(screen.getByText('Every room clean')).toBeDefined());
     expect(screen.getByRole('button', { name: 'Looks right' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'Not right' })).toBeDefined();
   });
 
-  it('sending work back requires saying what was wrong', () => {
+  it('sending work back requires saying what was wrong', async () => {
+    stubDetail();
     render(<Checks items={checks} onDone={() => {}} />);
     fireEvent.click(screen.getByText('Get treatment rooms ready'));
+    await waitFor(() => expect(screen.getByText('Every room clean')).toBeDefined());
     fireEvent.click(screen.getByRole('button', { name: 'Not right' }));
     expect(screen.getByRole('button', { name: 'Send it back' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('Q5: shows every item as recorded, including the ones NOT ticked', async () => {
+    stubDetail();
+    render(<Checks items={checks} onDone={() => {}} />);
+    fireEvent.click(screen.getByText('Get treatment rooms ready'));
+
+    await waitFor(() => expect(screen.getByText('What was recorded')).toBeDefined());
+    expect(screen.getByText('Every room clean')).toBeDefined();
+    // The unticked one is the whole point — it must not be quietly omitted.
+    expect(screen.getByText('Instruments laid out')).toBeDefined();
+    expect(visibleText()).not.toMatch(NEVER_ON_SCREEN);
+  });
+
+  it('Q5: cannot confirm before the work has actually loaded', () => {
+    // A confirmation given before seeing anything is exactly what Q5 exists
+    // to prevent, so the button waits.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(() => {}));
+    render(<Checks items={checks} onDone={() => {}} />);
+    fireEvent.click(screen.getByText('Get treatment rooms ready'));
+    expect(screen.getByRole('button', { name: 'Looks right' }).hasAttribute('disabled')).toBe(true);
+  });
+});
+
+describe('the review decisions, on screen', () => {
+  it('Q4: severity reads as what is being asked of you', () => {
+    const rows: AttentionRow[] = [
+      { ...attention[0]!, id: 'a', severity: 'PATIENT_SAFETY' },
+      { ...attention[0]!, id: 'b', severity: 'CRITICAL', headline: 'Autoclave cycle failed' },
+      { ...attention[0]!, id: 'c', severity: 'IMPORTANT', headline: 'Gloves running low' },
+      { ...attention[0]!, id: 'd', severity: 'ROUTINE', headline: 'Waste collection due' },
+    ];
+    render(<Attention items={rows} onResolved={() => {}} />);
+    expect(screen.getByText('Patient Safety')).toBeDefined();
+    expect(screen.getByText('Needs Immediate Action')).toBeDefined();
+    expect(screen.getByText('Needs Attention')).toBeDefined();
+    expect(screen.getByText('Routine')).toBeDefined();
+  });
+
+  it('shows progress through the checklist, and counts up as items are ticked', () => {
+    render(<TaskSheetScreen sheet={sheet} onBack={() => {}} onFinished={() => {}} />);
+    expect(screen.getByText('0 of 2 done')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: /Oxygen cylinder/ }));
+    expect(screen.getByText('1 of 2 done')).toBeDefined();
+  });
+
+  it('confirms the clinic is open only when the opening set is actually complete', () => {
+    const done: MyDay = { ...day, opening: { total: 5, done: 5, complete: true } };
+    render(<Today day={done} onOpenTask={() => {}} />);
+    expect(screen.getByText('The clinic is open')).toBeDefined();
+  });
+
+  it('says nothing about opening when it is only partly done', () => {
+    const partly: MyDay = { ...day, opening: { total: 5, done: 3, complete: false } };
+    render(<Today day={partly} onOpenTask={() => {}} />);
+    expect(screen.queryByText('The clinic is open')).toBeNull();
+  });
+
+  it('says nothing about opening when there is no opening set at all', () => {
+    // Absent is not complete. A closed day must never read as "open".
+    const none: MyDay = { ...day, opening: null };
+    render(<Today day={none} onOpenTask={() => {}} />);
+    expect(screen.queryByText('The clinic is open')).toBeNull();
   });
 });

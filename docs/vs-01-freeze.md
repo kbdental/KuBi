@@ -140,6 +140,46 @@ this freeze:
 
 ---
 
+## 5a. Amendments made under this freeze
+
+Usability review, round 1. Recorded here so the frozen surface is never
+silently different from this document.
+
+**Approved expansion (owner, explicitly):**
+
+- `GET /api/v1/checks/:id` — new endpoint. The checker sees each checklist item
+  as it was recorded. Approved on the grounds that it strengthens independent
+  verification rather than adding business capability: confirming work without
+  seeing what was claimed is a signature, not a check. Returns no names (Q6).
+- `GET /api/v1/my-day` — added `opening: { total, done, complete } | null`, for
+  the completion confirmation the owner asked for. Counts only. `null` means
+  there is no opening set today and must never render as "the clinic is open".
+
+**Behaviour changes inside the frozen surface:**
+
+- `POST /api/v1/tasks/:id/complete` — overriding a blocking gate now requires
+  `activity_instance:override_gate`, held by Owner/Director, Clinic Head,
+  Clinical Director and Clinic Manager. No request or response field changed;
+  `canOverride` now answers "can *you*", which is what the screen needed it to
+  mean all along.
+- New permission `activity_instance:override_gate` (71 in the catalogue).
+
+**Display only:** severity labels are now Patient Safety / Needs Immediate
+Action / Needs Attention / Routine. The underlying severities are unchanged.
+
+**Open consequence of Q2 — awaiting owner decision.** OPN-005's doer is the
+assigned assistant, and only the assignee may complete a task. The authority to
+proceed without confirmation now sits with the manager. So no one can currently
+finish that activity: the person who may decide cannot act, and the person who
+may act cannot decide. It fails closed, which is the right direction, but
+opening never reads as complete. Options put to the owner: (A) a manager
+authorises the specific instance, then the assignee finishes it; (B) configure
+emergency readiness as advisory until the inventory module lands; (C) leave it
+visibly incomplete. **Not to be resolved without an answer** — working agreement
+non-negotiable 4.
+
+---
+
 ## 6. Change control
 
 Any change to a frozen item requires: the defect stated plainly, the smallest

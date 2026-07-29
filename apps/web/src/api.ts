@@ -66,9 +66,21 @@ export interface TaskRow {
   blockedBy: string | null;
 }
 
+/**
+ * Today's opening set at this clinic, as counts. `null` when there is no
+ * opening set today — which is NOT the same as complete and must never be
+ * rendered as "the clinic is open".
+ */
+export interface OpeningStatus {
+  total: number;
+  done: number;
+  complete: boolean;
+}
+
 export interface MyDay {
   buckets: Record<BucketName, TaskRow[]>;
   attentionCount: number;
+  opening: OpeningStatus | null;
 }
 
 export interface SheetItem {
@@ -119,6 +131,21 @@ export interface CheckRow {
   standard: string | null;
 }
 
+/** What the checker sees: the work as it was actually recorded. No names (Q6). */
+export interface CheckDetail {
+  id: string;
+  title: string;
+  standard: string | null;
+  completedAt: string;
+  items: Array<{
+    id: string;
+    label: string;
+    checked: boolean;
+    value: number | null;
+    unit: string | null;
+  }>;
+}
+
 export interface ChecklistAnswer {
   itemId: string;
   checked: boolean;
@@ -148,6 +175,7 @@ export const api = {
     post<{ ok: boolean }>(`/api/v1/attention/${id}/resolve`, { note }),
 
   checks: () => call<CheckRow[]>('/api/v1/checks'),
+  check: (id: string) => call<CheckDetail>(`/api/v1/checks/${id}`),
   submitCheck: (id: string, result: 'PASS' | 'FAIL', comment?: string) =>
     post<{ status: string }>(`/api/v1/checks/${id}`, { result, ...(comment ? { comment } : {}) }),
 };

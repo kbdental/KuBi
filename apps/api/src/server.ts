@@ -25,6 +25,7 @@ import {
   evaluateGate, TaskAuthorizationError, GateBlockedError, PROBLEM_KINDS,
 } from './platform/workflow/task.service.js';
 import { writeAudit, AuditAction } from './platform/audit/audit.service.js';
+import { clinicLocalDate } from './platform/workflow/scheduler.service.js';
 import { ActivityStatus, ExceptionStatus } from '@kubi/contracts';
 
 const clock = systemClock;
@@ -38,6 +39,42 @@ function bucketFor(dueAt: Date, status: string, now: Date): Bucket {
   if (mins <= 60) return 'NOW';
   if (mins <= 240) return 'NEXT';
   return 'LATER';
+}
+
+/**
+ * Today's opening set at this person's clinic, as counts only.
+ *
+ * "The clinic is open" is a clinic-level fact — one person finishing their own
+ * three tasks does not mean it happened — so this looks at the whole opening
+ * set for today's clinic-local date. It returns numbers and nothing else: no
+ * titles, no assignees, no names (Q6).
+ *
+ * Returns null when there is no opening set today (a non-working day, or
+ * before generation has run). Absent is not the same as complete, and must
+ * never render as "the clinic is open".
+ */
+async function openingStatus(
+  tx: Parameters<Parameters<typeof withTenantContext>[2]>[0],
+  clinicIds: readonly string[],
+  now: Date,
+): Promise<{ total: number; done: number; complete: boolean } | null> {
+  const clinicId = clinicIds[0];
+  if (clinicIds.length !== 1 || !clinicId) return null; // cross-clinic has no single "today"
+
+  const clinic = await tx.clinic.findUnique({ where: { id: clinicId } });
+  if (!clinic) return null;
+
+  const periodKey = clinicLocalDate(now, clinic.timezone);
+  const rows = await tx.activityInstance.findMany({
+    where: { clinicId, periodKey },
+    select: { status: true },
+  });
+  if (rows.length === 0) return null;
+
+  const done = rows.filter(
+    (r) => r.status === ActivityStatus.COMPLETED || r.status === ActivityStatus.VERIFIED,
+  ).length;
+  return { total: rows.length, done, complete: done === rows.length };
 }
 
 async function requireSession(req: FastifyRequest): Promise<ResolvedSession> {
@@ -147,7 +184,13 @@ export async function buildServer(): Promise<FastifyInstance> {
   // ---- TODAY ----
   app.get('/api/v1/my-day', async (req) => {
     const s = await requireSession(req);
-    if (!s.employeeId) return { buckets: { OVERDUE: [], NOW: [], NEXT: [], LATER: [] }, attentionCount: 0 };
+    if (!s.employeeId) {
+      return {
+        buckets: { OVERDUE: [], NOW: [], NEXT: [], LATER: [] },
+        attentionCount: 0,
+        opening: null,
+      };
+    }
 
     const now = clock.now();
     const result = await withTenantContext(prisma, s.tenancy, async (tx) => {
@@ -171,6 +214,16 @@ export async function buildServer(): Promise<FastifyInstance> {
         },
       });
 
+      // Usability review: a lightweight confirmation once the clinic is
+      // actually open. Opening is a CLINIC fact, not a personal one — Priya
+      // finishing her three tasks does not mean the clinic opened — so this
+      // counts today's opening set at her clinic, not her own work.
+      //
+      // Counts only. No titles, no assignees, nothing about who did what:
+      // seeing that opening is complete is not the same as being allowed to
+      // read other people's tasks, and Q6 keeps names off the screen anyway.
+      const opening = await openingStatus(tx, s.tenancy.clinicIds, now);
+
       const buckets: Record<Bucket, unknown[]> = { OVERDUE: [], NOW: [], NEXT: [], LATER: [] };
       for (const i of instances) {
         const blocker = blockers.find((b) => b.id === i.blockedByItemId);
@@ -184,7 +237,7 @@ export async function buildServer(): Promise<FastifyInstance> {
           blockedBy: blocker ? blocker.headline : null,
         });
       }
-      return { buckets, attentionCount };
+      return { buckets, attentionCount, opening };
     });
 
     await track(s, 'view_today');
@@ -378,6 +431,62 @@ export async function buildServer(): Promise<FastifyInstance> {
         completedAt: r.completedAt,
         standard: r.definition.standardText,
       }));
+  });
+
+  /**
+   * Usability review Q5: the checker must see what was actually recorded.
+   *
+   * Approved expansion of the VS-01 freeze. It adds no business capability —
+   * it makes the check the system already claimed to perform actually
+   * possible. Confirming work without seeing what was claimed is not
+   * independent verification; it is a signature.
+   *
+   * Deliberately its own endpoint rather than reusing GET /tasks/:id, which is
+   * written from the doer's point of view (isMine, problemKinds, tick state to
+   * edit). A checker is answering a different question and gets a read-only
+   * view shaped for it.
+   */
+  app.get('/api/v1/checks/:id', async (req) => {
+    const s = await requireSession(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+
+    return withTenantContext(prisma, s.tenancy, async (tx) => {
+      const inst = await tx.activityInstance.findUniqueOrThrow({
+        where: { id },
+        include: {
+          definition: { include: { checklistItems: { orderBy: { ordinal: 'asc' } } } },
+          responses: true,
+        },
+      });
+
+      // Segregation of duties is enforced on the POST as well; refusing the
+      // read too means a person is never shown a review screen for their own
+      // work only to be turned away when they act on it.
+      if (inst.completedByEmployeeId === s.employeeId) {
+        throw Object.assign(
+          new Error('You cannot confirm your own work on this task.'),
+          { statusCode: 403 },
+        );
+      }
+
+      return {
+        id: inst.id,
+        title: inst.definition.title,
+        standard: inst.definition.standardText,
+        completedAt: inst.completedAt,
+        // Q6: no names. Who did it stays in the audit trail, off the screen.
+        items: inst.definition.checklistItems.map((it) => {
+          const r = inst.responses.find((x) => x.itemId === it.id);
+          return {
+            id: it.id,
+            label: it.label,
+            checked: r?.checked ?? false,
+            value: r?.numericValue ?? null,
+            unit: it.valueUnit,
+          };
+        }),
+      };
+    });
   });
 
   app.post('/api/v1/checks/:id', async (req) => {

@@ -12,10 +12,15 @@ import { api, type AttentionRow } from '../api.js';
  * may resolve an item is the server's decision, and it makes it when they try.
  */
 
+/**
+ * Usability review Q4. "Urgent" and "Important" were too close to argue about
+ * at 9am — both sound like "soon". These say what is being asked of you
+ * instead: act now, or look at it today.
+ */
 const SEVERITY: Record<string, { label: string; className: string }> = {
-  PATIENT_SAFETY: { label: 'Patient safety', className: 'pill pill-safety' },
-  CRITICAL: { label: 'Urgent', className: 'pill pill-critical' },
-  IMPORTANT: { label: 'Important', className: 'pill pill-important' },
+  PATIENT_SAFETY: { label: 'Patient Safety', className: 'pill pill-safety' },
+  CRITICAL: { label: 'Needs Immediate Action', className: 'pill pill-critical' },
+  IMPORTANT: { label: 'Needs Attention', className: 'pill pill-important' },
   ROUTINE: { label: 'Routine', className: 'pill pill-routine' },
 };
 

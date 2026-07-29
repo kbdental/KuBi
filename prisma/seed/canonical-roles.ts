@@ -64,12 +64,24 @@ const VERIFIES: readonly string[] = [c('activity_instance', 'verify')];
 /** Roles that own and close PROBLEMS. */
 const RESOLVES: readonly string[] = [c('attention_item', 'resolve'), c('activity_instance', 'view_clinic')];
 
+/**
+ * Usability review Q2: deciding it is safe to finish a task whose requirement
+ * cannot be confirmed is management authority, not something the person
+ * holding the checklist should carry at 8:45am.
+ *
+ * Held by management and clinical governance only — deliberately NOT by
+ * TREATING_DOCTOR or SENIOR_ASSISTANT, who can do and check work but do not
+ * carry accountability for proceeding without confirmation. An assistant's
+ * honest path is unchanged and always available: report a problem.
+ */
+const OVERRIDES_CANT_CONFIRM: readonly string[] = [c('activity_instance', 'override_gate')];
+
 export const CANONICAL_ROLES: readonly RoleSeed[] = [
   {
     code: RoleCode.OWNER_DIRECTOR,
     name: 'Owner / Director',
     grants: [
-      ...DOES_WORK, ...VERIFIES, ...RESOLVES,
+      ...DOES_WORK, ...VERIFIES, ...RESOLVES, ...OVERRIDES_CANT_CONFIRM,
       c('organization', 'view'), c('organization', 'update'), c('organization', 'configure'),
       c('clinic', 'view'), c('clinic', 'create'), c('clinic', 'update'), c('clinic', 'archive'), c('clinic', 'configure'),
       c('config_value', 'view'), c('config_value', 'set'), c('config_value', 'view_history'),
@@ -90,7 +102,7 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     // OD-01: management authority only. Deliberately excludes clinical_authority
     // grant/revoke, competency:assess, and any implied clinical grant.
     grants: [
-      ...DOES_WORK, ...VERIFIES, ...RESOLVES,
+      ...DOES_WORK, ...VERIFIES, ...RESOLVES, ...OVERRIDES_CANT_CONFIRM,
       c('organization', 'view'),
       c('clinic', 'view'), c('clinic', 'update'), c('clinic', 'configure'),
       c('config_value', 'view'), c('config_value', 'set'), c('config_value', 'view_history'),
@@ -110,7 +122,7 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     // Governs OTHER people's clinical authority; does not imply the Clinical
     // Director's OWN ClinicalAuthority row, which provisioning grants explicitly.
     grants: [
-      ...DOES_WORK, ...VERIFIES, ...RESOLVES,
+      ...DOES_WORK, ...VERIFIES, ...RESOLVES, ...OVERRIDES_CANT_CONFIRM,
       c('employee', 'view'),
       c('clinical_authority', 'view'), c('clinical_authority', 'grant'), c('clinical_authority', 'revoke'),
       c('functional_assignment', 'view'), c('functional_assignment', 'grant'), c('functional_assignment', 'revoke'),
@@ -133,7 +145,7 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     code: RoleCode.CLINIC_MANAGER,
     name: 'Clinic Manager',
     grants: [
-      ...DOES_WORK, ...VERIFIES, ...RESOLVES,
+      ...DOES_WORK, ...VERIFIES, ...RESOLVES, ...OVERRIDES_CANT_CONFIRM,
       c('clinic', 'view'),
       c('employee', 'view'), c('employee', 'update'),
       c('functional_assignment', 'view'), c('functional_assignment', 'grant'), c('functional_assignment', 'revoke'),

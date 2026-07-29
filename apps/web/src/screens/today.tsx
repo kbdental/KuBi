@@ -41,6 +41,17 @@ export function Today({
         </p>
       )}
 
+      {/* Usability review: a lightweight confirmation once opening is done.
+          `opening` is null when there is no opening set today — a non-working
+          day, or before the day's tasks exist. Absent is not complete, and
+          must never be shown as "the clinic is open". */}
+      {day.opening?.complete && (
+        <div className="notice notice-good" role="status">
+          <div className="notice-title">The clinic is open</div>
+          Everything for this morning is done and confirmed.
+        </div>
+      )}
+
       {total === 0 && (
         <div className="empty">
           <div className="empty-big">You&rsquo;re all clear</div>

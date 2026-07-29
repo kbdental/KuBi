@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { api, type CheckRow } from '../api.js';
+import { useEffect, useState } from 'react';
+import { api, type CheckRow, type CheckDetail } from '../api.js';
 
 /**
  * CHECKS — work someone else finished that needs a second pair of eyes.
@@ -11,6 +11,11 @@ import { api, type CheckRow } from '../api.js';
  *
  * Saying "not right" is deliberately as easy as saying "looks right". A
  * confirmation that is easier to give than to withhold is not a check.
+ *
+ * Usability review Q5: the checker now sees each item as it was actually
+ * recorded. Confirming without seeing what was claimed is a signature, not a
+ * check. Names stay off this screen (Q6) — what was done is the question here,
+ * not who did it.
  */
 export function Checks({
   items, onDone,
@@ -64,6 +69,16 @@ function OneCheck({
   const [problem, setProblem] = useState<string | null>(null);
   const [comment, setComment] = useState('');
   const [askingWhy, setAskingWhy] = useState(false);
+  const [detail, setDetail] = useState<CheckDetail | null>(null);
+  const [detailFailed, setDetailFailed] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    api.check(item.id)
+      .then((d) => { if (live) setDetail(d); })
+      .catch(() => { if (live) setDetailFailed(true); });
+    return () => { live = false; };
+  }, [item.id]);
 
   async function submit(result: 'PASS' | 'FAIL') {
     setBusy(true);
@@ -87,10 +102,41 @@ function OneCheck({
 
       {!askingWhy ? (
         <>
-          <div className="notice notice-calm">
+          <div className="group-label" style={{ marginTop: 18 }}>What was recorded</div>
+          {detail
+            ? detail.items.map((i) => (
+                <div key={i.id} className="recorded">
+                  <span
+                    className={i.checked ? 'recorded-mark is-yes' : 'recorded-mark is-no'}
+                    aria-hidden="true"
+                  >
+                    {i.checked ? '✓' : '—'}
+                  </span>
+                  <span className="recorded-label">{i.label}</span>
+                  {i.value != null && (
+                    <span className="recorded-value">{i.value}{i.unit ?? ''}</span>
+                  )}
+                </div>
+              ))
+            : (
+              <div className="notice notice-calm">
+                {detailFailed
+                  ? 'We could not load what was recorded. Please try again before confirming.'
+                  : 'Loading what was recorded…'}
+              </div>
+            )}
+
+          <div className="notice notice-calm" style={{ marginTop: 16 }}>
             Have a look for yourself before confirming.
           </div>
-          <button className="btn" type="button" disabled={busy} onClick={() => void submit('PASS')}>
+          {/* Confirming without having seen the work is the one thing this
+              screen exists to prevent, so it waits for the detail to load. */}
+          <button
+            className="btn"
+            type="button"
+            disabled={busy || !detail}
+            onClick={() => void submit('PASS')}
+          >
             {busy ? 'Saving…' : 'Looks right'}
           </button>
           <button

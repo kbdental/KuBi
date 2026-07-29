@@ -127,6 +127,7 @@ export const PERMISSION_CATALOGUE: readonly PermissionSeed[] = [
   p('checklist', 'respond', S, 'VS-01 — assignee only'),
   p('attention_item', 'view', S, 'VS-01 — Attention list, scoped to the caller'),
   p('attention_item', 'resolve', S, 'VS-01 — accountable owner, manager and above'),
+  p('activity_instance', 'override_gate', A, 'VS-01 usability review Q2 — finishing a task whose requirement cannot be confirmed is a management judgement, not a task-level one. ADMIN-class because deciding it is safe to proceed without confirmation is a governance act. Never applies to BLOCK_HARD, which has no override path at all (ADR-004)'),
 
   // -- patient (table exists since Phase 1; no clinical workflow built) ----
   p('patient', 'view', S, 'Phase 0.5 D1 clinical.patient — clinic-scoped read only; no clinical fields exist yet'),

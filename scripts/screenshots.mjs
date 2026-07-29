@@ -130,13 +130,15 @@ console.log('capturing:');
   await page.getByRole('button', { name: /Oxygen cylinder/ }).click();
   await shot(page, '10-report-a-problem-chosen');
 
-  // Back out, and meet the server's refusal instead.
+  // Back out, and meet the server's refusal instead. Since usability review
+  // Q2 an assistant is not offered the override at all, so the refusal lands
+  // on the checklist itself and points at the path she does have.
   await page.getByRole('button', { name: 'Cancel' }).click();
   await page.waitForSelector('.tick');
   for (const t of await page.locator('.tick').all()) await t.click();
   await page.getByRole('button', { name: 'Finish' }).click();
-  await page.waitForSelector('.screen-title');
-  await shot(page, '11-before-you-finish');
+  await page.waitForSelector('.notice-stop');
+  await shot(page, '11-cannot-finish-not-your-call');
   await ctx.close();
 }
 
@@ -184,7 +186,8 @@ await completeViaApi('priya', 'Get treatment rooms ready');
     const first = page.locator('.row').first();
     if (await first.count()) {
       await first.click();
-      await page.waitForSelector('.btn');
+      // Q5: wait for the recorded items, which is the point of this screen.
+      await page.waitForSelector('.recorded');
       await shot(page, '16-check-one');
       await page.getByRole('button', { name: 'Not right' }).click();
       await page.waitForSelector('textarea');

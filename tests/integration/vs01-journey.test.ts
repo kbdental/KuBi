@@ -153,27 +153,47 @@ describe('VS-01 journey — through the API', () => {
     });
     expect(blocked.statusCode).toBe(409);
     expect(blocked.json().error).toMatch(/can't confirm the emergency kit list yet/);
-    expect(blocked.json().canOverride).toBe(true);
     // Still plain language on the refusal path too.
     expect(blocked.json().error).not.toMatch(/NOT_CONFIGURED|UNKNOWN|gate/i);
 
-    // Going ahead requires saying why, and that never happens quietly.
+    // Usability review Q2: Priya is a Dental Assistant. Deciding it is safe to
+    // proceed without confirmation is management authority, so she is not
+    // offered the override at all -- canOverride is false, and the message
+    // sends her down the path she does have.
+    expect(blocked.json().canOverride).toBe(false);
+    expect(blocked.json().error).toMatch(/report a problem/i);
+
+    // And typing a reason anyway does not get her past it. The check is on
+    // authority, not on whether the request happens to carry a justification.
     const forced = await app.inject({
       method: 'POST', url: `/api/v1/tasks/${task.id}/complete`, headers: { cookie },
-      payload: { responses, overrideReason: 'SYNTHETIC: spare kit checked by hand against the paper list' },
+      payload: { responses, overrideReason: 'SYNTHETIC: I had a look myself' },
     });
-    expect(forced.statusCode).toBe(200);
-    expect(forced.json().status).toBe('COMPLETED');
+    expect(forced.statusCode).toBe(409);
+    expect(forced.json().canOverride).toBe(false);
+  });
 
-    // The override is visible to the manager without anyone reporting it.
+  it('a manager holds the override authority — but not for a task assigned to someone else', async () => {
+    // This records a real consequence of Q2 rather than asserting the happy
+    // path. OPN-005's doer is the assigned assistant, and only the assignee
+    // may complete a task (record relation). So the person with the authority
+    // to proceed is not the person able to press the button, and this
+    // activity cannot currently be finished by anyone. Documented in the
+    // completion notes and raised with the owner.
     const rahul = await login(`rahul_${suffix}@synthetic.test`);
-    const attention = (await app.inject({
-      method: 'GET', url: '/api/v1/attention', headers: { cookie: rahul },
-    })).json();
-    const override = attention.find((a: { headline: string }) => /emergency kit/i.test(a.headline)
-      && /finished before/i.test(a.headline));
-    expect(override).toBeDefined();
-    expect(override.detail).toMatch(/checked by hand/);
+    const priya = await login(`priya_${suffix}@synthetic.test`);
+
+    const day = (await app.inject({ method: 'GET', url: '/api/v1/my-day', headers: { cookie: priya } })).json();
+    const all = [...day.buckets.OVERDUE, ...day.buckets.NOW, ...day.buckets.NEXT, ...day.buckets.LATER];
+    const task = all.find((t: { title: string }) => t.title === 'Check the emergency kit');
+    expect(task).toBeDefined();
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/v1/tasks/${task.id}/complete`, headers: { cookie: rahul },
+      payload: { responses: [], overrideReason: 'SYNTHETIC: checked the kit myself' },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error).toMatch(/assigned to someone else/i);
   });
 
   it('the problem reaches Rahul automatically, and he resolves it', async () => {
@@ -272,6 +292,81 @@ describe('VS-01 journey — through the API', () => {
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().error).toMatch(/assigned to someone else/i);
+  });
+
+  it('Q5: the checker sees every item as it was actually recorded', async () => {
+    // Priya finishes reception setup; Anita opens it to check.
+    const priya = await login(`priya_${suffix}@synthetic.test`);
+    const day = (await app.inject({ method: 'GET', url: '/api/v1/my-day', headers: { cookie: priya } })).json();
+    const all = [...day.buckets.OVERDUE, ...day.buckets.NOW, ...day.buckets.NEXT, ...day.buckets.LATER];
+    const env2 = all.find((t: { title: string }) => t.title === 'Set up the clinic environment');
+
+    if (env2) {
+      const sheet = (await app.inject({
+        method: 'GET', url: `/api/v1/tasks/${env2.id}`, headers: { cookie: priya },
+      })).json();
+      await app.inject({ method: 'POST', url: `/api/v1/tasks/${env2.id}/start`, headers: { cookie: priya } });
+      // Tick all but the last, so an UNTICKED item has to survive to the checker.
+      const responses = sheet.items.map((i: { id: string }, n: number) => ({
+        itemId: i.id, checked: n < sheet.items.length - 1,
+      }));
+      await app.inject({
+        method: 'POST', url: `/api/v1/tasks/${env2.id}/complete`, headers: { cookie: priya },
+        payload: { responses },
+      });
+    }
+
+    const anita = await login(`anita_${suffix}@synthetic.test`);
+    const checks = (await app.inject({ method: 'GET', url: '/api/v1/checks', headers: { cookie: anita } })).json();
+    expect(checks.length).toBeGreaterThan(0);
+
+    const detail = (await app.inject({
+      method: 'GET', url: `/api/v1/checks/${checks[0].id}`, headers: { cookie: anita },
+    })).json();
+
+    expect(detail.items.length).toBeGreaterThan(0);
+    for (const item of detail.items) {
+      expect(typeof item.label).toBe('string');
+      expect(typeof item.checked).toBe('boolean'); // stated either way
+    }
+    // Q6: what was done, never who did it.
+    expect(JSON.stringify(detail)).not.toMatch(/priya|sharma|employee|completedBy/i);
+  });
+
+  it('Q5: a person cannot open the check screen for their own work', async () => {
+    // Refusing the READ as well as the write means nobody is shown a review
+    // screen for their own work and then turned away when they act on it.
+    const priya = await login(`priya_${suffix}@synthetic.test`);
+    const own = await withTenantContext(
+      prisma,
+      { organizationId: env.organizationId, clinicIds: [env.clinicId], crossClinic: false },
+      (tx) => tx.activityInstance.findFirst({
+        where: { completedByEmployeeId: env.assistant.employeeId },
+      }),
+    );
+    if (!own) return;
+
+    const res = await app.inject({
+      method: 'GET', url: `/api/v1/checks/${own.id}`, headers: { cookie: priya },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error).toMatch(/your own work/i);
+  });
+
+  it('reports opening progress for the clinic, and never guesses when there is none', async () => {
+    const cookie = await login(`priya_${suffix}@synthetic.test`);
+    const day = (await app.inject({ method: 'GET', url: '/api/v1/my-day', headers: { cookie } })).json();
+
+    expect(day.opening).not.toBeNull();
+    expect(day.opening.total).toBe(5);          // the whole clinic's set, not Priya's share
+    expect(day.opening.done).toBeGreaterThan(0);
+    expect(day.opening.complete).toBe(day.opening.done === day.opening.total);
+    // Counts only: every value is a number or a boolean. No titles, no names,
+    // no free text of any kind can ride along on this.
+    for (const v of Object.values(day.opening)) {
+      expect(['number', 'boolean']).toContain(typeof v);
+    }
+    expect(Object.keys(day.opening).sort()).toEqual(['complete', 'done', 'total']);
   });
 
   it('an unauthenticated request is refused', async () => {

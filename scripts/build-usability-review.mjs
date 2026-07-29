@@ -46,8 +46,8 @@ const STAGES = [
     ],
     question: {
       n: 1,
-      ask: 'Finish stays greyed out until every item is ticked. Is that right for your clinic, or should someone be able to finish with an item unticked and a note explaining why?',
-      why: 'Today the honest path for an unticked item is “Report a problem”, which puts it on the manager. That is deliberate — but it means a small, already-handled exception still becomes the manager’s to close.',
+      ask: 'DECIDED — Finish stays disabled until the checklist is complete. “Report a problem” remains the path for an item that cannot be ticked.',
+      why: 'Unchanged. Also added at your request: a progress bar and “3 of 5 done”, so the count is visible without recounting and a tick is visibly registered.',
     },
   },
   {
@@ -56,12 +56,13 @@ const STAGES = [
     lead: 'The emergency-kit requirement has no backing module yet, so the system genuinely does not know. It says so, in those words, and it will not let the task be finished quietly. This is the AP-1 rule you set — an unknown must never read as a pass — reaching an actual screen.',
     shots: [
       ['08-cant-confirm', 'The task, with the warning'],
-      ['11-before-you-finish', 'The server’s refusal'],
+      ['11-cannot-finish-not-your-call', 'Refused — and not hers to override'],
     ],
     question: {
       n: 2,
-      ask: 'Anyone assigned the task can go ahead by recording how they checked. Should that stay open to an assistant, or should going ahead require a manager?',
-      why: 'The reason is audited and raised to the clinic manager either way, so nothing is hidden. The question is whether the decision itself belongs to whoever is standing there at 8:45am.',
+      ask: 'DECIDED — going ahead now requires Manager or Clinical Director authority. An assistant is not offered the override at all, and typing a reason does not get past it.',
+      why: 'Implemented as a permission (activity_instance:override_gate) held by Owner, Clinic Head, Clinical Director and Clinic Manager only. This has a consequence that needs your call — see “One thing this created”.',
+      weight: 'high',
     },
   },
   {
@@ -75,8 +76,8 @@ const STAGES = [
     ],
     question: {
       n: 3,
-      ask: 'Four reasons: Not working, Missing, Not clean, Something else. Are those the right four for your clinic?',
-      why: 'Adding a fifth is cheap now and expensive once staff have learned the list.',
+      ask: 'DECIDED — the four categories stay as they are.',
+      why: 'Not working · Missing · Not clean · Something else. Unchanged.',
     },
   },
   {
@@ -89,8 +90,8 @@ const STAGES = [
     ],
     question: {
       n: 4,
-      ask: 'The four severities read as Patient safety, Urgent, Important, Routine. Are those the words you would use in front of staff?',
-      why: 'These are the labels people will argue with at 9am. They are display-only and cost nothing to change now.',
+      ask: 'DECIDED — relabelled to Patient Safety · Needs Immediate Action · Needs Attention · Routine.',
+      why: '“Urgent” and “Important” both read as “soon”, which is what made them arguable. The new labels say what is being asked of you instead. Display-only; the underlying severities are unchanged.',
     },
   },
   {
@@ -104,8 +105,8 @@ const STAGES = [
     ],
     question: {
       n: 5,
-      ask: 'This screen shows the task and the standard, but <strong>not the five items Priya actually ticked</strong>. Should the checker see them?',
-      why: 'This is the most substantive thing the review turned up. Right now Anita confirms work without seeing what was claimed, which weakens the check. Fixing it needs a new field on the API, so it is expansion under the freeze rather than something to slip in — it needs your call.',
+      ask: 'DONE — the checker now sees every item as it was actually recorded, ticked and unticked alike.',
+      why: 'Built on the API expansion you approved (GET /api/v1/checks/:id). “Looks right” stays disabled until the work has actually loaded, because a confirmation given before seeing anything is the thing this was meant to prevent. An unticked item is shown as unticked, never quietly omitted. No names (Q6).',
       weight: 'high',
     },
   },
@@ -116,8 +117,8 @@ const STAGES = [
     shots: [['18-me', 'Me']],
     question: {
       n: 6,
-      ask: 'No screen shows who reported a problem or who completed a task. That is deliberate — it keeps the tone blame-free. Is that what you want for the pilot?',
-      why: 'It is all recorded in the audit trail either way. This is only about what appears on a staff-facing screen.',
+      ask: 'DECIDED — staff-facing screens stay blame-free. No reporter or completer names anywhere.',
+      why: 'Unchanged, and now asserted by test: the new checker view is checked for the absence of names as well as the presence of items. Everything remains in the audit trail.',
     },
   },
 ];
@@ -129,6 +130,7 @@ const FIXED = [
   ['Monospace form fields', 'Placeholders and typed notes rendered in the browser’s terminal font. Form controls now inherit the page font.'],
   ['Severity pill overlapped the back button', 'The back control was inline, so the pill landed on top of it.'],
   ['Empty day said the same thing twice', '“Nothing waiting.” above “You’re all clear”.'],
+  ['Two warnings saying one thing', 'After the server refused, the original “can’t confirm” banner stayed up alongside the refusal, stacking three notices on one screen.'],
 ];
 
 const shotHtml = ([file, caption]) => `
@@ -140,7 +142,7 @@ const shotHtml = ([file, caption]) => `
 const questionHtml = (q) =>
   !q ? '' : `
       <aside class="ask${q.weight === 'high' ? ' ask-high' : ''}">
-        <p class="ask-n">Question ${q.n}${q.weight === 'high' ? ' · needs a decision' : ''}</p>
+        <p class="ask-n">Decision ${q.n}</p>
         <p class="ask-q">${q.ask}</p>
         <p class="ask-why">${q.why}</p>
       </aside>`;
@@ -306,27 +308,70 @@ const html = `<title>KuBi VS-01 — Usability Review</title>
 <div class="wrap">
   <header class="masthead">
     <p class="eyebrow">KuBi · Vertical Slice 01 · Clinic Opening</p>
-    <h1>What the clinic actually sees</h1>
+    <h1>Your review, applied</h1>
     <p class="standfirst">
-      Nineteen screens, captured from the running system against synthetic data —
-      not mockups. This is for your usability review: look at what a person meets,
-      and answer the six questions marked along the way.
+      All six decisions are in, plus the three additions you asked for.
+      Recaptured from the running system against synthetic data — this is what
+      a person meets now, not what was proposed. One decision created a
+      knock-on that needs your call; it is called out below.
     </p>
     <ul class="facts">
-      <li><b>19</b> screens</li>
-      <li><b>7</b> taps to open the clinic</li>
-      <li><b>24</b> taps, whole journey, 3 people</li>
-      <li><b>86</b> tests passing</li>
-      <li><b>6</b> questions for you</li>
+      <li><b>6</b> decisions applied</li>
+      <li><b>3</b> additions built</li>
+      <li><b>19</b> screens recaptured</li>
+      <li><b>97</b> tests passing</li>
+      <li><b>1</b> thing needs your call</li>
     </ul>
   </header>
 
   <section class="howto col">
-    <h2>How to give feedback</h2>
+    <h2>One thing this created</h2>
     <p class="lead">
-      VS-01 is frozen except for defect fixes, so it helps to know which bucket a
-      comment lands in. The test is one question: does the change alter what a
-      person can <em>accomplish</em>, or only how easily?
+      Decision 2 has a consequence worth a minute of your time, because it
+      currently stops the demo clinic finishing its morning.
+    </p>
+    <p class="lead">
+      Checking the emergency kit is assigned to the <strong>assistant</strong>,
+      and only the assignee may finish a task. The authority to proceed without
+      confirmation now sits with the <strong>manager</strong>. So the person who
+      can decide cannot press the button, and the person who can press the
+      button is not allowed to decide — and that activity cannot be finished by
+      anyone until the emergency-inventory module exists.
+    </p>
+    <p class="lead">
+      Nothing is broken or unsafe; it fails closed, which is the right
+      direction to fail. But it means opening never reads as complete, so the
+      confirmation you asked for will not appear in the demo. Three ways
+      forward, and the choice is yours:
+    </p>
+    <div class="rule-split">
+      <div class="rule-card rule-now">
+        <span class="tag">Option A · smallest</span>
+        <p>
+          A manager authorises the specific task, then the assistant finishes
+          it. Keeps both rules intact — the decision stays management's, the
+          work stays hers. Needs a small authorise step.
+        </p>
+      </div>
+      <div class="rule-card rule-later">
+        <span class="tag">Option B · configuration</span>
+        <p>
+          Set emergency readiness to advisory until the inventory module lands.
+          No code, warns instead of blocking. Weakens the control in the
+          meantime, so it should be a conscious, dated choice.
+        </p>
+      </div>
+    </div>
+    <p class="lead" style="margin-top:24px">
+      <strong>Option C</strong> — leave it. Opening stays visibly incomplete
+      until emergency inventory is built, which is arguably the honest state
+      of the clinic. Costs you the completion confirmation for now.
+    </p>
+    <h2 style="margin-top:44px">How to give feedback</h2>
+    <p class="lead">
+      VS-01 is still frozen except for defect fixes. The test is one question:
+      does the change alter what a person can <em>accomplish</em>, or only how
+      easily?
     </p>
     <div class="rule-split">
       <div class="rule-card rule-now">
@@ -355,10 +400,11 @@ const html = `<title>KuBi VS-01 — Usability Review</title>
 ${STAGES.map(stageHtml).join('\n')}
 
   <section class="fixed col">
-    <h2>Already fixed during this review</h2>
+    <h2>Defects fixed along the way</h2>
     <p class="lead">
-      Found while capturing these screens. Listed so you know they were caught
-      rather than missed — the first one is the one that mattered.
+      Found by looking at the captures rather than by testing. Listed so you
+      know they were caught rather than missed — the first one is the one that
+      mattered.
     </p>
     <ol>
 ${FIXED.map(([t, d]) => `      <li><h3>${t}</h3><p>${d}</p></li>`).join('\n')}

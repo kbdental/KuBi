@@ -14,6 +14,7 @@ import type { Clock } from '../../shared/clock.js';
 import { writeAudit } from '../audit/audit.service.js';
 import { raiseAttentionItem } from '../signals/attention.service.js';
 import { resolveActor, type ActorRef } from './assignment-resolver.js';
+import { checkPermission } from '../rbac/permission-evaluation.service.js';
 import { ActivityStatus, EvaluationResult, EnforcementMode, ENFORCEMENT_MATRIX } from '@kubi/contracts';
 
 export class TaskAuthorizationError extends Error {
@@ -174,6 +175,22 @@ export async function completeTask(
         false,
       );
     }
+    // Usability review Q2: going ahead without confirmation is a management
+    // judgement. Whether this person may make it is decided BEFORE we ask them
+    // for a reason -- otherwise we invite someone to type a justification and
+    // then refuse it, which is both rude and a way of leaking who holds what.
+    const mayOverride = await checkPermission(tx, clock, {
+      employeeId, organizationId: inst.organizationId, clinicId: inst.clinicId,
+      code: 'activity_instance:override_gate',
+    });
+
+    if (!mayOverride.allowed) {
+      throw new GateBlockedError(
+        `${gate.message}. Report a problem and a manager will take it from here.`,
+        false, // not overridable BY THIS PERSON -- the screen must not offer it
+      );
+    }
+
     if (!override?.reason?.trim()) {
       throw new GateBlockedError(
         `${gate.message}. Report a problem, or record why it is safe to go ahead.`,
