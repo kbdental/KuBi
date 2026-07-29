@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import {
   api, ApiError,
   type Me, type MyDay, type TaskSheet, type AttentionRow, type CheckRow, type Schedule,
@@ -9,6 +9,7 @@ import { TaskSheetScreen } from './screens/task-sheet.js';
 import { Attention } from './screens/attention.js';
 import { Checks } from './screens/checks.js';
 import { Clinic } from './screens/clinic.js';
+import { IconToday, IconClinic, IconAttention, IconChecks, IconMe } from './icons.js';
 
 /**
  * The shell.
@@ -149,6 +150,14 @@ export function App() {
   );
 }
 
+const TAB_ICON: Record<Place, (p: { filled: boolean }) => ReactElement> = {
+  TODAY: ({ filled }) => <IconToday filled={filled} />,
+  CLINIC: ({ filled }) => <IconClinic filled={filled} />,
+  ATTENTION: ({ filled }) => <IconAttention filled={filled} />,
+  CHECKS: ({ filled }) => <IconChecks filled={filled} />,
+  ME: ({ filled }) => <IconMe filled={filled} />,
+};
+
 function Tab({
   id, label, now, go, count,
 }: {
@@ -158,18 +167,24 @@ function Tab({
   go: (p: Place) => void;
   count?: number;
 }) {
+  const on = now === id;
+  const Icon = TAB_ICON[id];
   return (
     <button
       className="tab"
       type="button"
       onClick={() => go(id)}
-      {...(now === id ? { 'aria-current': 'page' as const } : {})}
+      // Without this the badge is read before the label — "2Attention".
+      aria-label={count ? `${label}, ${count} waiting` : label}
+      {...(on ? { 'aria-current': 'page' as const } : {})}
     >
-      <span className="tab-mark" aria-hidden="true" />
-      <span>
-        {label}
-        {count !== undefined && count > 0 && <span className="tab-count" style={{ marginLeft: 6 }}>{count}</span>}
+      <span className="tab-icon">
+        <Icon filled={on} />
+        {count !== undefined && count > 0 && (
+          <span className="tab-count" aria-hidden="true">{count > 9 ? '9+' : count}</span>
+        )}
       </span>
+      <span className="tab-label" aria-hidden="true">{label}</span>
     </button>
   );
 }

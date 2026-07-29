@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type CheckRow, type CheckDetail } from '../api.js';
+import { IconGo, IconTick } from '../icons.js';
 
 /**
  * CHECKS — work someone else finished that needs a second pair of eyes.
@@ -51,7 +52,7 @@ export function Checks({
               })}
             </div>
           </div>
-          <span className="row-go" aria-hidden="true">›</span>
+          <span className="row-go"><IconGo /></span>
         </button>
       ))}
     </div>
@@ -110,7 +111,7 @@ function OneCheck({
                     className={i.checked ? 'recorded-mark is-yes' : 'recorded-mark is-no'}
                     aria-hidden="true"
                   >
-                    {i.checked ? '✓' : '—'}
+                    {i.checked ? <IconTick size={14} /> : '—'}
                   </span>
                   <span className="recorded-label">{i.label}</span>
                   {i.value != null && (

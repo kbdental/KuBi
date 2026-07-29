@@ -6,19 +6,39 @@
  */
 
 :root {
-  --ink: #12181f;
-  --ink-soft: #55606d;
-  --line: #dde3ea;
-  --page: #f4f6f9;
+  /* Ink is a very dark slate rather than black: on a bright clinic tablet
+     pure black reads as harsh and slightly cheap. */
+  --ink: #101a22;
+  --ink-soft: #5a6875;
+  --ink-faint: #8b97a3;
+  --line: #e4e9ee;
+  --line-soft: #eef1f5;
+  --page: #f2f5f7;
   --card: #ffffff;
-  --accent: #12181f;
-  --safety: #b4232b;
-  --safety-tint: #fdf0f0;
+
+  /* Teal-green carries "ready" and identity. Deliberately not the default
+     product blue, and distinct from the red that means patient safety. */
+  --accent: #0d6e5e;
+  --accent-soft: #e8f3f0;
+  --accent-line: #b7ddd4;
+  --ink-btn: #101a22;
+
+  --safety: #b0202a;
+  --safety-tint: #fdf1f1;
+  --safety-line: #f0c6c8;
   --warn: #8a5a00;
-  --warn-tint: #fdf6e6;
-  --ok: #1c6b3f;
+  --warn-tint: #fdf7e9;
+  --warn-line: #ecdcaf;
+  --ok: #0d6e5e;
+
+  /* Two levels only. More would be decoration; these separate "surface" from
+     "the thing you are working on". */
+  --lift: 0 1px 2px rgba(16, 26, 34, .05);
+  --lift-md: 0 1px 2px rgba(16, 26, 34, .05), 0 8px 20px -10px rgba(16, 26, 34, .18);
+
   --tap: 56px;
-  --radius: 14px;
+  --radius: 16px;
+  --radius-sm: 11px;
 }
 
 * { box-sizing: border-box; }
@@ -29,8 +49,14 @@ body {
   margin: 0;
   background: var(--page);
   color: var(--ink);
-  font: 17px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font: 17px/1.45 system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI',
+        Roboto, 'Helvetica Neue', sans-serif;
   -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Every number in this product is compared against another number. */
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.006em;
 }
 
 /* Form controls do not inherit the page font on their own. Without this,
@@ -42,76 +68,97 @@ button, input, textarea, select { font: inherit; color: inherit; }
 
 .app { display: flex; flex-direction: column; min-height: 100%; }
 .screen { flex: 1; padding: 20px 18px 96px; max-width: 720px; width: 100%; margin: 0 auto; }
-.screen-title { font-size: 27px; font-weight: 700; margin: 4px 0 2px; letter-spacing: -0.01em; }
-.screen-sub { color: var(--ink-soft); margin: 0 0 22px; }
+.screen-title { font-size: 28px; font-weight: 700; margin: 4px 0 3px; letter-spacing: -0.022em; }
+.screen-sub { color: var(--ink-soft); margin: 0 0 22px; font-size: 16px; }
 
 /* ---- the bar of places you can go ---------------------------------------- */
 
 .tabs {
   position: fixed; bottom: 0; left: 0; right: 0;
-  display: flex; background: var(--card); border-top: 1px solid var(--line);
+  display: flex;
+  background: rgba(255, 255, 255, .92);
+  backdrop-filter: saturate(1.6) blur(12px);
+  -webkit-backdrop-filter: saturate(1.6) blur(12px);
+  border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
 }
 .tab {
-  flex: 1; min-height: var(--tap); border: 0; background: none;
-  padding: 10px 4px; cursor: pointer; color: var(--ink-soft);
+  flex: 1; min-height: 60px; border: 0; background: none;
+  padding: 8px 4px 9px; cursor: pointer; color: var(--ink-faint);
   display: flex; flex-direction: column; align-items: center; gap: 3px;
-  font-size: 13px; font-weight: 600;
+  transition: color .15s ease;
 }
-.tab[aria-current='page'] { color: var(--ink); }
-.tab-mark { width: 22px; height: 3px; border-radius: 2px; background: transparent; }
-.tab[aria-current='page'] .tab-mark { background: var(--ink); }
+.tab[aria-current='page'] { color: var(--accent); }
+.tab:active { transform: translateY(0.5px); }
+.tab-icon { position: relative; display: grid; place-items: center; height: 24px; }
+.tab-label { font-size: 11.5px; font-weight: 600; letter-spacing: 0.01em; }
 .tab-count {
+  position: absolute; top: -5px; left: 12px;
   background: var(--safety); color: #fff; border-radius: 999px;
-  min-width: 20px; padding: 1px 6px; font-size: 12px; line-height: 18px;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+  box-shadow: 0 0 0 2px var(--card);
 }
 
 /* ---- where the clinic is -------------------------------------------------- */
 
 .clinic {
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 18px 20px; margin-bottom: 24px;
-  display: flex; flex-direction: column; gap: 16px;
+  box-shadow: var(--lift-md);
+  padding: 20px 20px 18px; margin-bottom: 22px;
+  display: flex; flex-direction: column; gap: 17px;
+  position: relative; overflow: hidden;
 }
-.clinic.is-open { border-color: #bcdcc8; background: #f6fbf8; }
+/* A hairline of the accent along the top: enough identity to feel like a
+   product, not enough to become decoration. */
+.clinic::before {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), #17a68d);
+}
+.clinic.is-open { border-color: var(--accent-line); background: var(--accent-soft); }
 
 .clinic-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.clinic-name { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
-.clinic-greeting { color: var(--ink-soft); font-size: 16px; margin-top: 2px; }
+.clinic-name { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; }
+.clinic-greeting { color: var(--ink-soft); font-size: 15px; margin-top: 3px; }
 .clinic-clock {
-  font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em; white-space: nowrap;
+  font-size: 30px; font-weight: 680; letter-spacing: -0.03em; white-space: nowrap;
+  line-height: 1;
 }
 
 .clinic-phase { display: flex; flex-direction: column; gap: 9px; }
 .clinic-phase-name {
-  font-size: 13px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
-  color: var(--ink-soft);
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-faint);
 }
 .clinic.is-open .clinic-phase-name { color: var(--ok); }
 
 .clinic-progress { display: flex; align-items: center; gap: 12px; }
 .clinic-track {
-  flex: 1; height: 8px; border-radius: 999px; background: #e4e9ef; overflow: hidden;
+  flex: 1; height: 7px; border-radius: 999px; background: #dfe6ea; overflow: hidden;
 }
-.clinic-fill { height: 100%; background: var(--ok); border-radius: 999px; }
-.clinic-count { font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.clinic-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #17a68d);
+  transition: width .45s cubic-bezier(.2, .8, .3, 1);
+}
+.clinic-count { font-size: 14.5px; font-weight: 550; white-space: nowrap; }
 
 .clinic-when {
   display: flex; align-items: baseline; gap: 10px;
-  border-top: 1px solid var(--line); padding-top: 14px;
+  border-top: 1px solid var(--line); padding-top: 13px;
 }
-.clinic-when-label { color: var(--ink-soft); font-size: 15px; }
-.clinic-when-time { font-size: 19px; font-weight: 650; font-variant-numeric: tabular-nums; }
-.clinic-when-left { margin-left: auto; color: var(--ink-soft); font-size: 15px; }
-.clinic-when-left.is-late { color: var(--safety); font-weight: 650; }
+.clinic.is-open .clinic-when { border-top-color: var(--accent-line); }
+.clinic-when-label { color: var(--ink-soft); font-size: 14.5px; }
+.clinic-when-time { font-size: 19px; font-weight: 680; letter-spacing: -0.02em; }
+.clinic-when-left { margin-left: auto; color: var(--ink-faint); font-size: 14.5px; }
+.clinic-when-left.is-late { color: var(--safety); font-weight: 680; }
 
 /* ---- cards and rows ------------------------------------------------------- */
 
 .group { margin-bottom: 26px; }
 .group-label {
-  font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--ink-soft); margin-bottom: 9px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-faint); margin-bottom: 10px;
 }
 
 .card {
@@ -122,46 +169,74 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .row {
   display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 16px 18px; margin-bottom: 10px; min-height: var(--tap); cursor: pointer;
+  box-shadow: var(--lift);
+  padding: 15px 16px 15px 18px; margin-bottom: 10px; min-height: var(--tap);
+  cursor: pointer; position: relative; overflow: hidden;
+  transition: box-shadow .15s ease, transform .12s ease, border-color .15s ease;
 }
-.row:active { background: #eef1f5; }
+.row:hover { box-shadow: var(--lift-md); }
+.row:active { transform: translateY(1px); box-shadow: var(--lift); }
 .row-main { flex: 1; min-width: 0; }
-.row-title { font-weight: 600; font-size: 18px; }
-.row-note { color: var(--ink-soft); font-size: 15px; margin-top: 3px; }
-.row-go { color: var(--ink-soft); font-size: 22px; line-height: 1; }
-.row.is-overdue { border-color: #f0c2c4; }
-.row.is-blocked { background: var(--warn-tint); border-color: #ecd9a8; }
+.row-title { font-weight: 620; font-size: 17.5px; letter-spacing: -0.012em; }
+.row-note { color: var(--ink-soft); font-size: 14.5px; margin-top: 3px; }
+.row-go { color: var(--ink-faint); display: grid; place-items: center; }
+/* A stripe reads at a glance from across a room; a border colour does not. */
+.row.is-overdue { border-color: var(--safety-line); }
+.row.is-overdue::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--safety);
+}
+.row.is-blocked { background: var(--warn-tint); border-color: var(--warn-line); }
+.row.is-blocked::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: #c9902b;
+}
 
 /* ---- the thing happening right now ---------------------------------------- */
 
 .current {
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--lift-md);
   padding: 18px 18px 16px; margin-bottom: 26px;
 }
 .current-label {
-  font-size: 12px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
-  color: var(--ink-soft); margin-bottom: 6px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 6px;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+/* A quiet pulse: the only motion in the product, and it marks the one thing
+   the person is meant to be doing right now. */
+.current-label::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+  animation: livedot 2.4s ease-in-out infinite;
+}
+@keyframes livedot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .35; transform: scale(.82); }
 }
 .current-title {
-  font-size: 21px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 14px;
+  font-size: 21px; font-weight: 700; letter-spacing: -0.022em; margin: 0 0 14px;
 }
 
 /* ---- the checklist -------------------------------------------------------- */
 
 .tick {
   display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
-  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 14px 16px; margin-bottom: 10px; min-height: var(--tap); cursor: pointer;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 13px 15px; margin-bottom: 8px; min-height: 54px; cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, transform .1s ease;
 }
+.tick:active { transform: scale(.995); }
+.tick[aria-pressed='true'] { border-color: var(--accent-line); background: var(--accent-soft); }
 .tick-box {
-  width: 30px; height: 30px; flex: 0 0 30px; border-radius: 8px;
-  border: 2px solid #b9c2cd; display: grid; place-items: center;
-  font-size: 18px; color: transparent;
+  width: 28px; height: 28px; flex: 0 0 28px; border-radius: 9px;
+  border: 2px solid #c2ccd6; display: grid; place-items: center;
+  font-size: 16px; color: transparent; background: #fff;
+  transition: background .16s ease, border-color .16s ease, transform .16s ease;
 }
+.tick[aria-pressed='true'] .tick-box { transform: scale(1.04); }
 .tick[aria-pressed='true'] .tick-box {
   background: var(--ok); border-color: var(--ok); color: #fff;
 }
-.tick-label { flex: 1; font-size: 17px; }
+.tick-label { flex: 1; font-size: 16.5px; letter-spacing: -0.008em; }
 .tick-value {
   width: 92px; min-height: 44px; font-size: 17px; text-align: center;
   border: 1px solid var(--line); border-radius: 10px; padding: 6px;
@@ -204,15 +279,20 @@ button, input, textarea, select { font: inherit; color: inherit; }
   /* Stacked, not columns. A time, a name and an action do not fit side by
      side on a phone without one of them being crushed. */
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--lift);
   padding: 14px 16px; margin-bottom: 10px;
+  position: relative; overflow: hidden;
+}
+.visit.is-now::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--accent);
 }
 .visit.is-done { opacity: 0.55; }
 .visit-head { display: flex; align-items: baseline; gap: 12px; }
 .visit-when {
-  font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  font-weight: 700; font-size: 15.5px; white-space: nowrap; color: var(--ink-soft);
+  letter-spacing: -0.01em;
 }
-.visit-who { font-weight: 600; font-size: 17px; flex: 1; min-width: 0; }
+.visit-who { font-weight: 620; font-size: 17px; flex: 1; min-width: 0; letter-spacing: -0.012em; }
 .visit-what { color: var(--ink-soft); font-size: 15px; margin-top: 3px; }
 .visit-state { display: flex; align-items: center; gap: 8px; margin-top: 9px; flex-wrap: wrap; }
 .visit-waiting { font-size: 14px; color: var(--ink-soft); }
@@ -223,56 +303,83 @@ button, input, textarea, select { font: inherit; color: inherit; }
 
 /* ---- notices -------------------------------------------------------------- */
 
-.notice { border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px; font-size: 16px; }
-.notice-warn { background: var(--warn-tint); border: 1px solid #ecd9a8; color: var(--warn); }
-.notice-stop { background: var(--safety-tint); border: 1px solid #f0c2c4; color: var(--safety); }
-.notice-calm { background: #eef2f7; border: 1px solid var(--line); color: var(--ink-soft); }
-.notice-good { background: #edf6f0; border: 1px solid #bcdcc8; color: var(--ok); }
-.notice-title { font-weight: 700; margin-bottom: 3px; }
+.notice {
+  border-radius: var(--radius-sm); padding: 13px 15px; margin-bottom: 13px;
+  font-size: 15.5px; line-height: 1.45;
+}
+.notice-warn { background: var(--warn-tint); border: 1px solid var(--warn-line); color: var(--warn); }
+.notice-stop { background: var(--safety-tint); border: 1px solid var(--safety-line); color: var(--safety); }
+.notice-calm { background: #eef2f6; border: 1px solid var(--line); color: var(--ink-soft); }
+.notice-good { background: var(--accent-soft); border: 1px solid var(--accent-line); color: var(--ok); }
+.notice-title { font-weight: 680; margin-bottom: 3px; letter-spacing: -0.01em; }
 
 .pill {
-  display: inline-block; border-radius: 999px; padding: 3px 10px;
-  font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
+  display: inline-block; border-radius: 999px; padding: 3.5px 10px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.015em;
 }
 .pill-safety { background: var(--safety); color: #fff; }
 .pill-critical { background: #f0c2c4; color: var(--safety); }
 .pill-important { background: var(--warn-tint); color: var(--warn); border: 1px solid #ecd9a8; }
-.pill-routine { background: #eef2f7; color: var(--ink-soft); }
+.pill-routine { background: #eef2f6; color: var(--ink-soft); }
 
 /* ---- buttons -------------------------------------------------------------- */
 
 .btn {
-  display: block; width: 100%; min-height: var(--tap); border-radius: var(--radius);
-  border: 1px solid var(--accent); background: var(--accent); color: #fff;
-  font-size: 18px; font-weight: 650; cursor: pointer; padding: 14px;
+  display: block; width: 100%; min-height: var(--tap); border-radius: var(--radius-sm);
+  border: 1px solid var(--ink-btn); background: var(--ink-btn); color: #fff;
+  font-size: 17px; font-weight: 640; letter-spacing: -0.01em;
+  cursor: pointer; padding: 14px;
+  box-shadow: var(--lift);
+  transition: transform .1s ease, box-shadow .15s ease, opacity .15s ease;
 }
-.btn:disabled { opacity: 0.45; cursor: default; }
-.btn-quiet { background: var(--card); color: var(--ink); border-color: var(--line); }
+.btn:hover:not(:disabled) { box-shadow: var(--lift-md); }
+.btn:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
+.btn:disabled { opacity: 0.38; cursor: default; box-shadow: none; }
+.btn-quiet {
+  background: var(--card); color: var(--ink); border-color: var(--line);
+  font-weight: 600;
+}
 .btn-danger { background: var(--safety); border-color: var(--safety); }
-.btn + .btn { margin-top: 10px; }
+.btn + .btn { margin-top: 9px; }
 
-.field { width: 100%; min-height: var(--tap); font-size: 17px; padding: 14px;
-  border: 1px solid var(--line); border-radius: var(--radius); background: var(--card);
-  margin-bottom: 12px; }
+.field {
+  width: 100%; min-height: var(--tap); font-size: 16.5px; padding: 13px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card);
+  margin-bottom: 12px; transition: border-color .15s ease, box-shadow .15s ease;
+}
+.field:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(13, 110, 94, .13);
+}
 textarea.field { min-height: 96px; resize: vertical; }
-label.field-label { display: block; font-weight: 600; margin-bottom: 6px; }
+label.field-label {
+  display: block; font-weight: 620; margin-bottom: 7px; font-size: 15px;
+  letter-spacing: -0.008em;
+}
 
 /* Block, not inline: as an inline button it sits on the same line as whatever
    follows, and a severity pill lands on top of it. */
 .back {
   display: block; width: fit-content;
-  background: none; border: 0; padding: 10px 0; min-height: 44px;
-  color: var(--ink-soft); font-size: 16px; cursor: pointer;
+  background: none; border: 0; padding: 8px 0; min-height: 42px;
+  color: var(--ink-soft); font-size: 15.5px; font-weight: 550; cursor: pointer;
 }
+.back:hover { color: var(--ink); }
 
-.empty { text-align: center; color: var(--ink-soft); padding: 48px 20px; }
-.empty-big { font-size: 21px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+.empty { text-align: center; color: var(--ink-soft); padding: 44px 20px; }
+.empty-big {
+  font-size: 20px; font-weight: 650; color: var(--ink); margin-bottom: 6px;
+  letter-spacing: -0.018em;
+}
 
 /* ---- sign in -------------------------------------------------------------- */
 
 .signin { max-width: 380px; margin: 0 auto; padding: 12vh 22px 40px; }
-.wordmark { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
-.wordmark-sub { color: var(--ink-soft); margin-bottom: 30px; }
+.wordmark {
+  font-size: 38px; font-weight: 750; letter-spacing: -0.038em; margin-bottom: 6px;
+  color: var(--accent);
+}
+.wordmark-sub { color: var(--ink-soft); margin-bottom: 30px; font-size: 16.5px; }
 
 /* ---- demo scaffolding, not part of KuBi ----------------------------------- */
 
@@ -302,6 +409,40 @@ label.field-label { display: block; font-weight: 600; margin-bottom: 6px; }
   background: transparent; border: 1px solid rgba(255, 255, 255, 0.24); color: #cfd6de;
   border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; min-height: 34px;
 }
-.demo-app { max-width: 520px; margin: 0 auto; }
+.demo-app {
+  max-width: 480px; margin: 0 auto; background: var(--page);
+  min-height: calc(100vh - 96px);
+}
 /* The tab bar is fixed to the viewport; keep it inside the phone-width column. */
-.demo-app .tabs { max-width: 520px; margin: 0 auto; }
+.demo-app .tabs { max-width: 480px; margin: 0 auto; }
+
+/* On a laptop the app would otherwise float in a void. Give the page a ground
+   so it reads as a device being looked at, not a broken website. */
+@media (min-width: 760px) {
+  body {
+    background:
+      radial-gradient(1100px 620px at 50% -12%, #eef2f5 0%, transparent 62%),
+      #dde4ea;
+  }
+  /* A real device viewport: fixed height, scrolling inside, tab bar pinned to
+     the frame. Without this the bar falls below the fold on a laptop and the
+     app stops looking like an app. */
+  .demo-app {
+    box-shadow: 0 1px 3px rgba(16, 26, 34, .10), 0 26px 60px -22px rgba(16, 26, 34, .34);
+    border-radius: 24px; overflow: hidden;
+    margin: 24px auto;
+    /* The base rule sets a min-height for phones; it would win over this and
+       push the frame past the fold, so it is cleared here deliberately. */
+    min-height: 0;
+    height: min(900px, calc(100vh - 150px));
+    display: flex; flex-direction: column;
+  }
+  .demo-app .app { flex: 1; min-height: 0; }
+  .demo-app .screen { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 28px; }
+  .demo-app .tabs {
+    position: relative; border-radius: 0;
+    width: 100%; max-width: none; left: auto; right: auto;
+  }
+  /* The sign-in screen is not inside .app, so it needs the same treatment. */
+  .demo-app .signin { overflow-y: auto; }
+}

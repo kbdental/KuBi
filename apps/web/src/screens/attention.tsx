@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api, type AttentionRow } from '../api.js';
+import { IconGo } from '../icons.js';
 
 /**
  * ATTENTION — the things that need a person, worst first.
@@ -88,7 +89,7 @@ export function Attention({
                 {goesToTask ? 'Open it to decide' : due(item.dueAt)}
               </div>
             </div>
-            <span className="row-go" aria-hidden="true">›</span>
+            <span className="row-go"><IconGo /></span>
           </button>
           );
       })}

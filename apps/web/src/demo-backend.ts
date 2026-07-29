@@ -166,17 +166,27 @@ function freshState() {
       responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
     },
     {
+      // Already done and waiting on Anita, so a second pair of eyes has
+      // something real to look at the moment you switch to her.
       id: 't-002', code: 'OPN-002', title: 'Get treatment rooms ready',
       standard: 'All scheduled operatories clean, stocked and functional',
       assignee: 'e-priya', selfVerifyAllowed: false, checkerRoles: ['SENIOR_ASSISTANT'],
-      cantConfirm: null, minutesFromOpening: -15, status: 'DUE',
+      cantConfirm: null, minutesFromOpening: -15, status: 'COMPLETED',
       items: [
         { id: 'i-201', label: 'Every room clean' },
         { id: 'i-202', label: 'Instruments laid out' },
         { id: 'i-203', label: 'Suction working' },
         { id: 'i-204', label: 'Chairs tested' },
       ],
-      responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
+      responses: {
+        'i-201': { checked: true, value: null },
+        'i-202': { checked: true, value: null },
+        'i-203': { checked: true, value: null },
+        // Left unticked on purpose: the checker is meant to see it as unticked
+        // rather than have it quietly omitted.
+        'i-204': { checked: false, value: null },
+      },
+      blockedBy: null, releasedAt: null, completedBy: 'e-priya',
     },
     {
       id: 't-003', code: 'OPN-003', title: 'Get reception ready',
@@ -187,6 +197,38 @@ function freshState() {
         { id: 'i-301', label: 'Computers and card machine on' },
         { id: 'i-302', label: 'Appointment list printed' },
         { id: 'i-303', label: 'Waiting area tidy' },
+      ],
+      responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
+    },
+    // Already done before anyone opened the app — a real morning has history
+    // behind it, and Anita has something genuine waiting to be checked.
+    {
+      id: 't-006', code: 'OPN-006', title: 'Run the autoclave test cycle',
+      standard: 'Daily steriliser test passed and recorded before instruments are used',
+      assignee: 'e-anita', selfVerifyAllowed: false, checkerRoles: ['CLINIC_MANAGER'],
+      cantConfirm: null, minutesFromOpening: -45, status: 'COMPLETED',
+      items: [
+        { id: 'i-601', label: 'Test pack loaded' },
+        { id: 'i-602', label: 'Cycle completed without fault' },
+        { id: 'i-603', label: 'Indicator strip changed correctly' },
+        { id: 'i-604', label: 'Result recorded in the log' },
+      ],
+      responses: {
+        'i-601': { checked: true, value: null },
+        'i-602': { checked: true, value: null },
+        'i-603': { checked: true, value: null },
+        'i-604': { checked: false, value: null },
+      },
+      blockedBy: null, releasedAt: null, completedBy: 'e-anita',
+    },
+    {
+      id: 't-007', code: 'OPN-007', title: 'Check the fridge temperature',
+      standard: 'Cold chain intact: 2–8°C, recorded daily',
+      assignee: 'e-priya', selfVerifyAllowed: true, checkerRoles: [],
+      cantConfirm: null, minutesFromOpening: 45, status: 'DUE',
+      items: [
+        { id: 'i-701', label: 'Fridge temperature within range', requiresValue: true, unit: '°C' },
+        { id: 'i-702', label: 'Nothing stored past its date' },
       ],
       responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
     },
@@ -201,7 +243,28 @@ function freshState() {
     { id: 'v6', patientLabel: 'SYNTHETIC Imran Q.', patientUhid: 'SYN-1006', visitType: 'Check-up', chairLabel: 'Chair 1', startsInMinutes: 198, minutes: 30, status: 'BOOKED', arrivedAt: null },
   ];
 
-  return { tasks, visits, attention: [] as Attention[], signedIn: null as Person | null };
+  // A morning that has already been running: the app is not a blank slate
+  // when somebody picks up the tablet at 09:00.
+  const attention: Attention[] = [
+    {
+      id: 'a-seed-1', code: 'OPN.OVERDUE',
+      headline: 'Autoclave log line is missing for the test cycle',
+      severity: 'CRITICAL',
+      detail: 'The cycle passed but the result was not written into the log.',
+      owner: 'e-rahul', dueAt: OPENED_AT + 40 * 60_000,
+      instanceId: 't-006', needsAuthorisation: false, open: true,
+    },
+    {
+      id: 'a-seed-2', code: 'SCH.SUPPLY',
+      headline: 'Gloves down to the last box in Chair 2',
+      severity: 'IMPORTANT',
+      detail: 'Reported yesterday evening by the closing assistant.',
+      owner: 'e-rahul', dueAt: OPENED_AT + 5 * 60 * 60_000,
+      instanceId: null, needsAuthorisation: false, open: true,
+    },
+  ];
+
+  return { tasks, visits, attention, signedIn: null as Person | null };
 }
 
 let db = freshState();

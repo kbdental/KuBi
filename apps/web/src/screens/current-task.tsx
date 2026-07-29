@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError, type TaskSheet } from '../api.js';
+import { IconTick } from '../icons.js';
 
 /**
  * The thing being done right now, open on TODAY rather than one tap away.
@@ -146,7 +147,7 @@ export function CurrentTask({
           aria-pressed={ticks[item.id] ? 'true' : 'false'}
           onClick={() => void toggle(item.id)}
         >
-          <span className="tick-box" aria-hidden="true">✓</span>
+          <span className="tick-box" aria-hidden="true"><IconTick /></span>
           <span className="tick-label">{item.label}</span>
           {item.requiresValue && (
             <input

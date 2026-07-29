@@ -1,6 +1,7 @@
 import type { MyDay, BucketName, TaskRow } from '../api.js';
 import { ClinicHeader } from './clinic-header.js';
 import { CurrentTask } from './current-task.js';
+import { IconGo } from '../icons.js';
 
 /**
  * TODAY — where the clinic is, and the thing in front of you.
@@ -113,7 +114,7 @@ function TaskButton({
         <div className="row-title">{task.title}</div>
         <div className="row-note">{note}</div>
       </div>
-      <span className="row-go" aria-hidden="true">›</span>
+      <span className="row-go"><IconGo /></span>
     </button>
   );
 }

@@ -84,8 +84,13 @@ export function Clinic({
         // worked out from an arrival time.
         const tooLong = row.waitingMinutes !== null && row.waitingMinutes >= 15;
 
+        // The one being seen right now gets a stripe, so a glance finds it.
+        const classes = ['visit'];
+        if (done) classes.push('is-done');
+        if (row.status === 'IN_CHAIR' || row.status === 'ARRIVED') classes.push('is-now');
+
         return (
-          <div key={row.id} className={done ? 'visit is-done' : 'visit'}>
+          <div key={row.id} className={classes.join(' ')}>
             <div className="visit-head">
               <span className="visit-when">{hhmm(row.scheduledStart, schedule.timezone)}</span>
               <span className="visit-who">{row.patientLabel}</span>

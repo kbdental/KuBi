@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api, ApiError, type TaskSheet, type ChecklistAnswer, type CompleteResult } from '../api.js';
+import { IconTick } from '../icons.js';
 
 /**
  * DO THIS — one task, start to finish.
@@ -200,7 +201,7 @@ export function TaskSheetScreen({
             aria-pressed={ticks[item.id] ? 'true' : 'false'}
             onClick={() => toggle(item.id)}
           >
-            <span className="tick-box" aria-hidden="true">✓</span>
+            <span className="tick-box" aria-hidden="true"><IconTick /></span>
             <span className="tick-label">{item.label}</span>
             {item.requiresValue && (
               <input
