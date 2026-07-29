@@ -273,3 +273,35 @@ label.field-label { display: block; font-weight: 600; margin-bottom: 6px; }
 .signin { max-width: 380px; margin: 0 auto; padding: 12vh 22px 40px; }
 .wordmark { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
 .wordmark-sub { color: var(--ink-soft); margin-bottom: 30px; }
+
+/* ---- demo scaffolding, not part of KuBi ----------------------------------- */
+
+.demo-bar {
+  position: sticky; top: 0; z-index: 50;
+  background: #12181f; color: #fff; padding: 9px 14px 10px;
+  display: flex; flex-direction: column; gap: 9px;
+}
+.demo-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.demo-hint { font-size: 12.5px; color: #8b96a3; }
+.demo-tag {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.14); border-radius: 999px; padding: 3px 9px;
+}
+.demo-people {
+  display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.demo-people::-webkit-scrollbar { display: none; }
+.demo-who {
+  background: transparent; border: 1px solid rgba(255, 255, 255, 0.24); color: #cfd6de;
+  border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+  min-height: 34px; white-space: nowrap;
+}
+.demo-who.is-on { background: #fff; border-color: #fff; color: #12181f; font-weight: 650; }
+.demo-reset {
+  background: transparent; border: 1px solid rgba(255, 255, 255, 0.24); color: #cfd6de;
+  border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; min-height: 34px;
+}
+.demo-app { max-width: 520px; margin: 0 auto; }
+/* The tab bar is fixed to the viewport; keep it inside the phone-width column. */
+.demo-app .tabs { max-width: 520px; margin: 0 auto; }
