@@ -10,3 +10,6 @@ coverage/
 .DS_Store
 /tmp/
 *.log
+
+# Generated from docs/screens/ by scripts/build-usability-review.mjs
+docs/vs-01-usability-review.html

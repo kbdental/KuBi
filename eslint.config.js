@@ -44,7 +44,11 @@ export default tseslint.config(
   {
     // Plain Node scripts, run directly with `node`. Not part of the runtime.
     files: ['scripts/**/*.mjs'],
-    languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+    languageOptions: {
+      globals: {
+        process: 'readonly', console: 'readonly', fetch: 'readonly', Buffer: 'readonly',
+      },
+    },
     rules: { 'no-restricted-syntax': 'off' },
   },
   {

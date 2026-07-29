@@ -33,11 +33,13 @@ export function Today({
   return (
     <div className="screen">
       <h1 className="screen-title">Today</h1>
-      <p className="screen-sub">
-        {total === 0
-          ? 'Nothing waiting.'
-          : `${total} ${total === 1 ? 'thing' : 'things'} for you.`}
-      </p>
+      {/* When there is nothing, the empty state below says so. Saying it twice
+          in two different ways reads as a system repeating itself. */}
+      {total > 0 && (
+        <p className="screen-sub">
+          {total} {total === 1 ? 'thing' : 'things'} for you.
+        </p>
+      )}
 
       {total === 0 && (
         <div className="empty">

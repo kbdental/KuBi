@@ -33,7 +33,10 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
-button { font: inherit; color: inherit; }
+/* Form controls do not inherit the page font on their own. Without this,
+   every placeholder and typed note renders in the browser's monospace
+   default — which reads as "terminal", not "clinic". */
+button, input, textarea, select { font: inherit; color: inherit; }
 
 /* ---- layout --------------------------------------------------------------- */
 
@@ -145,7 +148,10 @@ button { font: inherit; color: inherit; }
 textarea.field { min-height: 96px; resize: vertical; }
 label.field-label { display: block; font-weight: 600; margin-bottom: 6px; }
 
+/* Block, not inline: as an inline button it sits on the same line as whatever
+   follows, and a severity pill lands on top of it. */
 .back {
+  display: block; width: fit-content;
   background: none; border: 0; padding: 10px 0; min-height: 44px;
   color: var(--ink-soft); font-size: 16px; cursor: pointer;
 }
