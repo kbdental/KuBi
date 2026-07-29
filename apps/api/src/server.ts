@@ -31,6 +31,7 @@ import {
 } from './platform/schedule/appointment.service.js';
 import { writeAudit, AuditAction } from './platform/audit/audit.service.js';
 import { clinicLocalDate, clinicLocalTimeToUtc } from './platform/workflow/scheduler.service.js';
+import { buildHandover } from './platform/workflow/handover.service.js';
 import { ActivityStatus, ExceptionStatus } from '@kubi/contracts';
 
 const clock = systemClock;
@@ -634,6 +635,23 @@ export async function buildServer(): Promise<FastifyInstance> {
       authoriseGate(tx, clock, { instanceId: id, employeeId: s.employeeId!, reason: body.reason }));
     await track(s, 'authorise_gate', { instanceId: id });
     return { ok: true };
+  });
+
+  // ---- CLOSING: what tomorrow inherits (VS-03) ----
+  app.get('/api/v1/handover', async (req) => {
+    const s = await requireSession(req);
+    const now = clock.now();
+
+    const result = await withTenantContext(prisma, s.tenancy, async (tx) => {
+      const clinicId = s.tenancy.clinicIds[0];
+      if (s.tenancy.clinicIds.length !== 1 || !clinicId) return null;
+      const clinic = await tx.clinic.findUnique({ where: { id: clinicId } });
+      if (!clinic) return null;
+      return buildHandover(tx, clock, clinicId, clinicLocalDate(now, clinic.timezone));
+    });
+
+    await track(s, 'view_handover');
+    return result ?? { periodKey: null, clear: true, unfinished: [], waitingOnSomeone: [], stillOpen: [], patientsNotSeen: [] };
   });
 
   app.get('/health', async () => ({ ok: true }));

@@ -1,15 +1,17 @@
 /**
- * Loads the five OPN definitions + their checklists into one organisation.
+ * Loads the standards library — the five OPN opening definitions and the four
+ * CLS closing ones — plus their checklists, into one organisation.
  * Idempotent by (organizationId, code, version).
  */
 import type { TenantPrisma } from '../../apps/api/src/platform/tenancy/rls-context.js';
+import { CLOSING_ACTIVITIES } from './closing-activities.js';
 import { OPENING_ACTIVITIES, ESCALATION_DEFAULTS } from './opening-activities.js';
 
 export async function loadOpeningActivities(
   tx: TenantPrisma,
   organizationId: string,
 ): Promise<number> {
-  for (const seed of OPENING_ACTIVITIES) {
+  for (const seed of [...OPENING_ACTIVITIES, ...CLOSING_ACTIVITIES]) {
     const existing = await tx.activityDefinition.findUnique({
       where: { organizationId_code_version: { organizationId, code: seed.code, version: 1 } },
     });
@@ -68,5 +70,5 @@ export async function loadOpeningActivities(
     }
   }
 
-  return OPENING_ACTIVITIES.length;
+  return OPENING_ACTIVITIES.length + CLOSING_ACTIVITIES.length;
 }

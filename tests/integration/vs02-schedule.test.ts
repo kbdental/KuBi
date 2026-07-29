@@ -241,3 +241,54 @@ describe('VS-02 — the clinic knows where its day is', () => {
     expect(typeof swept).toBe('number');
   });
 });
+
+describe('VS-03 — what tomorrow inherits', () => {
+  it('states what is being left behind, in the order it matters', async () => {
+    const cookie = await login(`rahul_${suffix}@synthetic.test`);
+    const res = await app.inject({ method: 'GET', url: '/api/v1/handover', headers: { cookie } });
+    expect(res.statusCode).toBe(200);
+
+    const h = res.json();
+    expect(h.periodKey).toBeTruthy();
+    // Closing a day with outstanding work must never read as clear.
+    expect(h.clear).toBe(false);
+
+    // Unfinished and "waiting on someone" are different facts: one is work
+    // that did not happen, the other is work nobody has confirmed.
+    expect(Array.isArray(h.unfinished)).toBe(true);
+    expect(Array.isArray(h.waitingOnSomeone)).toBe(true);
+
+    const all = [...h.unfinished, ...h.waitingOnSomeone, ...h.stillOpen, ...h.patientsNotSeen];
+    expect(all.length).toBeGreaterThan(0);
+    for (const line of all) {
+      expect(typeof line.headline).toBe('string');
+      expect(['PATIENT_SAFETY', 'CRITICAL', 'IMPORTANT', 'ROUTINE']).toContain(line.severity);
+    }
+    // Q6 holds through closing: a handover says what is outstanding, never who.
+    expect(JSON.stringify(h)).not.toMatch(/priya|rahul|anita|kavita/i);
+  });
+
+  it('names patients who were never seen, because someone has to ring them', async () => {
+    const cookie = await login(`rahul_${suffix}@synthetic.test`);
+    const h = (await app.inject({ method: 'GET', url: '/api/v1/handover', headers: { cookie } })).json();
+    expect(h.patientsNotSeen.length).toBeGreaterThan(0);
+    // Someone who arrived and never went through is worse than a no-show.
+    for (const line of h.patientsNotSeen) {
+      expect(line.headline).toMatch(/was not seen/);
+    }
+  });
+
+  it('loads the closing activities alongside the opening ones', async () => {
+    const defs = await withTenantContext(prisma, ctx(), (tx) =>
+      tx.activityDefinition.findMany({ where: { process: 'Closing Readiness' } }));
+    expect(defs.length).toBe(4);
+
+    // Sterilisation, drugs and securing the building are never self-confirmed,
+    // whatever the roster looks like.
+    for (const d of defs) {
+      expect(d.selfVerifyAllowed).toBe(false);
+    }
+    const codes = defs.map((d) => d.code).sort();
+    expect(codes).toEqual(['CLS-001', 'CLS-002', 'CLS-003', 'CLS-004']);
+  });
+});
