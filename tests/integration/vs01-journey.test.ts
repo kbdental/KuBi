@@ -161,7 +161,9 @@ describe('VS-01 journey — through the API', () => {
     // offered the override at all -- canOverride is false, and the message
     // sends her down the path she does have.
     expect(blocked.json().canOverride).toBe(false);
-    expect(blocked.json().error).toMatch(/report a problem/i);
+    // She is told it has been handed on, not told to go and find someone.
+    expect(blocked.json().error).toMatch(/a manager has been asked/i);
+    expect(blocked.json().error).toMatch(/don't need to chase/i);
 
     // And typing a reason anyway does not get her past it. The check is on
     // authority, not on whether the request happens to carry a justification.
@@ -194,6 +196,53 @@ describe('VS-01 journey — through the API', () => {
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().error).toMatch(/assigned to someone else/i);
+  });
+
+  it('the manager is told, and can release that one task so the assignee finishes it', async () => {
+    // The two rules coexist: only the assignee may do the work, only a manager
+    // may decide it is safe to proceed. Without this hand-off the activity is
+    // finishable by nobody.
+    const rahul = await login(`rahul_${suffix}@synthetic.test`);
+    const attention = (await app.inject({
+      method: 'GET', url: '/api/v1/attention', headers: { cookie: rahul },
+    })).json();
+    const ask = attention.find((a: { needsAuthorisation?: boolean }) => a.needsAuthorisation);
+    expect(ask).toBeDefined();
+    expect(ask.headline).toMatch(/needs a manager's go-ahead/);
+    expect(ask.instanceId).toBeTruthy();   // routes straight to the task
+
+    const authorised = await app.inject({
+      method: 'POST', url: `/api/v1/tasks/${ask.instanceId}/authorise`,
+      headers: { cookie: rahul },
+      payload: { reason: 'SYNTHETIC: counted the kit against the paper list myself' },
+    });
+    expect(authorised.statusCode).toBe(200);
+
+    // Now — and only now — the assignee can finish it.
+    const priya = await login(`priya_${suffix}@synthetic.test`);
+    const sheet = (await app.inject({
+      method: 'GET', url: `/api/v1/tasks/${ask.instanceId}`, headers: { cookie: priya },
+    })).json();
+    const done = await app.inject({
+      method: 'POST', url: `/api/v1/tasks/${ask.instanceId}/complete`, headers: { cookie: priya },
+      payload: { responses: sheet.items.map((i: { id: string }) => ({ itemId: i.id, checked: true })) },
+    });
+    expect(done.statusCode).toBe(200);
+    expect(done.json().status).toBe('COMPLETED');
+  });
+
+  it('an assistant cannot authorise, however they ask', async () => {
+    const priya = await login(`priya_${suffix}@synthetic.test`);
+    const target = await withTenantContext(
+      prisma,
+      { organizationId: env.organizationId, clinicIds: [env.clinicId], crossClinic: false },
+      (tx) => tx.activityInstance.findFirstOrThrow({ where: { definition: { code: 'OPN-002' } } }),
+    );
+    const res = await app.inject({
+      method: 'POST', url: `/api/v1/tasks/${target.id}/authorise`,
+      headers: { cookie: priya }, payload: { reason: 'SYNTHETIC: I think it is fine' },
+    });
+    expect(res.statusCode).toBe(403);
   });
 
   it('the problem reaches Rahul automatically, and he resolves it', async () => {
@@ -363,8 +412,8 @@ describe('VS-01 journey — through the API', () => {
     expect(day.clinic.timezone).toBe('Asia/Kolkata');   // times are clinic-local
     expect(day.clinic.phase).toBe('OPENING');
     expect(day.clinic.readyBy).toBeTruthy();            // from clinic configuration
-    // Never guessed: there are no appointments yet, so there is no first patient.
-    expect(day.clinic.firstPatientAt).toBeNull();
+    // VS-02: real, from the day's schedule rather than guessed.
+    expect(day.clinic.firstPatientAt).toBeTruthy();
 
     expect(day.opening).not.toBeNull();
     expect(day.opening.total).toBe(5);          // the whole clinic's set, not Priya's share

@@ -129,6 +129,12 @@ export const PERMISSION_CATALOGUE: readonly PermissionSeed[] = [
   p('attention_item', 'resolve', S, 'VS-01 — accountable owner, manager and above'),
   p('activity_instance', 'override_gate', A, 'VS-01 usability review Q2 — finishing a task whose requirement cannot be confirmed is a management judgement, not a task-level one. ADMIN-class because deciding it is safe to proceed without confirmation is a governance act. Never applies to BLOCK_HARD, which has no override path at all (ADR-004)'),
 
+  // -- appointments (VS-02) -----------------------------------------------
+  p('appointment', 'view', S, 'VS-02 — today\'s schedule at this clinic'),
+  p('appointment', 'update_status', S, 'VS-02 — arrived / in the chair / finished / cancelled. Reception and clinical staff both do this in practice, so it is STANDARD-class and narrowed by clinic scope rather than by role'),
+  p('appointment', 'create', S, 'VS-02 — booking. Not yet exposed in the UI; the permission exists so scheduling lands against a real grant rather than inventing one later'),
+  p('appointment', 'cancel', S, 'VS-02 — cancelling always records a reason (database trigger, not just a form)'),
+
   // -- patient (table exists since Phase 1; no clinical workflow built) ----
   p('patient', 'view', S, 'Phase 0.5 D1 clinical.patient — clinic-scoped read only; no clinical fields exist yet'),
   p('patient', 'view_all_clinics', A, 'ADR-002/D-02 — the org-wide visibility permission that OD-05 governs'),

@@ -198,6 +198,29 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .progress-fill { height: 100%; background: var(--ok); border-radius: 999px; }
 .progress-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+/* ---- the day, as people ---------------------------------------------------- */
+
+.visit {
+  /* Stacked, not columns. A time, a name and an action do not fit side by
+     side on a phone without one of them being crushed. */
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px 16px; margin-bottom: 10px;
+}
+.visit.is-done { opacity: 0.55; }
+.visit-head { display: flex; align-items: baseline; gap: 12px; }
+.visit-when {
+  font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.visit-who { font-weight: 600; font-size: 17px; flex: 1; min-width: 0; }
+.visit-what { color: var(--ink-soft); font-size: 15px; margin-top: 3px; }
+.visit-state { display: flex; align-items: center; gap: 8px; margin-top: 9px; flex-wrap: wrap; }
+.visit-waiting { font-size: 14px; color: var(--ink-soft); }
+.visit-waiting.is-long { color: var(--safety); font-weight: 650; }
+.visit-do { margin-top: 12px; min-height: 48px; font-size: 16px; }
+/* A status pill must never wrap -- a three-line pill reads as a bug. */
+.pill { white-space: nowrap; }
+
 /* ---- notices -------------------------------------------------------------- */
 
 .notice { border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px; font-size: 16px; }

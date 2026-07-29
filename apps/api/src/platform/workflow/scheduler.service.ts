@@ -14,6 +14,7 @@ import { withTenantContext } from '../tenancy/rls-context.js';
 import type { Clock } from '../../shared/clock.js';
 import { resolveActor, type ActorRef } from './assignment-resolver.js';
 import { raiseAttentionItem } from '../signals/attention.service.js';
+import { checkReadinessAgainstFirstPatient } from '../schedule/appointment.service.js';
 import { ActivityStatus, Priority } from '@kubi/contracts';
 
 /** Clinic-local calendar date, e.g. "2026-07-28". */
@@ -223,6 +224,19 @@ export async function sweepOverdue(
           ownerRoleCode: 'CLINIC_MANAGER',
         });
       }
+      // VS-02: the sweep also asks the question that makes this an operating
+      // assistant rather than a task tracker -- is the first patient nearly
+      // here while the clinic is still not ready? Deduplicated by the
+      // attention service, so a sweep every few minutes does not flood anyone.
+      const clinic = await tx.clinic.findUnique({ where: { id: clinicId } });
+      if (clinic) {
+        await checkReadinessAgainstFirstPatient(tx, clock, {
+          organizationId,
+          clinicId,
+          periodKey: clinicLocalDate(now, clinic.timezone),
+        });
+      }
+
       return stale.length;
     },
   );

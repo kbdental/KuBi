@@ -28,10 +28,24 @@ export class TaskAuthorizationError extends Error {
  */
 export class GateBlockedError extends Error {
   readonly overridable: boolean;
-  constructor(message: string, overridable: boolean) {
+  /**
+   * Set when the refusal is "not your call" rather than "not possible". The
+   * caller must raise the manager's attention item OUTSIDE this transaction:
+   * anything written before throwing is rolled back with it, so raising it
+   * here would look right and tell nobody.
+   */
+  readonly needsAuthorisation: boolean;
+  readonly instanceId: string | null;
+  constructor(
+    message: string,
+    overridable: boolean,
+    extra?: { needsAuthorisation?: boolean; instanceId?: string },
+  ) {
     super(message);
     this.name = 'GateBlockedError';
     this.overridable = overridable;
+    this.needsAuthorisation = extra?.needsAuthorisation ?? false;
+    this.instanceId = extra?.instanceId ?? null;
   }
 }
 
@@ -184,41 +198,62 @@ export async function completeTask(
       code: 'activity_instance:override_gate',
     });
 
-    if (!mayOverride.allowed) {
-      throw new GateBlockedError(
-        `${gate.message}. Report a problem and a manager will take it from here.`,
-        false, // not overridable BY THIS PERSON -- the screen must not offer it
-      );
-    }
+    // A manager may already have authorised THIS instance. That is how the two
+    // rules coexist: only the assignee may do the work, and only a manager may
+    // decide it is safe to proceed without confirmation. Without this the
+    // activity is finishable by nobody -- whoever may decide cannot act, and
+    // whoever may act cannot decide.
+    const authorised = inst.gateAuthorisedAt !== null;
 
-    if (!override?.reason?.trim()) {
+    if (authorised) {
+      // A manager has already decided. The assignee is not asked to justify a
+      // judgement that was not theirs; the manager's reason is the record.
+      await writeAudit(tx, {
+        organizationId: inst.organizationId, clinicId: inst.clinicId,
+        actorEmployeeId: employeeId, action: 'GATE_AUTHORISATION_USED',
+        entityType: 'activity_instance', entityId: instanceId,
+        reason: inst.gateAuthorisationReason,
+        newValue: { authorisedBy: inst.gateAuthorisedByEmployeeId },
+      });
+    } else if (!mayOverride.allowed) {
+      // Telling the assignee to "ask a manager" and leaving it there would
+      // make the product depend on someone walking across the clinic. The
+      // caller raises it, outside this transaction -- see the error's note.
+      throw new GateBlockedError(
+        `${gate.message}. A manager has been asked to look at it — you don't need to chase them.`,
+        false, // not overridable BY THIS PERSON -- the screen must not offer it
+        { needsAuthorisation: true, instanceId: inst.id },
+      );
+    } else if (!override?.reason?.trim()) {
       throw new GateBlockedError(
         `${gate.message}. Report a problem, or record why it is safe to go ahead.`,
         true,
       );
+    } else {
+      // A manager finishing their own blocked task: the decision and the work
+      // are the same person's, so one step. Never silent -- audited AND raised
+      // as Attention, so it is seen even if nobody reports it. OD-20 chose
+      // BLOCK_OVERRIDABLE precisely so this path exists.
+      await writeAudit(tx, {
+        organizationId: inst.organizationId, clinicId: inst.clinicId,
+        actorEmployeeId: employeeId, action: 'GATE_OVERRIDDEN',
+        entityType: 'activity_instance', entityId: instanceId,
+        reason: override.reason,
+        newValue: { requirement: gate.requirement, result: gate.result },
+      });
+      await raiseAttentionItem(tx, clock, {
+        organizationId: inst.organizationId, clinicId: inst.clinicId,
+        code: 'OPN.GATE_OVERRIDE.PROCEEDED_WITHOUT_CONFIRMATION',
+        severity: def.priority,
+        // Built as a sentence, not spliced out of the gate message -- chopping
+        // the front off "We can't confirm X yet" produces a headline that reads
+        // like broken English on the one screen that has to be trusted.
+        headline: `${def.title} — finished before everything could be confirmed`,
+        detail: `${gate.message}. Reason given: ${override.reason}`,
+        sourceInstanceId: inst.id,
+        ownerRoleCode: 'CLINIC_MANAGER',
+      });
     }
-    // Going ahead anyway is a management act, and it is never silent: it is
-    // audited AND raised as Attention, so a manager sees it even if nobody
-    // reports it. OD-20 chose BLOCK_OVERRIDABLE precisely so this path exists.
-    await writeAudit(tx, {
-      organizationId: inst.organizationId, clinicId: inst.clinicId,
-      actorEmployeeId: employeeId, action: 'GATE_OVERRIDDEN',
-      entityType: 'activity_instance', entityId: instanceId,
-      reason: override.reason,
-      newValue: { requirement: gate.requirement, result: gate.result },
-    });
-    await raiseAttentionItem(tx, clock, {
-      organizationId: inst.organizationId, clinicId: inst.clinicId,
-      code: 'OPN.GATE_OVERRIDE.PROCEEDED_WITHOUT_CONFIRMATION',
-      severity: def.priority,
-      // Built as a sentence, not spliced out of the gate message -- chopping
-      // the front off "We can't confirm X yet" produces a headline that reads
-      // like broken English on the one screen that has to be trusted.
-      headline: `${def.title} — finished before everything could be confirmed`,
-      detail: `${gate.message}. Reason given: ${override.reason}`,
-      sourceInstanceId: inst.id,
-      ownerRoleCode: 'CLINIC_MANAGER',
-    });
   }
 
   // Out-of-range VALUE readings raise Attention (OD-21) but do not block.
@@ -389,6 +424,115 @@ export const PROBLEM_KINDS = [
   { key: 'NOT_CLEAN', label: 'Not clean' },
   { key: 'OTHER', label: 'Something else' },
 ] as const;
+
+/**
+ * A manager authorises ONE task to go ahead without confirmation.
+ *
+ * This is the piece that makes the Q2 decision workable. Only the assignee may
+ * do the work, and only a manager may decide it is safe to proceed — so
+ * without a way to hand the decision across, a blocked task assigned to an
+ * assistant is finishable by nobody.
+ *
+ * Deliberately per-instance and per-day: authorising today's emergency-kit
+ * check says nothing about tomorrow's. A standing exemption is a different
+ * thing entirely and would need to be a policy decision, not a button.
+ */
+export async function authoriseGate(
+  tx: TenantPrisma, clock: Clock,
+  input: { instanceId: string; employeeId: string; reason: string },
+) {
+  const inst = await tx.activityInstance.findUniqueOrThrow({
+    where: { id: input.instanceId }, include: { definition: true },
+  });
+
+  const decision = await checkPermission(tx, clock, {
+    employeeId: input.employeeId,
+    organizationId: inst.organizationId,
+    clinicId: inst.clinicId,
+    code: 'activity_instance:override_gate',
+  });
+  if (!decision.allowed) {
+    throw new TaskAuthorizationError('You do not have authority to let this go ahead.');
+  }
+  if (!input.reason.trim()) {
+    throw new TaskAuthorizationError('Please say why it is safe to go ahead.');
+  }
+
+  const gate = await evaluateGate(
+    tx, inst.organizationId, inst.clinicId,
+    inst.definition.gateRequirement, inst.definition.gateEnforcement,
+  );
+  if (!gate?.blocks) {
+    throw new TaskAuthorizationError('There is nothing blocking this task.');
+  }
+  if (!gate.overridable) {
+    // ADR-004. No permission grants this and no reason unlocks it.
+    throw new TaskAuthorizationError('This one cannot be let through by anybody.');
+  }
+
+  const now = clock.now();
+  const updated = await tx.activityInstance.update({
+    where: { id: input.instanceId },
+    data: {
+      gateAuthorisedByEmployeeId: input.employeeId,
+      gateAuthorisedAt: now,
+      gateAuthorisationReason: input.reason.trim(),
+    },
+  });
+
+  await writeAudit(tx, {
+    organizationId: inst.organizationId, clinicId: inst.clinicId,
+    actorEmployeeId: input.employeeId, action: 'GATE_AUTHORISED',
+    entityType: 'activity_instance', entityId: input.instanceId,
+    reason: input.reason.trim(),
+    newValue: { requirement: gate.requirement, result: gate.result },
+  });
+
+  // The person holding the task is told, so they are not left refreshing a
+  // screen waiting to find out whether anything happened.
+  if (inst.assigneeEmployeeId) {
+    await tx.notification.create({
+      data: {
+        organizationId: inst.organizationId,
+        recipientEmployeeId: inst.assigneeEmployeeId,
+        priority: 'P2',
+        headline: `You can go ahead with: ${inst.definition.title}`,
+      },
+    });
+  }
+
+  return updated;
+}
+
+/**
+ * Ask a manager to look at one blocked task.
+ *
+ * Called AFTER the refusing transaction has rolled back, which is the whole
+ * point: a message written inside the transaction that refuses is discarded
+ * along with it, and the manager is never told.
+ */
+export async function askForAuthorisation(
+  tx: TenantPrisma, clock: Clock, instanceId: string,
+) {
+  const inst = await tx.activityInstance.findUniqueOrThrow({
+    where: { id: instanceId }, include: { definition: true },
+  });
+  const gate = await evaluateGate(
+    tx, inst.organizationId, inst.clinicId,
+    inst.definition.gateRequirement, inst.definition.gateEnforcement,
+  );
+  if (!gate?.blocks) return null;
+
+  return raiseAttentionItem(tx, clock, {
+    organizationId: inst.organizationId, clinicId: inst.clinicId,
+    code: 'OPN.GATE.NEEDS_AUTHORISATION',
+    severity: inst.definition.priority,
+    headline: `${inst.definition.title} needs a manager's go-ahead`,
+    detail: `${gate.message}. Whoever is doing it cannot finish until someone with the authority says it is safe.`,
+    sourceInstanceId: inst.id,
+    ownerRoleCode: 'CLINIC_MANAGER',
+  });
+}
 
 export async function reportProblem(
   tx: TenantPrisma, clock: Clock,

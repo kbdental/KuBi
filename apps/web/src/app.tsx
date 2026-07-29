@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, ApiError, type Me, type MyDay, type TaskSheet, type AttentionRow, type CheckRow } from './api.js';
+import {
+  api, ApiError,
+  type Me, type MyDay, type TaskSheet, type AttentionRow, type CheckRow, type Schedule,
+} from './api.js';
 import { SignIn } from './screens/sign-in.js';
 import { Today } from './screens/today.js';
 import { TaskSheetScreen } from './screens/task-sheet.js';
 import { Attention } from './screens/attention.js';
 import { Checks } from './screens/checks.js';
+import { Clinic } from './screens/clinic.js';
 
 /**
  * The shell.
@@ -18,13 +22,23 @@ import { Checks } from './screens/checks.js';
  * tab is a small daily lie about what this person's job is.
  */
 
-type Place = 'TODAY' | 'ATTENTION' | 'CHECKS' | 'ME';
+/**
+ * Who moves a visit along. A courtesy only — the server decides, and refuses
+ * anyone else. Hiding a button they cannot use beats offering a dead end.
+ */
+const CAN_MOVE_VISITS = [
+  'RECEPTION', 'CLINIC_MANAGER', 'CLINIC_HEAD', 'OWNER_DIRECTOR',
+  'TREATING_DOCTOR', 'CLINICAL_DIRECTOR',
+];
+
+type Place = 'TODAY' | 'CLINIC' | 'ATTENTION' | 'CHECKS' | 'ME';
 
 interface Loaded {
   me: Me;
   day: MyDay;
   attention: AttentionRow[];
   checks: CheckRow[];
+  schedule: Schedule;
 }
 
 export function App() {
@@ -34,10 +48,12 @@ export function App() {
   const [checking, setChecking] = useState(true);
 
   const refresh = useCallback(async () => {
-    const [me, day, attention, checks] = await Promise.all([
+    // The schedule is not fatal: someone who cannot see it still has a Today.
+    const [me, day, attention, checks, schedule] = await Promise.all([
       api.me(), api.myDay(), api.attention(), api.checks(),
+      api.schedule().catch((): Schedule => ({ rows: [], periodKey: null })),
     ]);
-    setData({ me, day, attention, checks });
+    setData({ me, day, attention, checks, schedule });
   }, []);
 
   // On load, find out whether the cookie we may already hold is still good.
@@ -93,7 +109,20 @@ export function App() {
       {place === 'TODAY' && (
         <Today day={data.day} onOpenTask={(id) => void open(id)} onRefresh={reload} />
       )}
-      {place === 'ATTENTION' && <Attention items={data.attention} onResolved={reload} />}
+      {place === 'CLINIC' && (
+        <Clinic
+          schedule={data.schedule}
+          canAct={CAN_MOVE_VISITS.some((r) => data.me.roleCodes.includes(r))}
+          onChanged={reload}
+        />
+      )}
+      {place === 'ATTENTION' && (
+        <Attention
+          items={data.attention}
+          onResolved={reload}
+          onOpenTask={(id) => void open(id)}
+        />
+      )}
       {place === 'CHECKS' && <Checks items={data.checks} onDone={reload} />}
       {place === 'ME' && (
         <MeScreen me={data.me} onSignedOut={() => { setData(null); setPlace('TODAY'); }} />
@@ -101,6 +130,9 @@ export function App() {
 
       <nav className="tabs">
         <Tab id="TODAY" label="Today" now={place} go={setPlace} />
+        {data.schedule.rows.length > 0 && (
+          <Tab id="CLINIC" label="Clinic" now={place} go={setPlace} />
+        )}
         <Tab
           id="ATTENTION"
           label="Attention"

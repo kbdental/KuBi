@@ -58,6 +58,18 @@ const DOES_WORK: readonly string[] = [
   c('attention_item', 'view'),
 ];
 
+/**
+ * VS-02: who deals with the day's schedule. Reception runs the front desk;
+ * clinical and management roles need it because their day IS the schedule.
+ * Housekeeping, inventory and lab do not — the schedule is not their job, and
+ * a patient list they have no use for is a patient list they should not see.
+ */
+const RUNS_THE_DAY: readonly string[] = [
+  c('appointment', 'view'),
+  c('appointment', 'update_status'),
+  c('appointment', 'cancel'),
+];
+
 /** Roles that act as an independent CHECK on someone else's work. */
 const VERIFIES: readonly string[] = [c('activity_instance', 'verify')];
 
@@ -81,7 +93,7 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     code: RoleCode.OWNER_DIRECTOR,
     name: 'Owner / Director',
     grants: [
-      ...DOES_WORK, ...VERIFIES, ...RESOLVES, ...OVERRIDES_CANT_CONFIRM,
+      ...DOES_WORK, ...VERIFIES, ...RESOLVES, ...OVERRIDES_CANT_CONFIRM, ...RUNS_THE_DAY,
       c('organization', 'view'), c('organization', 'update'), c('organization', 'configure'),
       c('clinic', 'view'), c('clinic', 'create'), c('clinic', 'update'), c('clinic', 'archive'), c('clinic', 'configure'),
       c('config_value', 'view'), c('config_value', 'set'), c('config_value', 'view_history'),
@@ -102,7 +114,7 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     // OD-01: management authority only. Deliberately excludes clinical_authority
     // grant/revoke, competency:assess, and any implied clinical grant.
     grants: [
-      ...DOES_WORK, ...VERIFIES, ...RESOLVES, ...OVERRIDES_CANT_CONFIRM,
+      ...DOES_WORK, ...VERIFIES, ...RESOLVES, ...OVERRIDES_CANT_CONFIRM, ...RUNS_THE_DAY,
       c('organization', 'view'),
       c('clinic', 'view'), c('clinic', 'update'), c('clinic', 'configure'),
       c('config_value', 'view'), c('config_value', 'set'), c('config_value', 'view_history'),
@@ -122,7 +134,7 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     // Governs OTHER people's clinical authority; does not imply the Clinical
     // Director's OWN ClinicalAuthority row, which provisioning grants explicitly.
     grants: [
-      ...DOES_WORK, ...VERIFIES, ...RESOLVES, ...OVERRIDES_CANT_CONFIRM,
+      ...DOES_WORK, ...VERIFIES, ...RESOLVES, ...OVERRIDES_CANT_CONFIRM, ...RUNS_THE_DAY,
       c('employee', 'view'),
       c('clinical_authority', 'view'), c('clinical_authority', 'grant'), c('clinical_authority', 'revoke'),
       c('functional_assignment', 'view'), c('functional_assignment', 'grant'), c('functional_assignment', 'revoke'),
@@ -135,7 +147,7 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     code: RoleCode.TREATING_DOCTOR,
     name: 'Treating / Associate Doctor',
     grants: [
-      ...DOES_WORK, ...VERIFIES,
+      ...DOES_WORK, ...VERIFIES, ...RUNS_THE_DAY,
       c('employee', 'view'),
       c('competency', 'view'),
       c('patient', 'view'),
@@ -145,7 +157,7 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     code: RoleCode.CLINIC_MANAGER,
     name: 'Clinic Manager',
     grants: [
-      ...DOES_WORK, ...VERIFIES, ...RESOLVES, ...OVERRIDES_CANT_CONFIRM,
+      ...DOES_WORK, ...VERIFIES, ...RESOLVES, ...OVERRIDES_CANT_CONFIRM, ...RUNS_THE_DAY,
       c('clinic', 'view'),
       c('employee', 'view'), c('employee', 'update'),
       c('functional_assignment', 'view'), c('functional_assignment', 'grant'), c('functional_assignment', 'revoke'),
@@ -158,7 +170,7 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     code: RoleCode.RECEPTION,
     name: 'Reception',
     grants: [
-      ...DOES_WORK,
+      ...DOES_WORK, ...RUNS_THE_DAY, c('appointment', 'create'),
       c('patient', 'view'),
     ],
   },
@@ -166,11 +178,16 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
     code: RoleCode.SENIOR_ASSISTANT,
     name: 'Senior Assistant',
     grants: [
-      ...DOES_WORK, ...VERIFIES,
+      ...DOES_WORK, ...VERIFIES, c('appointment', 'view'),
       c('patient', 'view'),
     ],
   },
-  { code: RoleCode.DENTAL_ASSISTANT, name: 'Dental Assistant', grants: [...DOES_WORK, c('patient', 'view')] },
+  {
+    code: RoleCode.DENTAL_ASSISTANT,
+    name: 'Dental Assistant',
+    // Sees the day so they can prepare for it; does not move visits along.
+    grants: [...DOES_WORK, c('appointment', 'view'), c('patient', 'view')],
+  },
   { code: RoleCode.INVENTORY_COORDINATOR, name: 'Inventory Coordinator', grants: [...DOES_WORK] },
   { code: RoleCode.LAB_COORDINATOR, name: 'Lab Coordinator', grants: [...DOES_WORK] },
   {

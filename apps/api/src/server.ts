@@ -22,8 +22,13 @@ import { checkPermission } from './platform/rbac/permission-evaluation.service.j
 import { withSystemContext } from './platform/tenancy/rls-context.js';
 import {
   startTask, respondToChecklist, completeTask, verifyTask, reportProblem,
-  evaluateGate, TaskAuthorizationError, GateBlockedError, PROBLEM_KINDS,
+  evaluateGate, authoriseGate, askForAuthorisation,
+  TaskAuthorizationError, GateBlockedError, PROBLEM_KINDS,
 } from './platform/workflow/task.service.js';
+import {
+  getSchedule, nextPatientAt, setAppointmentStatus, AppointmentTransitionError,
+  type AppointmentStatus,
+} from './platform/schedule/appointment.service.js';
 import { writeAudit, AuditAction } from './platform/audit/audit.service.js';
 import { clinicLocalDate, clinicLocalTimeToUtc } from './platform/workflow/scheduler.service.js';
 import { ActivityStatus, ExceptionStatus } from '@kubi/contracts';
@@ -68,13 +73,13 @@ async function clinicContext(
    * at the clinic, whoever is looking and from wherever.
    */
   timezone: string;
-  phase: 'OPENING' | 'OPEN' | null;
+  phase: 'OPENING' | 'OPEN' | 'SEEING_PATIENTS' | null;
   opening: { total: number; done: number; complete: boolean } | null;
   readyBy: Date | null;
   /**
-   * When the first patient is expected. Always null until appointment
-   * integration lands — the field exists so the screen is built against the
-   * real shape, and it is never populated with a guess.
+   * When the next patient the clinic must be ready for is due. Real since
+   * VS-02, and still null when there is genuinely nobody left today — which
+   * is an answer, not a gap, and must not be dressed up as a time.
    */
   firstPatientAt: Date | null;
 } | null> {
@@ -91,7 +96,8 @@ async function clinicContext(
     select: { status: true },
   });
 
-  const base = { name: clinic.name, timezone: clinic.timezone, firstPatientAt: null };
+  const firstPatientAt = await nextPatientAt(tx, clinicId, periodKey);
+  const base = { name: clinic.name, timezone: clinic.timezone, firstPatientAt };
   if (rows.length === 0) return { ...base, phase: null, opening: null, readyBy: null };
 
   const done = rows.filter(
@@ -106,9 +112,13 @@ async function clinicContext(
   });
   const openingTime = (cfg?.valueJson as { value?: string } | null)?.value ?? null;
 
+  const inChair = await tx.appointment.count({
+    where: { clinicId, periodKey, status: 'IN_CHAIR' },
+  });
+
   return {
     ...base,
-    phase: complete ? 'OPEN' : 'OPENING',
+    phase: !complete ? 'OPENING' : inChair > 0 ? 'SEEING_PATIENTS' : 'OPEN',
     opening: { total: rows.length, done, complete },
     readyBy: openingTime ? clinicLocalTimeToUtc(periodKey, openingTime, clinic.timezone) : null,
   };
@@ -160,6 +170,10 @@ export async function buildServer(): Promise<FastifyInstance> {
     // isn't ready. 409 so the screen can offer the two honest ways forward.
     if (err instanceof GateBlockedError) {
       reply.status(409).send({ error: err.message, canOverride: err.overridable });
+      return;
+    }
+    if (err instanceof AppointmentTransitionError) {
+      reply.status(409).send({ error: err.message });
       return;
     }
     if (status >= 500) logger.error({ errorName: err.name }, 'request failed');
@@ -347,11 +361,22 @@ export async function buildServer(): Promise<FastifyInstance> {
       overrideReason: z.string().min(1).max(500).optional(),
     }).parse(req.body);
 
-    const result = await withTenantContext(prisma, s.tenancy, async (tx) => {
-      await respondToChecklist(tx, clock, id, s.employeeId!, body.responses);
-      return completeTask(tx, clock, id, s.employeeId!,
-        body.overrideReason ? { reason: body.overrideReason } : undefined);
-    });
+    let result;
+    try {
+      result = await withTenantContext(prisma, s.tenancy, async (tx) => {
+        await respondToChecklist(tx, clock, id, s.employeeId!, body.responses);
+        return completeTask(tx, clock, id, s.employeeId!,
+          body.overrideReason ? { reason: body.overrideReason } : undefined);
+      });
+    } catch (err) {
+      // The refusal rolled its transaction back, so the manager still has to
+      // be told — in a transaction of its own, which survives.
+      if (err instanceof GateBlockedError && err.needsAuthorisation && err.instanceId) {
+        await withTenantContext(prisma, s.tenancy, (tx) =>
+          askForAuthorisation(tx, clock, err.instanceId!)).catch(() => undefined);
+      }
+      throw err;
+    }
 
     await track(s, 'task_complete', {
       instanceId: id,
@@ -410,6 +435,11 @@ export async function buildServer(): Promise<FastifyInstance> {
         mine: i.ownerEmployeeId === s.employeeId, // who acts
         dueAt: i.dueAt,                // by when
         escalated: i.escalationLevel !== 'INITIAL',
+        // Some attention items are not "close this", they are "go and do
+        // something". Carried as a plain flag rather than the code, which is
+        // engine vocabulary and never reaches a screen.
+        instanceId: i.sourceInstanceId,
+        needsAuthorisation: i.code === 'OPN.GATE.NEEDS_AUTHORISATION',
       }));
   });
 
@@ -537,6 +567,73 @@ export async function buildServer(): Promise<FastifyInstance> {
       verifyTask(tx, clock, id, s.employeeId!, body.result, body.comment));
     await track(s, 'verify_task', { instanceId: id });
     return { status };
+  });
+
+  // ---- CLINIC: today's schedule (VS-02) ----
+  app.get('/api/v1/schedule', async (req) => {
+    const s = await requireSession(req);
+    const now = clock.now();
+
+    const result = await withTenantContext(prisma, s.tenancy, async (tx) => {
+      const clinicId = s.tenancy.clinicIds[0];
+      if (s.tenancy.clinicIds.length !== 1 || !clinicId) return { rows: [], periodKey: null };
+      const clinic = await tx.clinic.findUnique({ where: { id: clinicId } });
+      if (!clinic) return { rows: [], periodKey: null };
+
+      const periodKey = clinicLocalDate(now, clinic.timezone);
+      const rows = await getSchedule(tx, clock, clinicId, periodKey);
+      return { rows, periodKey, timezone: clinic.timezone };
+    });
+
+    await track(s, 'view_schedule');
+    return result;
+  });
+
+  app.post('/api/v1/appointments/:id/status', async (req) => {
+    const s = await requireSession(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const body = z.object({
+      to: z.enum(['ARRIVED', 'IN_CHAIR', 'COMPLETED', 'CANCELLED', 'NO_SHOW']),
+      reason: z.string().max(500).optional(),
+    }).parse(req.body);
+
+    const updated = await withTenantContext(prisma, s.tenancy, async (tx) => {
+      const appt = await tx.appointment.findUniqueOrThrow({ where: { id } });
+      const decision = await checkPermission(tx, clock, {
+        employeeId: s.employeeId!, organizationId: s.organizationId,
+        clinicId: appt.clinicId, code: 'appointment:update_status',
+      });
+      if (!decision.allowed) {
+        await writeAudit(tx, {
+          organizationId: s.organizationId, clinicId: appt.clinicId,
+          actorEmployeeId: s.employeeId, action: AuditAction.UNAUTHORIZED_ATTEMPT,
+          entityType: 'appointment', entityId: id,
+        });
+        throw Object.assign(new Error('You do not have permission to change this visit.'), { statusCode: 403 });
+      }
+      return setAppointmentStatus(tx, clock, {
+        appointmentId: id,
+        to: body.to as AppointmentStatus,
+        employeeId: s.employeeId!,
+        organizationId: s.organizationId,
+        reason: body.reason ?? null,
+      });
+    });
+
+    await track(s, 'appointment_status', { metadata: { to: body.to } });
+    return { status: updated.status };
+  });
+
+  // ---- a manager lets one blocked task go ahead (usability review Q2) ----
+  app.post('/api/v1/tasks/:id/authorise', async (req) => {
+    const s = await requireSession(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const body = z.object({ reason: z.string().min(1).max(500) }).parse(req.body);
+
+    await withTenantContext(prisma, s.tenancy, (tx) =>
+      authoriseGate(tx, clock, { instanceId: id, employeeId: s.employeeId!, reason: body.reason }));
+    await track(s, 'authorise_gate', { instanceId: id });
+    return { ok: true };
   });
 
   app.get('/health', async () => ({ ok: true }));

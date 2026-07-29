@@ -19,6 +19,7 @@ import { Checks } from '../../apps/web/src/screens/checks.js';
 import { SignIn } from '../../apps/web/src/screens/sign-in.js';
 import { ClinicHeader } from '../../apps/web/src/screens/clinic-header.js';
 import { CurrentTask } from '../../apps/web/src/screens/current-task.js';
+import { Clinic } from '../../apps/web/src/screens/clinic.js';
 import type { MyDay, TaskSheet, AttentionRow, CheckRow } from '../../apps/web/src/api.js';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -361,6 +362,93 @@ describe('the thing happening now is already open', () => {
   });
 });
 
+describe('VS-02 — the day, as people', () => {
+  const schedule = {
+    periodKey: '2026-07-29',
+    timezone: 'Asia/Kolkata',
+    rows: [
+      {
+        id: 'a1', patientLabel: 'SYNTHETIC Meera J.', patientUhid: 'SYN-1001',
+        visitType: 'Check-up', chairLabel: 'Chair 1',
+        scheduledStart: '2026-07-29T04:00:00.000Z', scheduledEnd: '2026-07-29T04:30:00.000Z',
+        status: 'ARRIVED' as const, statusLabel: 'Waiting',
+        waitingMinutes: 22, arrivedAt: '2026-07-29T04:00:00.000Z',
+      },
+      {
+        id: 'a2', patientLabel: 'SYNTHETIC Arjun P.', patientUhid: 'SYN-1002',
+        visitType: 'Root canal', chairLabel: 'Chair 2',
+        scheduledStart: '2026-07-29T04:30:00.000Z', scheduledEnd: '2026-07-29T05:15:00.000Z',
+        status: 'BOOKED' as const, statusLabel: 'Expected',
+        waitingMinutes: null, arrivedAt: null,
+      },
+    ],
+  };
+
+  it('answers the front desk’s actual question: who is here, who is next', () => {
+    render(<Clinic schedule={schedule} canAct onChanged={() => {}} />);
+    expect(screen.getByText(/2 still to see · 1 waiting · 0 in the chair/)).toBeDefined();
+    expect(screen.getByText('SYNTHETIC Meera J.')).toBeDefined();
+    expect(screen.getByText('Waiting')).toBeDefined();
+    expect(visibleText()).not.toMatch(NEVER_ON_SCREEN);
+    // Never a status token on screen.
+    expect(visibleText()).not.toMatch(/\bBOOKED\b|\bIN_CHAIR\b|\bNO_SHOW\b/);
+  });
+
+  it('calls out somebody who has been waiting too long', () => {
+    render(<Clinic schedule={schedule} canAct onChanged={() => {}} />);
+    expect(screen.getByText('waiting 22 min')).toBeDefined();
+  });
+
+  it('shows clinic time, not the viewer’s', () => {
+    // 04:00 UTC is 09:30 in Kolkata.
+    render(<Clinic schedule={schedule} canAct onChanged={() => {}} />);
+    expect(screen.getByText('09:30 AM')).toBeDefined();
+  });
+
+  it('offers one press to move a visit along, and the right one for its state', () => {
+    render(<Clinic schedule={schedule} canAct onChanged={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Taken through' })).toBeDefined(); // waiting
+    expect(screen.getByRole('button', { name: 'They’re here' })).toBeDefined();  // expected
+  });
+
+  it('offers no actions to someone whose job this is not', () => {
+    render(<Clinic schedule={schedule} canAct={false} onChanged={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Taken through' })).toBeNull();
+    // They can still see the day, which is the point of showing it to them.
+    expect(screen.getByText('SYNTHETIC Meera J.')).toBeDefined();
+  });
+});
+
+describe('the clinic header, once the day is real', () => {
+  const base = {
+    name: 'KB Dental Andheri',
+    timezone: 'Asia/Kolkata',
+    phase: 'OPENING' as const,
+    opening: { total: 5, done: 2, complete: false },
+    readyBy: new Date(Date.now() + 20 * 60_000).toISOString(),
+    firstPatientAt: new Date(Date.now() + 35 * 60_000).toISOString(),
+  };
+
+  it('counts down to the first patient', () => {
+    render(<ClinicHeader clinic={base} />);
+    expect(screen.getByText('First patient')).toBeDefined();
+    expect(screen.getByText('35 minutes left')).toBeDefined();
+  });
+
+  it('a patient already past their time never reads as neutral', () => {
+    const late = { ...base, firstPatientAt: new Date(Date.now() - 40 * 60_000).toISOString() };
+    render(<ClinicHeader clinic={late} />);
+    const el = screen.getByText('40 minutes late');
+    expect(el.className).toContain('is-late');
+  });
+
+  it('says nothing about a first patient when nobody is left today', () => {
+    const none = { ...base, firstPatientAt: null };
+    render(<ClinicHeader clinic={none} />);
+    expect(screen.queryByText('First patient')).toBeNull();
+  });
+});
+
 describe('the review decisions, on screen', () => {
   it('Q4: severity reads as what is being asked of you', () => {
     const rows: AttentionRow[] = [
@@ -383,22 +471,43 @@ describe('the review decisions, on screen', () => {
     expect(screen.getByText('1 of 2 done')).toBeDefined();
   });
 
-  it('confirms the clinic is open only when the opening set is actually complete', () => {
-    const done: MyDay = { ...day, opening: { total: 5, done: 5, complete: true } };
-    render(<Today day={done} onOpenTask={() => {}} onRefresh={() => {}} />);
-    expect(screen.getByText('Opening is done')).toBeDefined();
+  it('confirms the clinic is open, as the clinic\'s state rather than a notice', () => {
+    // The confirmation belongs in the header: it is a fact about the clinic,
+    // not one more line in somebody's list.
+    const openClinic = {
+      name: 'KB Dental Andheri', timezone: 'Asia/Kolkata', phase: 'OPEN' as const,
+      opening: { total: 5, done: 5, complete: true },
+      readyBy: new Date().toISOString(), firstPatientAt: null,
+    };
+    render(<ClinicHeader clinic={openClinic} />);
+    expect(screen.getByText('Clinic open')).toBeDefined();
+    expect(screen.getByText('5 of 5 areas ready')).toBeDefined();
+    // Nothing left to count down to once it is open.
+    expect(screen.queryByText('Ready by')).toBeNull();
   });
 
-  it('says nothing about opening when it is only partly done', () => {
-    const partly: MyDay = { ...day, opening: { total: 5, done: 3, complete: false } };
-    render(<Today day={partly} onOpenTask={() => {}} onRefresh={() => {}} />);
-    expect(screen.queryByText('Opening is done')).toBeNull();
+  it('says "seeing patients" once someone is actually in the chair', () => {
+    const busy = {
+      name: 'KB Dental Andheri', timezone: 'Asia/Kolkata', phase: 'SEEING_PATIENTS' as const,
+      opening: { total: 5, done: 5, complete: true },
+      readyBy: new Date().toISOString(),
+      firstPatientAt: new Date(Date.now() + 25 * 60_000).toISOString(),
+    };
+    render(<ClinicHeader clinic={busy} />);
+    expect(screen.getByText('Seeing patients')).toBeDefined();
+    // "First" would be wrong once the day is underway.
+    expect(screen.getByText('Next patient')).toBeDefined();
+    expect(screen.queryByText('First patient')).toBeNull();
   });
 
-  it('says nothing about opening when there is no opening set at all', () => {
-    // Absent is not complete. A closed day must never read as "open".
-    const none: MyDay = { ...day, opening: null };
-    render(<Today day={none} onOpenTask={() => {}} onRefresh={() => {}} />);
-    expect(screen.queryByText('Opening is done')).toBeNull();
+  it('never says open while opening is only partly done', () => {
+    const partly = {
+      name: 'KB Dental Andheri', timezone: 'Asia/Kolkata', phase: 'OPENING' as const,
+      opening: { total: 5, done: 3, complete: false },
+      readyBy: new Date().toISOString(), firstPatientAt: null,
+    };
+    render(<ClinicHeader clinic={partly} />);
+    expect(screen.getByText('Clinic opening')).toBeDefined();
+    expect(screen.queryByText('Clinic open')).toBeNull();
   });
 });

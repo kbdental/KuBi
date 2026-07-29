@@ -10,6 +10,7 @@ import 'dotenv/config';
 import { prisma, withSystemContext } from '../../apps/api/src/platform/tenancy/rls-context.js';
 import { bootstrapOrganization, createDemoEmployee } from '../../apps/api/src/domains/identity/provisioning.service.js';
 import { loadOpeningActivities } from './load-opening-activities.js';
+import { seedScheduleForToday } from './vs02-schedule.js';
 import { systemClock } from '../../apps/api/src/shared/clock.js';
 import { RoleCode, FunctionalAssignmentType } from '@kubi/contracts';
 
@@ -93,6 +94,11 @@ export async function seedVs01Demo(suffix: string): Promise<DemoEnvironment> {
           },
         });
       }
+      // VS-02: a synthetic day's schedule, so the clinic has a shape.
+      await seedScheduleForToday(tx, systemClock, {
+        organizationId: boot.organizationId,
+        clinicId: boot.clinicId,
+      });
     },
   );
 

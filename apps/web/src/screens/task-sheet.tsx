@@ -18,7 +18,7 @@ import { api, ApiError, type TaskSheet, type ChecklistAnswer, type CompleteResul
  *     like failing. It is the cheapest honest path, on purpose.
  */
 
-type Panel = 'CHECKLIST' | 'PROBLEM' | 'WHY' | 'DONE';
+type Panel = 'CHECKLIST' | 'PROBLEM' | 'WHY' | 'AUTHORISE' | 'DONE';
 
 export function TaskSheetScreen({
   sheet, onBack, onFinished,
@@ -108,6 +108,16 @@ export function TaskSheetScreen({
         onCancel={() => { countTap(); setPanel('CHECKLIST'); }}
         onReported={onFinished}
         onTap={countTap}
+      />
+    );
+  }
+
+  if (panel === 'AUTHORISE') {
+    return (
+      <Authorise
+        sheet={sheet}
+        onCancel={() => { countTap(); setPanel('CHECKLIST'); }}
+        onAuthorised={onFinished}
       />
     );
   }
@@ -223,6 +233,19 @@ export function TaskSheetScreen({
       >
         Report a problem
       </button>
+
+      {/* A manager looking at somebody else's blocked task can release it.
+          The server decides whether they may; this only offers it when there
+          is actually something blocking. */}
+      {sheet.cantConfirm && sheet.canOverrideBlock && !sheet.isMine && (
+        <button
+          className="btn btn-quiet"
+          type="button"
+          onClick={() => { countTap(); setPanel('AUTHORISE'); }}
+        >
+          Let this go ahead
+        </button>
+      )}
     </div>
   );
 }
@@ -359,6 +382,69 @@ function SayWhy({
       >
         {busy ? 'Saving…' : 'Go ahead and finish'}
       </button>
+    </div>
+  );
+}
+
+/**
+ * A manager releases one blocked task so the person holding it can finish.
+ *
+ * The split is the point: the manager decides, the assignee does the work.
+ * Neither can do the other's part, and the reason given here is the record —
+ * the assignee is never asked to justify a judgement that was not theirs.
+ */
+function Authorise({
+  sheet, onCancel, onAuthorised,
+}: {
+  sheet: TaskSheet;
+  onCancel: () => void;
+  onAuthorised: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  async function submit() {
+    setBusy(true);
+    setProblem(null);
+    try {
+      await api.authoriseTask(sheet.id, reason.trim());
+      onAuthorised();
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : 'That did not go through.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="screen">
+      <button className="back" onClick={onCancel} type="button">‹ Back</button>
+      <h1 className="screen-title">Let this go ahead</h1>
+      <div className="notice notice-warn">{sheet.cantConfirm}</div>
+      <p className="screen-sub">
+        You&rsquo;re saying it is safe to finish <strong>{sheet.title}</strong> without that
+        confirmation, just for today. Whoever is doing it will be told they can carry on.
+      </p>
+
+      {problem && <div className="notice notice-stop" role="alert">{problem}</div>}
+
+      <label className="field-label" htmlFor="why-safe">How do you know it&rsquo;s safe?</label>
+      <textarea
+        id="why-safe"
+        className="field"
+        placeholder="This is the record, so a sentence that would make sense in six months."
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+      />
+      <button
+        className="btn"
+        type="button"
+        disabled={busy || reason.trim().length === 0}
+        onClick={() => void submit()}
+      >
+        {busy ? 'Saving…' : 'Let it go ahead'}
+      </button>
+      <button className="btn btn-quiet" type="button" onClick={onCancel}>Cancel</button>
     </div>
   );
 }

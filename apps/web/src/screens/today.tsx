@@ -61,17 +61,6 @@ export function Today({
         </p>
       )}
 
-      {/* The completion confirmation lives in the header now, where it reads
-          as the clinic's state rather than as one more notice in a list. This
-          line is the human half of it. `opening` is null when there is no
-          opening set today — absent is never "open". */}
-      {day.opening?.complete && (
-        <div className="notice notice-good" role="status">
-          <div className="notice-title">Opening is done</div>
-          Everything for this morning is finished and confirmed.
-        </div>
-      )}
-
       {total === 0 && (
         <div className="empty">
           <div className="empty-big">You&rsquo;re all clear</div>

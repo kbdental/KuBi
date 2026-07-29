@@ -45,6 +45,9 @@ const TENANT_SCOPED_MODELS = new Set([
   'Employee',
   'EmployeeRole',
   'FunctionalAssignment',
+  // VS-02. An appointment links a patient to a time and a place, so it is the
+  // last thing that should ever be readable without a resolved tenancy.
+  'Appointment',
 ]);
 
 /** Thrown when a tenant-scoped query is attempted without a resolved context. */

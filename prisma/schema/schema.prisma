@@ -25,30 +25,31 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  clinics  Clinic[]
-  patients Patient[]
-  users                  User[]
-  employees              Employee[]
-  clinicalAuthorities    ClinicalAuthority[]
-  roles                  Role[]
-  rolePermissions        RolePermission[]
-  employeeRoles          EmployeeRole[]
-  functionalAssignments  FunctionalAssignment[]
-  employeeCompetencies   EmployeeCompetency[]
-  configValues           ConfigValue[]
-  auditLogs              AuditLog[]
-  breakGlassGrants       BreakGlassGrant[]
-  refreshTokens          RefreshToken[]
-  activityDefinitions    ActivityDefinition[]
-  checklistItemDefs      ChecklistItemDefinition[]
-  activityInstances      ActivityInstance[]
-  checklistResponses     ChecklistResponse[]
-  evidence               Evidence[]
-  verifications          Verification[]
-  attentionItems         AttentionItem[]
-  notifications          Notification[]
-  uxEvents               UxEvent[]
-  automationExecutions   AutomationExecution[]
+  clinics               Clinic[]
+  patients              Patient[]
+  users                 User[]
+  employees             Employee[]
+  clinicalAuthorities   ClinicalAuthority[]
+  roles                 Role[]
+  rolePermissions       RolePermission[]
+  employeeRoles         EmployeeRole[]
+  functionalAssignments FunctionalAssignment[]
+  employeeCompetencies  EmployeeCompetency[]
+  configValues          ConfigValue[]
+  auditLogs             AuditLog[]
+  breakGlassGrants      BreakGlassGrant[]
+  refreshTokens         RefreshToken[]
+  activityDefinitions   ActivityDefinition[]
+  checklistItemDefs     ChecklistItemDefinition[]
+  activityInstances     ActivityInstance[]
+  checklistResponses    ChecklistResponse[]
+  evidence              Evidence[]
+  verifications         Verification[]
+  attentionItems        AttentionItem[]
+  notifications         Notification[]
+  uxEvents              UxEvent[]
+  automationExecutions  AutomationExecution[]
+  appointments          Appointment[]
 
   @@map("organizations")
 }
@@ -133,17 +134,17 @@ model User {
 /// a Doer without ever logging in (Phase 0 §09). `userId` is nullable and
 /// unique: at most one user per employee, at most one employee per user.
 model Employee {
-  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId        String   @map("organization_id") @db.Uuid
-  userId                String?  @unique @map("user_id") @db.Uuid
-  code                  String
-  displayLabel          String   @map("display_label")
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
+  userId             String?  @unique @map("user_id") @db.Uuid
+  code               String
+  displayLabel       String   @map("display_label")
   /// Self-referencing: drives escalation targeting (REPORTING_MANAGER_OF), not
   /// authorization. A manager cannot necessarily do their report's job.
-  reportingManagerId    String?  @map("reporting_manager_id") @db.Uuid
-  status                String   @default("ACTIVE")
-  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  reportingManagerId String?  @map("reporting_manager_id") @db.Uuid
+  status             String   @default("ACTIVE")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization          Organization           @relation(fields: [organizationId], references: [id])
   user                  User?                  @relation(fields: [userId], references: [id])
@@ -338,17 +339,17 @@ model EmployeeCompetency {
 /// building the full Phase 0.5 §15 94-key registry (that is Phase 3+ work,
 /// once the activities/procedures it configures actually exist).
 model ConfigValue {
-  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String      @map("organization_id") @db.Uuid
-  clinicId       String?     @map("clinic_id") @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  clinicId       String?  @map("clinic_id") @db.Uuid
   /// ConfigScope: ORGANIZATION | CLINIC (ACTIVITY/PROCEDURE/ROLE/SYSTEM unused
   /// until their owning entities exist).
   scope          String
   key            String
-  valueJson      Json @map("value_json") @db.JsonB
-  updatedBy      String?     @map("updated_by") @db.Uuid
-  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  valueJson      Json     @map("value_json") @db.JsonB
+  updatedBy      String?  @map("updated_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id])
 
@@ -363,19 +364,19 @@ model ConfigValue {
 /// by a trigger, so neither an application bug nor a hand-written migration
 /// can rewrite history (see migration 0003_identity_rbac.sql).
 model AuditLog {
-  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId  String       @map("organization_id") @db.Uuid
-  clinicId        String?      @map("clinic_id") @db.Uuid
-  actorUserId     String?      @map("actor_user_id") @db.Uuid
-  actorEmployeeId String?      @map("actor_employee_id") @db.Uuid
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  clinicId        String?  @map("clinic_id") @db.Uuid
+  actorUserId     String?  @map("actor_user_id") @db.Uuid
+  actorEmployeeId String?  @map("actor_employee_id") @db.Uuid
   action          String
-  entityType      String       @map("entity_type")
-  entityId        String?      @map("entity_id") @db.Uuid
-  oldValue        Json? @map("old_value") @db.JsonB
-  newValue        Json? @map("new_value") @db.JsonB
+  entityType      String   @map("entity_type")
+  entityId        String?  @map("entity_id") @db.Uuid
+  oldValue        Json?    @map("old_value") @db.JsonB
+  newValue        Json?    @map("new_value") @db.JsonB
   reason          String?
-  correlationId   String?      @map("correlation_id")
-  occurredAt      DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  correlationId   String?  @map("correlation_id")
+  occurredAt      DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id])
 
@@ -438,44 +439,44 @@ model RefreshToken {
 /// version they were created under, so a definition edited in June cannot
 /// retroactively change what March's completed work was measured against.
 model ActivityDefinition {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
   /// Matrix v2.0 Activity ID, e.g. OPN-001. Natural key, never reissued.
-  code           String
-  version        Int      @default(1)
+  code              String
+  version           Int      @default(1)
   /// Plain-language task title shown to staff. NOT the Matrix "Activity" text
   /// verbatim where that text is written for auditors rather than doers.
-  title          String
+  title             String
   /// Matrix "Standard / Expected Result" — shown as supporting text.
-  standardText   String   @map("standard_text")
-  process        String
-  priority       String
-  executionMode  String   @map("execution_mode")
-  recurrence     String
-  instanceScope  String   @map("instance_scope")
+  standardText      String   @map("standard_text")
+  process           String
+  priority          String
+  executionMode     String   @map("execution_mode")
+  recurrence        String
+  instanceScope     String   @map("instance_scope")
   /// DueRule as JSON — see DueRuleKind in contracts.
-  dueRule        Json     @map("due_rule") @db.JsonB
+  dueRule           Json     @map("due_rule") @db.JsonB
   /// Assignment rules as JSON: { doer, checker, owner } each an ActorRef.
-  assignmentRule Json     @map("assignment_rule") @db.JsonB
+  assignmentRule    Json     @map("assignment_rule") @db.JsonB
   /// SodPolicy: STRICT | OVERRIDABLE | NOT_REQUIRED
-  sodPolicy      String   @map("sod_policy")
+  sodPolicy         String   @map("sod_policy")
   /// True only for the OD-02 approved allowlist (VS-01: OPN-003, OPN-004).
-  selfVerifyAllowed Boolean @default(false) @map("self_verify_allowed")
-  evidenceType   String   @map("evidence_type")
+  selfVerifyAllowed Boolean  @default(false) @map("self_verify_allowed")
+  evidenceType      String   @map("evidence_type")
   /// Gate requirement code, if this activity depends on one. Null = no gate.
-  gateRequirement String? @map("gate_requirement")
+  gateRequirement   String?  @map("gate_requirement")
   /// EnforcementMode for the gate. Read from config, not hard-coded.
-  gateEnforcement String? @map("gate_enforcement")
-  failureDefinition String @map("failure_definition")
-  escalationPolicy String  @map("escalation_policy")
-  capaPolicy     String   @map("capa_policy")
-  enabled        Boolean  @default(true)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gateEnforcement   String?  @map("gate_enforcement")
+  failureDefinition String   @map("failure_definition")
+  escalationPolicy  String   @map("escalation_policy")
+  capaPolicy        String   @map("capa_policy")
+  enabled           Boolean  @default(true)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization             @relation(fields: [organizationId], references: [id])
+  organization   Organization              @relation(fields: [organizationId], references: [id])
   checklistItems ChecklistItemDefinition[]
-  instances    ActivityInstance[]
+  instances      ActivityInstance[]
 
   @@unique([organizationId, code, version])
   @@index([organizationId])
@@ -483,20 +484,20 @@ model ActivityDefinition {
 }
 
 model ChecklistItemDefinition {
-  id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String @map("organization_id") @db.Uuid
-  definitionId String @map("definition_id") @db.Uuid
-  ordinal      Int
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String  @map("organization_id") @db.Uuid
+  definitionId   String  @map("definition_id") @db.Uuid
+  ordinal        Int
   /// Plain clinic language. "Chair and light working", not "asset_check_1".
-  label        String
+  label          String
   /// If true this item captures a VALUE (e.g. AC temperature), not just a tick.
-  requiresValue Boolean @default(false) @map("requires_value")
-  valueUnit    String? @map("value_unit")
-  valueMin     Float?  @map("value_min")
-  valueMax     Float?  @map("value_max")
+  requiresValue  Boolean @default(false) @map("requires_value")
+  valueUnit      String? @map("value_unit")
+  valueMin       Float?  @map("value_min")
+  valueMax       Float?  @map("value_max")
 
-  organization Organization       @relation(fields: [organizationId], references: [id])
-  definition   ActivityDefinition @relation(fields: [definitionId], references: [id])
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  definition   ActivityDefinition  @relation(fields: [definitionId], references: [id])
   responses    ChecklistResponse[]
 
   @@unique([definitionId, ordinal])
@@ -507,33 +508,40 @@ model ChecklistItemDefinition {
 /// The runtime unit of WORK. Idempotency is a DB constraint, not app logic:
 /// re-running the scheduler cannot duplicate a task.
 model ActivityInstance {
-  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId    String    @map("organization_id") @db.Uuid
-  clinicId          String    @map("clinic_id") @db.Uuid
-  definitionId      String    @map("definition_id") @db.Uuid
-  definitionVersion Int       @map("definition_version")
+  id                         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId             String    @map("organization_id") @db.Uuid
+  clinicId                   String    @map("clinic_id") @db.Uuid
+  definitionId               String    @map("definition_id") @db.Uuid
+  definitionVersion          Int       @map("definition_version")
   /// The entity giving this instance its identity (InstanceScope). For
   /// CLINIC_DAY this is the clinic-local date string.
-  scopeKey          String    @map("scope_key")
+  scopeKey                   String    @map("scope_key")
   /// Clinic-local period, e.g. "2026-07-28". Part of the idempotency key.
-  periodKey         String    @map("period_key")
-  status            String
-  assigneeEmployeeId String?  @map("assignee_employee_id") @db.Uuid
-  dueAt             DateTime  @map("due_at") @db.Timestamptz(6)
-  startedAt         DateTime? @map("started_at") @db.Timestamptz(6)
-  completedAt       DateTime? @map("completed_at") @db.Timestamptz(6)
-  completedByEmployeeId String? @map("completed_by_employee_id") @db.Uuid
-  verifiedAt        DateTime? @map("verified_at") @db.Timestamptz(6)
+  periodKey                  String    @map("period_key")
+  status                     String
+  assigneeEmployeeId         String?   @map("assignee_employee_id") @db.Uuid
+  dueAt                      DateTime  @map("due_at") @db.Timestamptz(6)
+  startedAt                  DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt                DateTime? @map("completed_at") @db.Timestamptz(6)
+  completedByEmployeeId      String?   @map("completed_by_employee_id") @db.Uuid
+  verifiedAt                 DateTime? @map("verified_at") @db.Timestamptz(6)
   /// Set when the task cannot proceed because a PROBLEM was reported.
-  blockedByItemId   String?   @map("blocked_by_item_id") @db.Uuid
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  blockedByItemId            String?   @map("blocked_by_item_id") @db.Uuid
+  /// Usability review Q2 follow-through. Proceeding when a requirement cannot
+  /// be confirmed is management authority, but only the assignee may do the
+  /// work. A manager authorises THIS instance; the assignee then finishes it.
+  /// Neither person can do the other's part, which is the point.
+  gateAuthorisedByEmployeeId String?   @map("gate_authorised_by_employee_id") @db.Uuid
+  gateAuthorisedAt           DateTime? @map("gate_authorised_at") @db.Timestamptz(6)
+  gateAuthorisationReason    String?   @map("gate_authorisation_reason")
+  createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization  Organization       @relation(fields: [organizationId], references: [id])
-  definition    ActivityDefinition @relation(fields: [definitionId], references: [id])
-  responses     ChecklistResponse[]
-  evidence      Evidence[]
-  verifications Verification[]
+  organization   Organization        @relation(fields: [organizationId], references: [id])
+  definition     ActivityDefinition  @relation(fields: [definitionId], references: [id])
+  responses      ChecklistResponse[]
+  evidence       Evidence[]
+  verifications  Verification[]
   attentionItems AttentionItem[]
 
   @@unique([definitionId, scopeKey, periodKey])
@@ -543,14 +551,14 @@ model ActivityInstance {
 }
 
 model ChecklistResponse {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String @map("organization_id") @db.Uuid
-  instanceId  String   @map("instance_id") @db.Uuid
-  itemId      String   @map("item_id") @db.Uuid
-  checked     Boolean  @default(false)
-  numericValue Float?  @map("numeric_value")
-  respondedByEmployeeId String @map("responded_by_employee_id") @db.Uuid
-  respondedAt DateTime @default(now()) @map("responded_at") @db.Timestamptz(6)
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId        String   @map("organization_id") @db.Uuid
+  instanceId            String   @map("instance_id") @db.Uuid
+  itemId                String   @map("item_id") @db.Uuid
+  checked               Boolean  @default(false)
+  numericValue          Float?   @map("numeric_value")
+  respondedByEmployeeId String   @map("responded_by_employee_id") @db.Uuid
+  respondedAt           DateTime @default(now()) @map("responded_at") @db.Timestamptz(6)
 
   organization Organization            @relation(fields: [organizationId], references: [id])
   instance     ActivityInstance        @relation(fields: [instanceId], references: [id])
@@ -563,14 +571,14 @@ model ChecklistResponse {
 
 /// Append-only. Corrections supersede rather than mutate.
 model Evidence {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String @map("organization_id") @db.Uuid
-  instanceId   String   @map("instance_id") @db.Uuid
-  evidenceType String   @map("evidence_type")
-  payload      Json     @db.JsonB
-  capturedByEmployeeId String @map("captured_by_employee_id") @db.Uuid
-  capturedAt   DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
-  supersededById String? @map("superseded_by_id") @db.Uuid
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String   @map("organization_id") @db.Uuid
+  instanceId           String   @map("instance_id") @db.Uuid
+  evidenceType         String   @map("evidence_type")
+  payload              Json     @db.JsonB
+  capturedByEmployeeId String   @map("captured_by_employee_id") @db.Uuid
+  capturedAt           DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
+  supersededById       String?  @map("superseded_by_id") @db.Uuid
 
   organization Organization     @relation(fields: [organizationId], references: [id])
   instance     ActivityInstance @relation(fields: [instanceId], references: [id])
@@ -582,16 +590,16 @@ model Evidence {
 
 /// A CHECK. Records whether it was independent or an approved self-verification.
 model Verification {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String @map("organization_id") @db.Uuid
-  instanceId   String   @map("instance_id") @db.Uuid
-  verifierEmployeeId String @map("verifier_employee_id") @db.Uuid
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
+  instanceId         String   @map("instance_id") @db.Uuid
+  verifierEmployeeId String   @map("verifier_employee_id") @db.Uuid
   /// PASS | FAIL
-  result       String
+  result             String
   /// True when verifier == doer under an OD-02 approved allowlist entry.
-  selfVerified Boolean  @default(false) @map("self_verified")
-  comment      String?
-  verifiedAt   DateTime @default(now()) @map("verified_at") @db.Timestamptz(6)
+  selfVerified       Boolean  @default(false) @map("self_verified")
+  comment            String?
+  verifiedAt         DateTime @default(now()) @map("verified_at") @db.Timestamptz(6)
 
   organization Organization     @relation(fields: [organizationId], references: [id])
   instance     ActivityInstance @relation(fields: [instanceId], references: [id])
@@ -604,28 +612,28 @@ model Verification {
 /// A PROBLEM. Internally carries taxonomy + severity + SLA; the UI shows
 /// plain language only.
 model AttentionItem {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
-  clinicId       String    @map("clinic_id") @db.Uuid
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String    @map("organization_id") @db.Uuid
+  clinicId             String    @map("clinic_id") @db.Uuid
   /// Internal taxonomy code, e.g. OPN.PHYSICAL_FAILURE.ROOM_NOT_READY.
-  code           String
-  severity       String
+  code                 String
+  severity             String
   /// Plain-language headline shown to staff.
-  headline       String
-  detail         String?
-  sourceInstanceId String? @map("source_instance_id") @db.Uuid
+  headline             String
+  detail               String?
+  sourceInstanceId     String?   @map("source_instance_id") @db.Uuid
   /// Who must act. Resolved relationally at creation time.
-  ownerEmployeeId String?  @map("owner_employee_id") @db.Uuid
-  status         String    @default("OPEN")
-  dueAt          DateTime  @map("due_at") @db.Timestamptz(6)
-  escalationLevel String   @default("INITIAL") @map("escalation_level")
-  escalatedAt    DateTime? @map("escalated_at") @db.Timestamptz(6)
-  acknowledgedAt DateTime? @map("acknowledged_at") @db.Timestamptz(6)
-  resolvedAt     DateTime? @map("resolved_at") @db.Timestamptz(6)
-  resolvedByEmployeeId String? @map("resolved_by_employee_id") @db.Uuid
-  resolutionNote String?   @map("resolution_note")
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  ownerEmployeeId      String?   @map("owner_employee_id") @db.Uuid
+  status               String    @default("OPEN")
+  dueAt                DateTime  @map("due_at") @db.Timestamptz(6)
+  escalationLevel      String    @default("INITIAL") @map("escalation_level")
+  escalatedAt          DateTime? @map("escalated_at") @db.Timestamptz(6)
+  acknowledgedAt       DateTime? @map("acknowledged_at") @db.Timestamptz(6)
+  resolvedAt           DateTime? @map("resolved_at") @db.Timestamptz(6)
+  resolvedByEmployeeId String?   @map("resolved_by_employee_id") @db.Uuid
+  resolutionNote       String?   @map("resolution_note")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization   Organization      @relation(fields: [organizationId], references: [id])
   sourceInstance ActivityInstance? @relation(fields: [sourceInstanceId], references: [id])
@@ -637,14 +645,14 @@ model AttentionItem {
 }
 
 model Notification {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  recipientEmployeeId String @map("recipient_employee_id") @db.Uuid
-  priority       String
-  headline       String
-  attentionItemId String? @map("attention_item_id") @db.Uuid
-  readAt         DateTime? @map("read_at") @db.Timestamptz(6)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId      String    @map("organization_id") @db.Uuid
+  recipientEmployeeId String    @map("recipient_employee_id") @db.Uuid
+  priority            String
+  headline            String
+  attentionItemId     String?   @map("attention_item_id") @db.Uuid
+  readAt              DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   organization  Organization   @relation(fields: [organizationId], references: [id])
   attentionItem AttentionItem? @relation(fields: [attentionItemId], references: [id])
@@ -688,4 +696,50 @@ model AutomationExecution {
 
   @@index([organizationId, clinicId, ruleCode])
   @@map("automation_executions")
+}
+
+// =============================================================================
+// VS-02 — Appointments
+//
+// The clinic's day is driven by patients arriving, not by a task list. These
+// tables are what let KuBi say "first patient at 09:55" and mean it.
+//
+// Deliberately minimal: no treatment, no billing, no clinical content. VS-02
+// integrates the SCHEDULE, which is what the operating assistant needs to know
+// where the day is. Clinical records remain out of scope.
+// =============================================================================
+
+model Appointment {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
+  clinicId           String    @map("clinic_id") @db.Uuid
+  patientId          String    @map("patient_id") @db.Uuid
+  /// The treating employee. Nullable: a slot can be booked before it is
+  /// assigned, and pretending otherwise would force a wrong answer.
+  providerEmployeeId String?   @map("provider_employee_id") @db.Uuid
+  /// Clinic-local date, "2026-07-29". Matches the activity engine's periodKey
+  /// so a day's schedule and a day's opening line up without timezone maths.
+  periodKey          String    @map("period_key")
+  scheduledStart     DateTime  @map("scheduled_start") @db.Timestamptz(6)
+  scheduledEnd       DateTime  @map("scheduled_end") @db.Timestamptz(6)
+  /// Where it happens. A label, not a table: rooms are named, not modelled,
+  /// until there is a reason to model them.
+  chairLabel         String?   @map("chair_label")
+  /// What kind of visit, in clinic words ("Check-up", "Root canal").
+  visitType          String    @map("visit_type")
+  /// BOOKED | ARRIVED | IN_CHAIR | COMPLETED | CANCELLED | NO_SHOW
+  status             String    @default("BOOKED")
+  arrivedAt          DateTime? @map("arrived_at") @db.Timestamptz(6)
+  seatedAt           DateTime? @map("seated_at") @db.Timestamptz(6)
+  completedAt        DateTime? @map("completed_at") @db.Timestamptz(6)
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelReason       String?   @map("cancel_reason")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, clinicId, periodKey])
+  @@index([organizationId, clinicId, status])
+  @@map("appointments")
 }

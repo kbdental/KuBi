@@ -86,7 +86,7 @@ export interface ClinicContext {
   /** The clinic's timezone. Every time on screen is formatted with this. */
   timezone: string;
   /** null when there is no opening set today. Absent is not ready. */
-  phase: 'OPENING' | 'OPEN' | null;
+  phase: 'OPENING' | 'OPEN' | 'SEEING_PATIENTS' | null;
   opening: OpeningStatus | null;
   /** The clinic's own configured opening time for today. */
   readyBy: string | null;
@@ -140,6 +140,10 @@ export interface AttentionRow {
   mine: boolean;
   dueAt: string | null;
   escalated: boolean;
+  /** The task this came from, when there is one. */
+  instanceId?: string | null;
+  /** Some items are "go and do something", not "close this". */
+  needsAuthorisation?: boolean;
 }
 
 export interface CheckRow {
@@ -162,6 +166,27 @@ export interface CheckDetail {
     value: number | null;
     unit: string | null;
   }>;
+}
+
+/** One visit on today's list. Patient-facing words only — no status tokens. */
+export interface ScheduleRow {
+  id: string;
+  patientLabel: string;
+  patientUhid: string;
+  visitType: string;
+  chairLabel: string | null;
+  scheduledStart: string;
+  scheduledEnd: string;
+  status: 'BOOKED' | 'ARRIVED' | 'IN_CHAIR' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+  statusLabel: string;
+  waitingMinutes: number | null;
+  arrivedAt: string | null;
+}
+
+export interface Schedule {
+  rows: ScheduleRow[];
+  periodKey: string | null;
+  timezone?: string;
 }
 
 export interface ChecklistAnswer {
@@ -191,6 +216,17 @@ export const api = {
   attention: () => call<AttentionRow[]>('/api/v1/attention'),
   resolveAttention: (id: string, note: string) =>
     post<{ ok: boolean }>(`/api/v1/attention/${id}/resolve`, { note }),
+
+  schedule: () => call<Schedule>('/api/v1/schedule'),
+  setAppointmentStatus: (
+    id: string,
+    to: 'ARRIVED' | 'IN_CHAIR' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW',
+    reason?: string,
+  ) => post<{ status: string }>(`/api/v1/appointments/${id}/status`, {
+    to, ...(reason ? { reason } : {}),
+  }),
+  authoriseTask: (id: string, reason: string) =>
+    post<{ ok: boolean }>(`/api/v1/tasks/${id}/authorise`, { reason }),
 
   checks: () => call<CheckRow[]>('/api/v1/checks'),
   check: (id: string) => call<CheckDetail>(`/api/v1/checks/${id}`),

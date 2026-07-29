@@ -142,6 +142,8 @@ console.log('capturing:');
   await ctx.close();
 }
 
+// The refusal above is what puts the ask in front of the manager below.
+
 // 12 a task on hold after a problem is reported.
 {
   const { ctx, page } = await fresh();
@@ -164,9 +166,11 @@ console.log('capturing:');
   await page.waitForSelector('.row, .empty-big');
   await shot(page, '13-attention');
 
-  const first = page.locator('.row').first();
-  if (await first.count()) {
-    await first.click();
+  // Pick something that is actually closed with a note. An item asking for a
+  // manager's go-ahead opens the task instead, which is a different screen.
+  const resolvable = page.locator('.row').filter({ hasNotText: /go-ahead/ }).first();
+  if (await resolvable.count()) {
+    await resolvable.click();
     await page.waitForSelector('textarea');
     await shot(page, '14-attention-resolve');
   }
@@ -211,6 +215,62 @@ await completeViaApi('priya', 'Get treatment rooms ready');
   // Today leads with the clinic header now, not a page heading.
   await page.waitForSelector('.clinic, .empty-big');
   await shot(page, '19-today-empty');
+  await ctx.close();
+}
+
+// 20-23 VS-02: the day as people, and the clinic knowing where it is.
+{
+  const { ctx, page } = await fresh();
+  await signIn(page, 'kavita');
+  const tab = page.getByRole('button', { name: /^Clinic/ });
+  if (await tab.count()) {
+    await tab.click();
+    await page.waitForSelector('.visit');
+    await shot(page, '20-clinic-the-day');
+
+    // Someone arrives, and is taken through.
+    const arrive = page.getByRole('button', { name: 'They’re here' }).first();
+    if (await arrive.count()) {
+      await arrive.click();
+      await page.waitForTimeout(900);
+      await shot(page, '21-clinic-waiting');
+
+      const seat = page.getByRole('button', { name: 'Taken through' }).first();
+      if (await seat.count()) {
+        await seat.click();
+        await page.waitForTimeout(900);
+        await shot(page, '22-clinic-in-chair');
+      }
+    }
+  }
+  await ctx.close();
+}
+
+// 23 a manager releasing one blocked task, so the assignee can finish it.
+{
+  const { ctx, page } = await fresh();
+  await signIn(page, 'rahul');
+  await page.getByRole('button', { name: /^Today/ }).first().click();
+  await page.waitForTimeout(700);
+  // Rahul opens the emergency-kit check from the list and lets it go ahead.
+  // The ask reaches him on Attention, and routes straight to the task.
+  await page.getByRole('button', { name: /^Attention/ }).click();
+  await page.waitForSelector('.row, .empty-big');
+  await shot(page, '23-manager-asked');
+
+  const ask = page.getByText(/needs a manager.s go-ahead/).first();
+  if (await ask.count()) {
+    await ask.click();
+    await page.waitForTimeout(900);
+    const release = page.getByRole('button', { name: 'Let this go ahead' });
+    if (await release.count()) {
+      await release.click();
+      await page.waitForSelector('textarea');
+      await page.fill('textarea', 'SYNTHETIC: counted the kit against the paper list myself this morning.');
+      await page.waitForTimeout(300);
+      await shot(page, '24-manager-releases-it');
+    }
+  }
   await ctx.close();
 }
 

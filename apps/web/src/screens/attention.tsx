@@ -35,10 +35,11 @@ function due(iso: string | null): string {
 }
 
 export function Attention({
-  items, onResolved,
+  items, onResolved, onOpenTask,
 }: {
   items: AttentionRow[];
   onResolved: () => void;
+  onOpenTask?: ((instanceId: string) => void) | undefined;
 }) {
   const [open, setOpen] = useState<AttentionRow | null>(null);
 
@@ -62,8 +63,16 @@ export function Attention({
 
       {items.map((item) => {
         const sev = SEVERITY[item.severity] ?? SEVERITY.ROUTINE!;
-        return (
-          <button key={item.id} className="row" type="button" onClick={() => setOpen(item)}>
+          // Some items are a decision to make on a task, not a note to close.
+          // Sending those to a "what did you do?" box would be a dead end.
+          const goesToTask = item.needsAuthorisation && item.instanceId && onOpenTask;
+          return (
+          <button
+            key={item.id}
+            className="row"
+            type="button"
+            onClick={() => (goesToTask ? onOpenTask(item.instanceId!) : setOpen(item))}
+          >
             <div className="row-main">
               <div style={{ marginBottom: 6 }}>
                 <span className={sev.className}>{sev.label}</span>
@@ -75,11 +84,13 @@ export function Attention({
                 )}
               </div>
               <div className="row-title">{item.headline}</div>
-              <div className="row-note">{due(item.dueAt)}</div>
+              <div className="row-note">
+                {goesToTask ? 'Open it to decide' : due(item.dueAt)}
+              </div>
             </div>
             <span className="row-go" aria-hidden="true">›</span>
           </button>
-        );
+          );
       })}
     </div>
   );

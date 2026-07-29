@@ -71,7 +71,12 @@ export function ClinicHeader({ clinic }: { clinic: ClinicContext }) {
   }, []);
 
   const ready = clinic.readyBy ? countdown(new Date(clinic.readyBy), now) : null;
-  const open = clinic.phase === 'OPEN';
+  // Open OR already seeing patients — either way the morning's job is done and
+  // the screen should stop counting down to it.
+  const open = clinic.phase === 'OPEN' || clinic.phase === 'SEEING_PATIENTS';
+  const phaseName = clinic.phase === 'SEEING_PATIENTS' ? 'Seeing patients'
+    : clinic.phase === 'OPEN' ? 'Clinic open'
+    : 'Clinic opening';
 
   return (
     <header className={`clinic${open ? ' is-open' : ''}`}>
@@ -89,7 +94,7 @@ export function ClinicHeader({ clinic }: { clinic: ClinicContext }) {
         </div>
       ) : (
         <div className="clinic-phase">
-          <div className="clinic-phase-name">{open ? 'Clinic open' : 'Clinic opening'}</div>
+          <div className="clinic-phase-name">{phaseName}</div>
           {clinic.opening && (
             <div className="clinic-progress">
               <div className="clinic-track" aria-hidden="true">
@@ -120,20 +125,27 @@ export function ClinicHeader({ clinic }: { clinic: ClinicContext }) {
         </div>
       )}
 
-      {/* Deliberately absent until appointments are integrated. An invented
-          "first patient" time would be the most trusted wrong number on the
-          screen. */}
-      {clinic.firstPatientAt && (
-        <div className="clinic-when">
-          <span className="clinic-when-label">First patient</span>
-          <span className="clinic-when-time">
-            {clockFace(new Date(clinic.firstPatientAt), clinic.timezone)}
-          </span>
-          <span className="clinic-when-left">
-            {countdown(new Date(clinic.firstPatientAt), now).text}
-          </span>
-        </div>
-      )}
+      {/* Real since VS-02, and absent rather than guessed when there is nobody
+          left today. A patient already past their time is the most serious
+          number on this screen, so it is not allowed to read as neutral. */}
+      {clinic.firstPatientAt && (() => {
+        const next = countdown(new Date(clinic.firstPatientAt), now);
+        return (
+          <div className="clinic-when">
+            {/* Once the day is underway "first" is wrong — it is whoever is
+                next. Same number, honest label. */}
+            <span className="clinic-when-label">
+              {clinic.phase === 'OPENING' ? 'First patient' : 'Next patient'}
+            </span>
+            <span className="clinic-when-time">
+              {clockFace(new Date(clinic.firstPatientAt), clinic.timezone)}
+            </span>
+            <span className={next.late ? 'clinic-when-left is-late' : 'clinic-when-left'}>
+              {next.text}
+            </span>
+          </div>
+        );
+      })()}
     </header>
   );
 }
