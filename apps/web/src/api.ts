@@ -189,6 +189,15 @@ export interface Schedule {
   timezone?: string;
 }
 
+export interface Overview {
+  readiness: { done: number; total: number; percent: number | null };
+  patients: { seen: number; expected: number; waiting: number; notSeen: number };
+  problems: { open: number; patientSafety: number; overdue: number };
+  /** Oldest first. `readiness` is null on a day with nothing scheduled. */
+  week: Array<{ periodKey: string; readiness: number | null; onTime: boolean | null }>;
+  independentChecks: { independent: number; total: number; percent: number | null };
+}
+
 export interface ChecklistAnswer {
   itemId: string;
   checked: boolean;
@@ -217,6 +226,7 @@ export const api = {
   resolveAttention: (id: string, note: string) =>
     post<{ ok: boolean }>(`/api/v1/attention/${id}/resolve`, { note }),
 
+  overview: () => call<Overview>('/api/v1/overview'),
   schedule: () => call<Schedule>('/api/v1/schedule'),
   setAppointmentStatus: (
     id: string,

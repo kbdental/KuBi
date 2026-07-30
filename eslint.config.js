@@ -52,6 +52,15 @@ export default tseslint.config(
     rules: { 'no-restricted-syntax': 'off' },
   },
   {
+    // Scripts that drive a real browser. The bodies of `page.evaluate(...)` are
+    // serialised and run inside the page, not in Node, so browser globals are
+    // legitimately in scope there even though the file itself is a Node script.
+    files: ['scripts/verify-app.mjs', 'scripts/screenshots.mjs'],
+    languageOptions: {
+      globals: { document: 'readonly', window: 'readonly', getComputedStyle: 'readonly' },
+    },
+  },
+  {
     // The browser IS the clock, for display only. "Overdue by 20 min" is
     // rendering, not behaviour: nothing branches on it and there is no
     // server-side decision to make testable. The Clock port exists so

@@ -46,6 +46,8 @@ export const DEMO_PASSWORD = 'SyntheticDemo123!';
 const MAY_RELEASE: Role[] = ['CLINIC_MANAGER'];
 /** Who may move a visit along. */
 const MAY_MOVE_VISITS: Role[] = ['RECEPTION', 'CLINIC_MANAGER'];
+/** Who may see how the clinic as a whole is running, rather than their own day. */
+const MAY_SEE_CLINIC: Role[] = ['CLINIC_MANAGER'];
 
 interface Item { id: string; label: string; requiresValue?: boolean; unit?: string }
 
@@ -266,6 +268,24 @@ function freshState() {
 
   return { tasks, visits, attention, signedIn: null as Person | null };
 }
+
+/**
+ * The six days before today, oldest first — a synthetic history, so the week
+ * chart has something to say the moment the file opens.
+ *
+ * One entry is deliberately `null`: the clinic was shut, and a shut day must
+ * draw as absent rather than as 0% readiness. That is the rule the real
+ * overview service keeps, and a demo that quietly drew it as zero would be
+ * teaching the wrong thing about the product.
+ */
+const HISTORY: Array<{ readiness: number | null; independentOf: number; independent: number }> = [
+  { readiness: 100, independentOf: 7, independent: 6 },
+  { readiness: 86, independentOf: 6, independent: 4 },
+  { readiness: 100, independentOf: 7, independent: 6 },
+  { readiness: null, independentOf: 0, independent: 0 },
+  { readiness: 71, independentOf: 5, independent: 3 },
+  { readiness: 100, independentOf: 7, independent: 7 },
+];
 
 let db = freshState();
 
@@ -555,6 +575,72 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     t.status = body.result === 'PASS' ? 'VERIFIED' : 'IN_PROGRESS';
     if (body.result === 'FAIL') t.completedBy = null;
     return json({ status: t.status });
+  }
+
+  // ---- THE CLINIC AT A GLANCE ----
+  if (path === '/api/v1/overview') {
+    // A 403 here is the correct answer for most people, not a failure: an
+    // assistant has a day, a manager has a clinic.
+    if (!me.roles.some((r) => MAY_SEE_CLINIC.includes(r))) {
+      return json({ error: 'You do not have permission to see clinic-wide performance.' }, 403);
+    }
+    const now = Date.now();
+    const dayKey = (offsetDays: number) =>
+      new Date(now - offsetDays * 86_400_000).toISOString().slice(0, 10);
+
+    const confirmed = db.tasks.filter((t) => t.status === 'VERIFIED');
+    const total = db.tasks.length;
+    const week = [
+      ...HISTORY.map((h, i) => ({
+        periodKey: dayKey(HISTORY.length - i),
+        readiness: h.readiness,
+        onTime: h.readiness === null ? null : h.readiness === 100,
+      })),
+      {
+        periodKey: dayKey(0),
+        readiness: total === 0 ? null : Math.round((confirmed.length / total) * 100),
+        onTime: confirmed.length === total,
+      },
+    ];
+
+    // Independence is counted over the week, because one day is noise. Today's
+    // share comes from the activities themselves: anything whose activity needs
+    // a second pair of eyes and has been confirmed was confirmed by someone
+    // other than the doer, because the demo refuses self-checks the same way
+    // the server does.
+    const todayIndependent = confirmed.filter((t) => !t.selfVerifyAllowed).length;
+    const pastTotal = HISTORY.reduce((n, h) => n + h.independentOf, 0);
+    const pastIndependent = HISTORY.reduce((n, h) => n + h.independent, 0);
+    const indTotal = pastTotal + confirmed.length;
+    const indIndependent = pastIndependent + todayIndependent;
+
+    const openItems = db.attention.filter((a) => a.open);
+    const visitCount = (s: Visit['status']) => db.visits.filter((v) => v.status === s).length;
+
+    return json({
+      readiness: {
+        done: confirmed.length,
+        total,
+        percent: total === 0 ? null : Math.round((confirmed.length / total) * 100),
+      },
+      patients: {
+        seen: visitCount('COMPLETED'),
+        expected: db.visits.length - visitCount('CANCELLED'),
+        waiting: visitCount('ARRIVED'),
+        notSeen: visitCount('NO_SHOW'),
+      },
+      problems: {
+        open: openItems.length,
+        patientSafety: openItems.filter((a) => a.severity === 'PATIENT_SAFETY').length,
+        overdue: openItems.filter((a) => a.dueAt !== null && a.dueAt < now).length,
+      },
+      week,
+      independentChecks: {
+        independent: indIndependent,
+        total: indTotal,
+        percent: indTotal === 0 ? null : Math.round((indIndependent / indTotal) * 100),
+      },
+    });
   }
 
   // ---- THE DAY ----

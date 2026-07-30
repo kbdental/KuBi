@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import {
   api, ApiError,
   type Me, type MyDay, type TaskSheet, type AttentionRow, type CheckRow, type Schedule,
+  type Overview as OverviewData,
 } from './api.js';
 import { SignIn } from './screens/sign-in.js';
 import { Today } from './screens/today.js';
@@ -9,7 +10,10 @@ import { TaskSheetScreen } from './screens/task-sheet.js';
 import { Attention } from './screens/attention.js';
 import { Checks } from './screens/checks.js';
 import { Clinic } from './screens/clinic.js';
-import { IconToday, IconClinic, IconAttention, IconChecks, IconMe } from './icons.js';
+import { Overview } from './screens/overview.js';
+import {
+  IconToday, IconClinic, IconAttention, IconChecks, IconMe, IconOverview,
+} from './icons.js';
 
 /**
  * The shell.
@@ -32,7 +36,7 @@ const CAN_MOVE_VISITS = [
   'TREATING_DOCTOR', 'CLINICAL_DIRECTOR',
 ];
 
-type Place = 'TODAY' | 'CLINIC' | 'ATTENTION' | 'CHECKS' | 'ME';
+type Place = 'OVERVIEW' | 'TODAY' | 'CLINIC' | 'ATTENTION' | 'CHECKS' | 'ME';
 
 interface Loaded {
   me: Me;
@@ -40,6 +44,8 @@ interface Loaded {
   attention: AttentionRow[];
   checks: CheckRow[];
   schedule: Schedule;
+  /** Null for anyone who may not see clinic-wide performance. */
+  overview: OverviewData | null;
 }
 
 export function App() {
@@ -50,11 +56,13 @@ export function App() {
 
   const refresh = useCallback(async () => {
     // The schedule is not fatal: someone who cannot see it still has a Today.
-    const [me, day, attention, checks, schedule] = await Promise.all([
+    const [me, day, attention, checks, schedule, overview] = await Promise.all([
       api.me(), api.myDay(), api.attention(), api.checks(),
       api.schedule().catch((): Schedule => ({ rows: [], periodKey: null })),
+      // A 403 here is the correct answer for most people, not a failure.
+      api.overview().catch(() => null),
     ]);
-    setData({ me, day, attention, checks, schedule });
+    setData({ me, day, attention, checks, schedule, overview });
   }, []);
 
   // On load, find out whether the cookie we may already hold is still good.
@@ -115,6 +123,7 @@ export function App() {
           {data.day.clinic && <span className="nav-clinic">{data.day.clinic.name}</span>}
         </div>
         <div className="nav-items">
+          {data.overview && <Tab id="OVERVIEW" label="Overview" now={place} go={setPlace} />}
           <Tab id="TODAY" label="Today" now={place} go={setPlace} />
           {data.schedule.rows.length > 0 && (
             <Tab id="CLINIC" label="Clinic" now={place} go={setPlace} />
@@ -137,6 +146,15 @@ export function App() {
       </nav>
 
       <main className="main">
+      {place === 'OVERVIEW' && data.overview && (
+        <Overview
+          data={data.overview}
+          attention={data.attention}
+          schedule={data.schedule}
+          onGoToAttention={() => setPlace('ATTENTION')}
+          onGoToClinic={() => setPlace('CLINIC')}
+        />
+      )}
       {place === 'TODAY' && (
         <Today day={data.day} onOpenTask={(id) => void open(id)} onRefresh={reload} />
       )}
@@ -164,6 +182,7 @@ export function App() {
 }
 
 const TAB_ICON: Record<Place, (p: { filled: boolean }) => ReactElement> = {
+  OVERVIEW: ({ filled }) => <IconOverview filled={filled} />,
   TODAY: ({ filled }) => <IconToday filled={filled} />,
   CLINIC: ({ filled }) => <IconClinic filled={filled} />,
   ATTENTION: ({ filled }) => <IconAttention filled={filled} />,

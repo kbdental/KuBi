@@ -32,6 +32,7 @@ import {
 import { writeAudit, AuditAction } from './platform/audit/audit.service.js';
 import { clinicLocalDate, clinicLocalTimeToUtc } from './platform/workflow/scheduler.service.js';
 import { buildHandover } from './platform/workflow/handover.service.js';
+import { buildOverview } from './platform/insight/overview.service.js';
 import { ActivityStatus, ExceptionStatus } from '@kubi/contracts';
 
 const clock = systemClock;
@@ -652,6 +653,36 @@ export async function buildServer(): Promise<FastifyInstance> {
 
     await track(s, 'view_handover');
     return result ?? { periodKey: null, clear: true, unfinished: [], waitingOnSomeone: [], stillOpen: [], patientsNotSeen: [] };
+  });
+
+  // ---- the clinic at a glance ----
+  app.get('/api/v1/overview', async (req) => {
+    const s = await requireSession(req);
+
+    const result = await withTenantContext(prisma, s.tenancy, async (tx) => {
+      const clinicId = s.tenancy.clinicIds[0];
+      if (s.tenancy.clinicIds.length !== 1 || !clinicId) return null;
+
+      // Clinic-wide performance is not everyone's business: an assistant sees
+      // their own work, not how the clinic is scoring.
+      const decision = await checkPermission(tx, clock, {
+        employeeId: s.employeeId!, organizationId: s.organizationId,
+        clinicId, code: 'activity_instance:view_clinic',
+      });
+      if (!decision.allowed) {
+        throw Object.assign(
+          new Error('You do not have permission to see the clinic overview.'),
+          { statusCode: 403 },
+        );
+      }
+
+      const clinic = await tx.clinic.findUnique({ where: { id: clinicId } });
+      if (!clinic) return null;
+      return buildOverview(tx, clock, clinicId, clinic.timezone);
+    });
+
+    await track(s, 'view_overview');
+    return result;
   });
 
   app.get('/health', async () => ({ ok: true }));

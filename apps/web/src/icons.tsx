@@ -111,3 +111,14 @@ export function IconAlert({ size = 18 }: Props) {
     </svg>
   );
 }
+
+/** OVERVIEW — bars, because that is what the screen is. */
+export function IconOverview({ size = 22, filled = false }: Props) {
+  return (
+    <svg {...base(size)}>
+      <rect x="3" y="4" width="18" height="16" rx="3" fill={filled ? 'currentColor' : 'none'} opacity={filled ? 0.12 : 1} />
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <path d="M8 16v-4M12 16V8.5M16 16v-2.5" />
+    </svg>
+  );
+}
