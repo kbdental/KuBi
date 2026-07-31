@@ -1,7 +1,7 @@
 # KuBi — Owner Review Pack
 
-Covering VS-02 (appointments), VS-03 (closing and handover), and the KPI layer
-built against the Operations App requirements you sent.
+Covering VS-02 (appointments), VS-03 (closing and handover), the KPI layer, and
+the scheduler — built against the Operations App requirements you sent.
 
 ---
 
@@ -19,6 +19,11 @@ runs on the same engine as opening, anchored to the clinic's own configured
 closing time. Two new phases, CLOSING and CLOSED. The handover screen states
 what is being left behind in four lists: not done, waiting to be confirmed,
 problems still open, patients not seen.
+
+**The scheduler — KuBi generates the day itself.** Every five minutes it
+creates each active clinic's opening and closing sets and sweeps anything past
+its deadline. Until this existed the generators were complete and tested but
+nothing called them; the app could describe a clinic but not run one.
 
 **The KPI layer — 16 control parameters, one operational score.** Your §7 and
 the owner dashboard you drew twice. Every activity now belongs to one of the 16
@@ -92,20 +97,26 @@ The demo's day is deliberately untidy. A day that ends clean proves nothing.
 ## 5. Decisions that need you
 
 **a. Where does KuBi's code live?** This is the urgent one. KuBi is currently a
-local repository with **no remote** — the three commits from this session exist
-only in this session's container. The two repositories I can reach
-(`kb-management-suite`, `kb-denarts`) are different products. KuBi needs its own
-repository, or an explicit decision to put it in one of those.
+local repository with **no remote** — every commit from this session exists only
+in this session's container, and the container is reclaimed after a period of
+inactivity. The two repositories I can reach (`kb-management-suite`,
+`kb-denarts`) are different products: Apps Script tools, not a TypeScript
+monorepo with its own database and migrations. My recommendation is a new
+`kbdental/kubi` repository; create it (or tell me to) and I will push
+everything, history included. Until then, the source and its 155 tests are one
+timeout away from being lost.
 
 **b. Which parameter next?** Ten of the sixteen have no activities yet (§7
 below). Lab, inventory and attendance are very different business value and I
 should not pick for you.
 
-**c. Nothing generates tasks in a running system.** The generators are built,
-idempotent and tested, but only tests call them. A production scheduler has to
-enumerate tenants, and this system deliberately has *no* ungoverned global
-scope — so that needs a designed, reviewed mechanism rather than a quick loop.
-It is the single thing standing between KuBi and running a real morning.
+**c. ~~Nothing generates tasks in a running system.~~ Now built.** The
+scheduler runs every five minutes and generates each active clinic's opening
+and closing sets. Enumerating tenants without an ungoverned global scope was
+the hard part; it uses the same narrow SECURITY DEFINER pattern that
+authentication already uses, and a test asserts the application role still
+holds no BYPASSRLS. Nothing needed from you — recorded here because it was
+listed as a decision and is now resolved.
 
 Still open from earlier: the 6-vs-5 taps question, "waiting too long" = 15
 minutes, and whether an unready clinic escalates to you personally.
@@ -127,7 +138,7 @@ All found by driving the built app in a real browser at 390 / 834 / 1440px.
 | Disabled Finish button read as broken rather than as not-yet | — |
 
 Each now has a test or an assertion that fails if it comes back.
-**150 tests pass**: 27 unit, 86 integration, 37 UI, plus a browser pass that
+**155 tests pass**: 27 unit, 91 integration, 37 UI, plus a browser pass that
 checks three widths for sideways scroll, sub-36px controls, unstyled severity
 pills, top-bar overflow, and console errors.
 
@@ -142,9 +153,9 @@ maintenance & utilities, patient clinical journey (beyond arrival and waiting),
 clinical documentation, surgery & high-risk protocols, follow-up & experience,
 laboratory, inventory & implants, staff conduct, quality & CAPA.
 
-**Four of your six engines are not built.** The Exception engine is done and the
-Time engine's logic is done but unscheduled (5c above). The Patient Event,
-Equipment, Inventory and procedure-specific Compliance engines do not exist yet.
+**Four of your six engines are not built.** The Time and Exception engines are
+done. The Patient Event, Equipment, Inventory and procedure-specific Compliance
+engines do not exist yet.
 
 **No notifications.** Exceptions surface in the app; nothing leaves it. Your
 escalation ladder (L1 → L2 → L3) is modelled but only reaches people who open
@@ -163,13 +174,11 @@ model is not in one.
 
 ## 8. Recommendation for the next capability
 
-**Build the scheduler first (5c), then Laboratory (§12).**
+**Laboratory (§12).** The scheduler that used to head this list is now built,
+so KuBi generates its own mornings and the next thing can be a real capability
+rather than plumbing.
 
-The scheduler because nothing else matters until KuBi generates a morning on
-its own — every capability built after it inherits the fix, and every day
-without it is a day the app cannot actually run a clinic.
-
-Then Laboratory, for three reasons: it is the parameter your own example
+Laboratory, for three reasons: it is the parameter your own example
 reaches for twice ("crown delivery appointment given before crown arrived"); it
 is a genuine dependency chain — Received → QC Passed → appointment allowed —
 which exercises the gate machinery on something with real money attached; and a
