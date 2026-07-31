@@ -51,6 +51,9 @@ model Organization {
   automationExecutions  AutomationExecution[]
   appointments          Appointment[]
 
+  incidents    Incident[]
+  capaActions  CapaAction[]
+
   @@map("organizations")
 }
 
@@ -549,6 +552,8 @@ model ActivityInstance {
   attentionItems AttentionItem[]
 
   @@unique([definitionId, scopeKey, periodKey])
+  incidents Incident[]
+
   @@index([organizationId, clinicId, status])
   @@index([assigneeEmployeeId, status])
   @@map("activity_instances")
@@ -746,4 +751,102 @@ model Appointment {
   @@index([organizationId, clinicId, periodKey])
   @@index([organizationId, clinicId, status])
   @@map("appointments")
+}
+
+/// The IMPROVE stage of the §8 loop — how the clinic learns from a failure
+/// instead of correcting the same one forever.
+///
+/// The requirement's chain is: what happened → immediate correction → why did
+/// it happen → root cause → corrective action → preventive action →
+/// responsible person → due date → verification → closed. Each field below is
+/// one link of it, and the service refuses transitions that skip a link.
+model Incident {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  clinicId       String @map("clinic_id") @db.Uuid
+
+  /// Human-facing reference, e.g. INC-2026-0001. Stable once issued.
+  reference String
+  /// EXCEPTION when raised automatically by CAPA policy; MANUAL otherwise.
+  source    String @default("MANUAL")
+  /// Which of the 16 control parameters this failure belongs to.
+  parameter String
+  /// Routine / Important / Critical / Patient Safety. Drives nothing's colour
+  /// on its own — it decides how hard the closing rules bite.
+  priority  String
+  status    String @default("OPEN")
+
+  /// What happened, in clinic words.
+  summary     String
+  description String?
+
+  /// The immediate correction: what was done about today. Recorded before any
+  /// investigation, because the patient in the chair cannot wait for a root
+  /// cause analysis.
+  immediateCorrection String?   @map("immediate_correction")
+  containedAt         DateTime? @map("contained_at") @db.Timestamptz(6)
+
+  /// Why it happened. The link the whole parameter exists to force.
+  rootCause      String?   @map("root_cause")
+  investigatedAt DateTime? @map("investigated_at") @db.Timestamptz(6)
+
+  closedAt DateTime? @map("closed_at") @db.Timestamptz(6)
+
+  /// The exception that raised this, when it was raised automatically.
+  sourceAttentionItemId String? @map("source_attention_item_id") @db.Uuid
+  /// The activity instance that failed, when there was one.
+  sourceInstanceId      String? @map("source_instance_id") @db.Uuid
+
+  reportedByEmployeeId String? @map("reported_by_employee_id") @db.Uuid
+  ownerEmployeeId      String? @map("owner_employee_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  sourceInstance ActivityInstance? @relation(fields: [sourceInstanceId], references: [id])
+  actions        CapaAction[]
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, clinicId, status])
+  @@index([organizationId, clinicId, parameter])
+  @@map("incidents")
+}
+
+/// One corrective or preventive action on an incident.
+///
+/// Separate rows rather than two text fields on the incident, because each
+/// action needs its own owner, due date and independent verification — and
+/// because "at least one PREVENTIVE action exists" is the rule that stops CAPA
+/// degenerating into a log of things that were fixed once.
+model CapaAction {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  incidentId     String @map("incident_id") @db.Uuid
+
+  /// CORRECTIVE fixes this instance; PREVENTIVE stops the next one.
+  type        String
+  description String
+  status      String @default("OPEN")
+
+  responsibleEmployeeId String   @map("responsible_employee_id") @db.Uuid
+  dueAt                 DateTime @map("due_at") @db.Timestamptz(6)
+
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  /// Verification is by someone other than the responsible person, for the
+  /// same reason a doer cannot confirm their own activity.
+  verifiedByEmployeeId String?   @map("verified_by_employee_id") @db.Uuid
+  verifiedAt           DateTime? @map("verified_at") @db.Timestamptz(6)
+  verificationNote     String?   @map("verification_note")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  incident     Incident     @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, incidentId])
+  @@index([responsibleEmployeeId, status])
+  @@map("capa_actions")
 }

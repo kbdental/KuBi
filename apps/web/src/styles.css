@@ -847,3 +847,174 @@ label.field-label {
   .demo-app .nav-brand, .demo-app .nav-who { display: none; }
   .demo-app .main { overflow-y: auto; }
 }
+
+/* ---- Quality: the IMPROVE stage ---------------------------------------- */
+
+/* A row that is read and worked in place rather than tapped through to a
+   detail screen — the loop's steps only make sense next to each other. */
+.row-static { cursor: default; display: block; }
+
+.inc-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.inc-ref { font-weight: 600; font-size: 0.8rem; color: var(--ink); }
+.inc-meta { font-size: 0.75rem; color: var(--ink-soft); }
+
+/* Where an incident is on its journey, before what it owes.
+
+   Scrolls rather than wraps: a progress rail that reflows onto two rows stops
+   reading as a progression at all. Only the current step keeps its label on a
+   narrow screen, so the shape stays legible without a horizontal drag. */
+.rail {
+  display: flex;
+  list-style: none;
+  margin: 10px 0 8px;
+  padding: 0;
+}
+.rail-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+}
+.rail-step::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--line);
+}
+.rail-step:first-child::before { display: none; }
+.rail-step.done::before, .rail-step.here::before { background: var(--ok); }
+
+.rail-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--line);
+  position: relative;
+  z-index: 1;
+}
+.rail-step.done .rail-dot { background: var(--ok); }
+.rail-step.here .rail-dot {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px rgba(13, 110, 94, 0.2);
+}
+
+.rail-label {
+  font-size: 0.65rem;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--ink-soft);
+  /* Never let a long label force the rail wider than its share. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.rail-step.here .rail-label { color: var(--ink); font-weight: 600; }
+
+/* On a phone only the step you are on needs naming; the dots carry the rest. */
+@media (max-width: 560px) {
+  .rail-step:not(.here) .rail-label { display: none; }
+  .rail-step.here .rail-label { white-space: normal; }
+}
+
+/* The single next step. Louder than the status word above it, because a status
+   says where a thing is and this says what to do about it. */
+.next-step { font-weight: 600; color: var(--ink); margin: 2px 0 10px; }
+
+.inc-body { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+
+/* A step whose precondition is not met is dimmed, not hidden: seeing that
+   "why it happened" exists and is not yet answerable is the teaching. */
+.step { margin-bottom: 16px; }
+.step > h3 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  margin: 0 0 6px;
+}
+.step-locked { opacity: 0.5; }
+.step textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+}
+
+/* What somebody already recorded, quoted back rather than left editable. */
+.said {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--ok);
+  background: rgba(13, 110, 94, 0.06);
+  border-radius: 0 8px 8px 0;
+}
+
+.seg { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.seg button {
+  flex: 1 1 10rem;
+  min-height: 40px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 0.78rem;
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.seg button.on {
+  border-color: var(--ok);
+  background: rgba(13, 110, 94, 0.08);
+  font-weight: 600;
+}
+
+.action-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.action-row .action-main { flex: 1; min-width: 0; }
+.action-row .action-main p { margin: 0; }
+.action-row .btn { flex: 0 0 auto; }
+
+.tag {
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 3px 6px;
+  border-radius: 5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* Preventive is the one that matters, so it is the one that carries colour. */
+.tag-prevent { background: #dcefe9; color: #0b5648; }
+.tag-correct { background: #eef2f6; color: var(--ink-soft); }
+
+.add-action { margin-top: 10px; }
+
+.closed-fold { margin-top: 18px; }
+.closed-fold > summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  padding: 6px 0;
+}

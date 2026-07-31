@@ -99,6 +99,41 @@ interface Attention {
   open: boolean;
 }
 
+/** One corrective or preventive action. */
+interface CapaAction {
+  id: string;
+  type: 'CORRECTIVE' | 'PREVENTIVE';
+  status: 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'VERIFIED';
+  description: string;
+  responsible: string;
+  responsibleName: string;
+  dueInDays: number;
+  verifiedBy: string | null;
+  verificationNote: string | null;
+}
+
+/**
+ * An incident travelling the IMPROVE stage of the loop.
+ *
+ * The chain is the requirement's: what happened -> immediate correction ->
+ * root cause -> corrective and preventive actions -> verification -> closed.
+ * Nulls are meaningful here: a null rootCause is not "none", it is "nobody has
+ * asked why yet", which is the thing the screen must make impossible to miss.
+ */
+interface Incident {
+  id: string;
+  reference: string;
+  parameter: ParameterKey;
+  priority: string;
+  status: 'OPEN' | 'CONTAINED' | 'INVESTIGATED' | 'ACTIONS_PLANNED' | 'VERIFYING' | 'CLOSED';
+  ageDays: number;
+  summary: string;
+  description: string | null;
+  immediateCorrection: string | null;
+  rootCause: string | null;
+  actions: CapaAction[];
+}
+
 interface Visit {
   id: string;
   patientLabel: string;
@@ -340,8 +375,57 @@ function freshState() {
     },
   ];
 
+  /**
+   * The IMPROVE stage, mid-flight.
+   *
+   * Three incidents deliberately sitting at three different points of the
+   * loop, because the whole idea is that an incident is not "open" or "closed"
+   * but somewhere on a journey, and the screen's job is to say which step is
+   * owed next. The crown one is the requirement's own example.
+   */
+  const incidents: Incident[] = [
+    {
+      id: 'inc-1', reference: 'INC-2026-0007', parameter: 'LABORATORY',
+      priority: 'IMPORTANT', status: 'OPEN', ageDays: 0,
+      summary: 'Crown delivery appointment given before the crown arrived',
+      description: 'Mrs Shah was booked for Thursday. The lab case is still in production.',
+      immediateCorrection: null, rootCause: null, actions: [],
+    },
+    {
+      id: 'inc-2', reference: 'INC-2026-0006', parameter: 'INFECTION_CONTROL',
+      priority: 'PATIENT_SAFETY', status: 'CONTAINED', ageDays: 1,
+      summary: 'Autoclave cycle closed without the log line being verified',
+      description: null,
+      immediateCorrection: 'Cycle re-run and the batch re-verified before the first patient.',
+      rootCause: null, actions: [],
+    },
+    {
+      id: 'inc-3', reference: 'INC-2026-0004', parameter: 'APPOINTMENT_CONTROL',
+      priority: 'IMPORTANT', status: 'VERIFYING', ageDays: 4,
+      summary: 'Three patients not confirmed before the morning cutoff',
+      description: null,
+      immediateCorrection: 'All three called by 10:15 and confirmed.',
+      rootCause: 'The confirmation list is worked from memory; nobody owns it before 9:45.',
+      actions: [
+        {
+          id: 'act-1', type: 'CORRECTIVE', status: 'VERIFIED',
+          description: 'Call the three patients and confirm',
+          responsible: 'e-kavita', responsibleName: 'Kavita', dueInDays: -2,
+          verifiedBy: 'Rahul', verificationNote: null,
+        },
+        {
+          id: 'act-2', type: 'PREVENTIVE', status: 'COMPLETED',
+          description: 'Confirmation becomes a named 09:30 task owned by reception, with its own deadline',
+          responsible: 'e-rahul', responsibleName: 'Rahul', dueInDays: 1,
+          verifiedBy: null, verificationNote: null,
+        },
+      ],
+    },
+  ];
+
   return {
-    tasks, visits, attention,
+    tasks, visits, attention, incidents,
+    nextIncidentNumber: 8,
     signedIn: null as Person | null,
     /**
      * Set by the demo's "Jump to the end of the day" control. A real clinic
@@ -562,6 +646,49 @@ function taskView(t: Task, me: Person) {
     canOverrideBlock: t.cantConfirm !== null,
     blockedBy: t.blockedBy,
     problemKinds: PROBLEM_KINDS,
+  };
+}
+
+const STAGES = ['OPEN', 'CONTAINED', 'INVESTIGATED', 'ACTIONS_PLANNED', 'VERIFYING', 'CLOSED'] as const;
+
+/**
+ * What this incident is waiting for, in one clause.
+ *
+ * A status word tells somebody where a thing is; it does not tell them what to
+ * do. The requirement asks management to see deviations rather than lists, and
+ * a deviation nobody knows how to clear is just a different kind of list.
+ */
+function nextStepFor(inc: Incident): string | null {
+  switch (inc.status) {
+    case 'OPEN': return 'Record what was done about it today';
+    case 'CONTAINED': return 'Record why it happened';
+    case 'INVESTIGATED':
+      return inc.actions.some((a) => a.type === 'PREVENTIVE')
+        ? 'Add a corrective action'
+        : 'Add a preventive action — what stops the next one';
+    case 'ACTIONS_PLANNED': {
+      const n = inc.actions.filter((a) => a.status === 'OPEN' || a.status === 'IN_PROGRESS').length;
+      return n > 0 ? `${n} action${n === 1 ? '' : 's'} still to do` : null;
+    }
+    case 'VERIFYING': {
+      const n = inc.actions.filter((a) => a.status === 'COMPLETED').length;
+      return n > 0 ? `${n} action${n === 1 ? '' : 's'} waiting to be checked` : null;
+    }
+    default: return null;
+  }
+}
+
+function incidentView(inc: Incident) {
+  return {
+    ...inc,
+    stage: STAGES.indexOf(inc.status),
+    stageCount: STAGES.length,
+    blockedBy: nextStepFor(inc),
+    openActions: inc.actions.filter((a) => a.status !== 'VERIFIED').length,
+    totalActions: inc.actions.length,
+    canClose: inc.actions.length > 0
+      && inc.actions.some((a) => a.type === 'PREVENTIVE')
+      && inc.actions.every((a) => a.status === 'VERIFIED'),
   };
 }
 
@@ -969,6 +1096,132 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
       v.arrivedAt = Date.now() - 16 * 60_000;
     }
     return json({ status: v.status });
+  }
+
+
+  // ---- CAPA: the IMPROVE stage of the loop ----
+  //
+  // These refusals mirror the server's exactly. A demo that let you close an
+  // incident the real system would refuse would be teaching the wrong product.
+
+  if (path === '/api/v1/incidents' && method === 'GET') {
+    if (!MAY_SEE_CLINIC.some((r) => me.roles.includes(r))) return json({ error: 'Forbidden' }, 403);
+    return json(db.incidents.map(incidentView));
+  }
+
+  if (path === '/api/v1/incidents' && method === 'POST') {
+    const summary = String(body.summary ?? '').trim();
+    if (!summary) return json({ error: 'Say what happened.' }, 409);
+    const inc: Incident = {
+      id: `inc-${db.nextIncidentNumber}`,
+      reference: `INC-2026-${String(db.nextIncidentNumber).padStart(4, '0')}`,
+      parameter: (body.parameter as ParameterKey) ?? 'QUALITY_CAPA',
+      priority: String(body.priority ?? 'IMPORTANT'),
+      status: 'OPEN', ageDays: 0, summary,
+      description: (body.description as string) || null,
+      immediateCorrection: null, rootCause: null, actions: [],
+    };
+    db.nextIncidentNumber += 1;
+    db.incidents.unshift(inc);
+    return json(incidentView(inc));
+  }
+
+  const incMatch = /^\/api\/v1\/incidents\/([^/]+)(?:\/(\w+))?$/.exec(path);
+  if (incMatch) {
+    const inc = db.incidents.find((i) => i.id === incMatch[1]);
+    if (!inc) return json({ error: 'Not found' }, 404);
+    const step = incMatch[2];
+
+    if (!step && method === 'GET') return json(incidentView(inc));
+
+    if (step === 'contain') {
+      const text = String(body.immediateCorrection ?? '').trim();
+      if (inc.status !== 'OPEN') return json({ error: 'Already past containment.' }, 409);
+      if (!text) return json({ error: 'Say what was done about it today.' }, 409);
+      inc.immediateCorrection = text;
+      inc.status = 'CONTAINED';
+      return json(incidentView(inc));
+    }
+
+    if (step === 'investigate') {
+      const text = String(body.rootCause ?? '').trim();
+      // The patient in the chair cannot wait for a root cause analysis, so
+      // containment comes first and is never confused with the fix.
+      if (inc.status !== 'CONTAINED') {
+        return json({ error: 'Record what was done about today before asking why it happened.' }, 409);
+      }
+      if (!text) return json({ error: 'Say why it happened.' }, 409);
+      inc.rootCause = text;
+      inc.status = 'INVESTIGATED';
+      return json(incidentView(inc));
+    }
+
+    if (step === 'actions') {
+      // Jumping straight to a fix is the habit CAPA exists to break.
+      if (inc.status !== 'INVESTIGATED' && inc.status !== 'ACTIONS_PLANNED') {
+        return json({ error: 'Record a root cause before planning actions.' }, 409);
+      }
+      const description = String(body.description ?? '').trim();
+      if (!description) return json({ error: 'Say what will be done.' }, 409);
+      const responsible = String(body.responsibleEmployeeId ?? 'e-rahul');
+      inc.actions.push({
+        id: `act-${Math.random().toString(36).slice(2, 8)}`,
+        type: body.type === 'PREVENTIVE' ? 'PREVENTIVE' : 'CORRECTIVE',
+        status: 'OPEN', description,
+        responsible,
+        responsibleName: PEOPLE.find((p) => p.employeeId === responsible)?.displayLabel ?? 'Rahul',
+        dueInDays: Number(body.dueInDays ?? 7),
+        verifiedBy: null, verificationNote: null,
+      });
+      const hasC = inc.actions.some((a) => a.type === 'CORRECTIVE');
+      const hasP = inc.actions.some((a) => a.type === 'PREVENTIVE');
+      if (hasC && hasP && inc.status === 'INVESTIGATED') inc.status = 'ACTIONS_PLANNED';
+      return json(incidentView(inc));
+    }
+
+    if (step === 'close') {
+      if (inc.actions.length === 0) {
+        return json({ error: 'An incident closed without an action has taught the clinic nothing.' }, 409);
+      }
+      // The requirement's central point: "simply correcting today's appointment
+      // doesn't solve the operational problem."
+      if (!inc.actions.some((a) => a.type === 'PREVENTIVE')) {
+        return json({ error: 'No preventive action. Correcting this one instance does not stop the next.' }, 409);
+      }
+      const unverified = inc.actions.filter((a) => a.status !== 'VERIFIED').length;
+      if (unverified > 0) {
+        return json({ error: `${unverified} action${unverified === 1 ? '' : 's'} still unverified.` }, 409);
+      }
+      inc.status = 'CLOSED';
+      return json(incidentView(inc));
+    }
+  }
+
+  const actMatch = /^\/api\/v1\/capa-actions\/([^/]+)\/(\w+)$/.exec(path);
+  if (actMatch) {
+    const inc = db.incidents.find((i) => i.actions.some((a) => a.id === actMatch[1]));
+    const action = inc?.actions.find((a) => a.id === actMatch[1]);
+    if (!inc || !action) return json({ error: 'Not found' }, 404);
+
+    if (actMatch[2] === 'complete') {
+      action.status = 'COMPLETED';
+    } else if (actMatch[2] === 'verify') {
+      if (action.status !== 'COMPLETED') {
+        return json({ error: 'An action must be completed before it can be verified.' }, 409);
+      }
+      // Same reason a doer cannot confirm their own activity.
+      if (action.responsible === me.employeeId) {
+        return json({
+          error: 'A CAPA action must be verified by someone other than the person responsible for it.',
+        }, 409);
+      }
+      action.status = 'VERIFIED';
+      action.verifiedBy = me.displayLabel;
+      action.verificationNote = (body.note as string) || null;
+    }
+    const allDone = inc.actions.every((a) => a.status === 'COMPLETED' || a.status === 'VERIFIED');
+    if (allDone && inc.status === 'ACTIONS_PLANNED') inc.status = 'VERIFYING';
+    return json(incidentView(inc));
   }
 
   return json({ error: 'Not found' }, 404);

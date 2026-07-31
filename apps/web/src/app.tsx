@@ -9,11 +9,13 @@ import { SignIn } from './screens/sign-in.js';
 import { Today } from './screens/today.js';
 import { TaskSheetScreen } from './screens/task-sheet.js';
 import { Attention } from './screens/attention.js';
+import { Quality } from './screens/quality.js';
 import { Checks } from './screens/checks.js';
 import { Clinic } from './screens/clinic.js';
 import { Overview } from './screens/overview.js';
 import {
-  IconToday, IconClinic, IconAttention, IconChecks, IconMe, IconOverview,
+  IconToday, IconClinic, IconAttention, IconChecks,
+  IconQuality, IconMe, IconOverview,
 } from './icons.js';
 
 /**
@@ -37,7 +39,7 @@ const CAN_MOVE_VISITS = [
   'TREATING_DOCTOR', 'CLINICAL_DIRECTOR',
 ];
 
-type Place = 'OVERVIEW' | 'TODAY' | 'CLINIC' | 'ATTENTION' | 'CHECKS' | 'ME';
+type Place = 'OVERVIEW' | 'TODAY' | 'CLINIC' | 'ATTENTION' | 'QUALITY' | 'CHECKS' | 'ME';
 
 interface Loaded {
   me: Me;
@@ -165,6 +167,9 @@ export function App() {
           {showChecks && (
             <Tab id="CHECKS" label="Checks" now={place} go={setPlace} count={data.checks.length} />
           )}
+          {/* The IMPROVE stage. Clinic-wide, like Overview: an assistant has a
+              day, a manager has a clinic — and learning is a clinic's job. */}
+          {data.overview && <Tab id="QUALITY" label="Quality" now={place} go={setPlace} />}
           <Tab id="ME" label="Me" now={place} go={setPlace} />
         </div>
         <div className="nav-who">
@@ -204,6 +209,7 @@ export function App() {
           onOpenTask={(id) => void open(id)}
         />
       )}
+      {place === 'QUALITY' && <Quality onChanged={reload} />}
       {place === 'CHECKS' && <Checks items={data.checks} onDone={reload} />}
       {place === 'ME' && (
         <MeScreen me={data.me} onSignedOut={() => { setData(null); setPlace('TODAY'); }} />
@@ -218,6 +224,7 @@ const TAB_ICON: Record<Place, (p: { filled: boolean }) => ReactElement> = {
   TODAY: ({ filled }) => <IconToday filled={filled} />,
   CLINIC: ({ filled }) => <IconClinic filled={filled} />,
   ATTENTION: ({ filled }) => <IconAttention filled={filled} />,
+  QUALITY: ({ filled }) => <IconQuality filled={filled} />,
   CHECKS: ({ filled }) => <IconChecks filled={filled} />,
   ME: ({ filled }) => <IconMe filled={filled} />,
 };

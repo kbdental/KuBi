@@ -727,6 +727,78 @@ export const FunctionalAssignmentType = {
 export type FunctionalAssignmentType =
   (typeof FunctionalAssignmentType)[keyof typeof FunctionalAssignmentType];
 
+// ---------------------------------------------------------------------------
+// CAPA — the IMPROVE stage of the §8 loop
+// ---------------------------------------------------------------------------
+
+/**
+ * Operations App §8 names one loop:
+ *
+ *   PLAN → TRIGGER → ASSIGN → EXECUTE → PROVE → VERIFY → ESCALATE → MEASURE → IMPROVE
+ *
+ * Everything before IMPROVE was already built. Without IMPROVE the clinic
+ * detects the same failure every day and files it identically every day — a
+ * line, not a loop. The requirement states the purpose plainly: "this is how
+ * your clinic starts learning from failures rather than repeatedly correcting
+ * them."
+ *
+ * These six states are not decoration. Each transition has a precondition that
+ * refuses to let the investigation be skipped, because an incident record you
+ * can close without a root cause is a filing system, not a learning mechanism.
+ */
+export const IncidentStatus = {
+  /** Something happened. Nothing has been done about it yet. */
+  OPEN: 'OPEN',
+  /** Today's damage is dealt with — the immediate correction is recorded. */
+  CONTAINED: 'CONTAINED',
+  /** Why it happened is recorded. Requires containment first. */
+  INVESTIGATED: 'INVESTIGATED',
+  /** Corrective AND preventive actions exist, each owned and dated. */
+  ACTIONS_PLANNED: 'ACTIONS_PLANNED',
+  /** Every action is done and awaiting independent verification. */
+  VERIFYING: 'VERIFYING',
+  /** Every action verified by someone other than its owner. */
+  CLOSED: 'CLOSED',
+} as const;
+export type IncidentStatus = (typeof IncidentStatus)[keyof typeof IncidentStatus];
+
+/**
+ * The distinction the whole parameter exists for.
+ *
+ * The requirement's own example: a crown delivery appointment given before the
+ * crown arrived. "Simply correcting today's appointment doesn't solve the
+ * operational problem." CORRECTIVE fixes this instance; PREVENTIVE stops the
+ * next one. An incident with only corrective actions has not learned anything,
+ * which is why closing one is refused.
+ */
+export const CapaActionType = {
+  /** Fixes the instance that went wrong. */
+  CORRECTIVE: 'CORRECTIVE',
+  /** Changes the system so the instance cannot recur. */
+  PREVENTIVE: 'PREVENTIVE',
+} as const;
+export type CapaActionType = (typeof CapaActionType)[keyof typeof CapaActionType];
+
+/** Mirrors the activity lifecycle: doing it and proving it are separate. */
+export const CapaActionStatus = {
+  OPEN: 'OPEN',
+  IN_PROGRESS: 'IN_PROGRESS',
+  /** The owner says it is done. This is not the same as verified. */
+  COMPLETED: 'COMPLETED',
+  /** Someone other than the owner confirmed it. */
+  VERIFIED: 'VERIFIED',
+} as const;
+export type CapaActionStatus = (typeof CapaActionStatus)[keyof typeof CapaActionStatus];
+
+/** Where the incident came from. */
+export const IncidentSource = {
+  /** Raised automatically from an exception, per the activity's CAPA policy. */
+  EXCEPTION: 'EXCEPTION',
+  /** Raised by a person who saw something worth learning from. */
+  MANUAL: 'MANUAL',
+} as const;
+export type IncidentSource = (typeof IncidentSource)[keyof typeof IncidentSource];
+
 /** Registry of every enum in this file, for the contract-drift test. */
 export const ENUM_REGISTER = {
   EvaluationResult, EnforcementMode, GateDecision, OverrideAuthority,
@@ -738,4 +810,5 @@ export const ENUM_REGISTER = {
   ProcedureCategory, AllergySeverity, FollowupOutcome, AssetStatus,
   SterilizationStage, CycleResult, LabCaseStatus, StockTransactionType,
   ConfigScope, Provenance, FunctionalAssignmentType,
+  IncidentStatus, CapaActionType, CapaActionStatus, IncidentSource,
 } as const;

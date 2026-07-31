@@ -134,3 +134,21 @@ export function IconOverview({ size = 22, filled = false }: Props) {
     </svg>
   );
 }
+
+/**
+ * QUALITY — a loop that closes.
+ *
+ * A circular arrow rather than a clipboard or a warning triangle: this tab is
+ * not a list of problems, it is the stage where a problem goes round and comes
+ * back changed. The gap in the ring is where the arrowhead lands, so the shape
+ * reads as returning rather than as a plain circle.
+ */
+export function IconQuality({ size = 22, filled = false }: Props) {
+  return (
+    <svg {...base(size)}>
+      <path d="M20 12a8 8 0 1 1-2.6-5.9" />
+      <path d="M20 3.5V8h-4.5" />
+      {filled && <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none" />}
+    </svg>
+  );
+}

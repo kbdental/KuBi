@@ -33,6 +33,10 @@ import { writeAudit, AuditAction } from './platform/audit/audit.service.js';
 import { clinicLocalDate, clinicLocalTimeToUtc } from './platform/workflow/scheduler.service.js';
 import { buildHandover } from './platform/workflow/handover.service.js';
 import { buildOverview } from './platform/insight/overview.service.js';
+import {
+  raiseIncident, containIncident, investigateIncident, addAction,
+  completeAction, verifyAction, closeIncident, listIncidents, CapaRuleError,
+} from './platform/quality/capa.service.js';
 import { ActivityStatus, ExceptionStatus } from '@kubi/contracts';
 
 const clock = systemClock;
@@ -717,6 +721,148 @@ export async function buildServer(): Promise<FastifyInstance> {
 
     await track(s, 'view_overview');
     return result;
+  });
+
+  // ---- CAPA: the IMPROVE stage of the §8 loop ----
+  //
+  // Every route here is a step of the requirement's chain: what happened →
+  // immediate correction → root cause → corrective and preventive actions →
+  // responsible person and due date → verification → closed. The service
+  // refuses out-of-order steps; these routes only carry the refusal through
+  // with a status the UI can show.
+
+  app.get('/api/v1/incidents', async (req) => {
+    const s = await requireSession(req);
+    const q = z.object({ includeClosed: z.enum(['true', 'false']).optional() }).parse(req.query);
+
+    const result = await withTenantContext(prisma, s.tenancy, async (tx) => {
+      const clinicId = s.tenancy.clinicIds[0];
+      if (s.tenancy.clinicIds.length !== 1 || !clinicId) return [];
+      return listIncidents(tx, clock, s.organizationId, clinicId, {
+        includeClosed: q.includeClosed === 'true',
+      });
+    });
+    await track(s, 'view_incidents');
+    return result;
+  });
+
+  app.get('/api/v1/incidents/:id', async (req) => {
+    const s = await requireSession(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    return withTenantContext(prisma, s.tenancy, async (tx) => {
+      const inc = await tx.incident.findUniqueOrThrow({
+        where: { id },
+        include: { actions: { orderBy: { createdAt: 'asc' } } },
+      });
+      return inc;
+    });
+  });
+
+  app.post('/api/v1/incidents', async (req) => {
+    const s = await requireSession(req);
+    const body = z.object({
+      summary: z.string().min(1).max(300),
+      description: z.string().max(2000).optional(),
+      parameter: z.string(),
+      priority: z.string(),
+    }).parse(req.body);
+
+    return withTenantContext(prisma, s.tenancy, async (tx) => {
+      const clinicId = s.tenancy.clinicIds[0];
+      if (!clinicId) throw Object.assign(new Error('No clinic in context.'), { statusCode: 400 });
+      const inc = await raiseIncident(tx, clock, {
+        organizationId: s.organizationId,
+        clinicId,
+        parameter: body.parameter as never,
+        priority: body.priority,
+        summary: body.summary,
+        ...(body.description ? { description: body.description } : {}),
+        ...(s.employeeId ? { reportedByEmployeeId: s.employeeId } : {}),
+      });
+      await writeAudit(tx, {
+        organizationId: s.organizationId, clinicId,
+        actorEmployeeId: s.employeeId, action: 'INCIDENT_RAISED',
+        entityType: 'incident', entityId: inc.id,
+      });
+      return inc;
+    });
+  });
+
+  /** Wraps a CAPA step so a rule refusal reads as 409, not 500. */
+  const capaStep = <T>(fn: () => Promise<T>) =>
+    fn().catch((e) => {
+      if (e instanceof CapaRuleError) {
+        throw Object.assign(new Error(e.message), { statusCode: 409, code: e.code });
+      }
+      throw e;
+    });
+
+  app.post('/api/v1/incidents/:id/contain', async (req) => {
+    const s = await requireSession(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const body = z.object({ immediateCorrection: z.string().min(1).max(1000) }).parse(req.body);
+    const out = await capaStep(() => withTenantContext(prisma, s.tenancy, (tx) =>
+      containIncident(tx, clock, id, body.immediateCorrection)));
+    await track(s, 'capa_contain');
+    return out;
+  });
+
+  app.post('/api/v1/incidents/:id/investigate', async (req) => {
+    const s = await requireSession(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const body = z.object({ rootCause: z.string().min(1).max(1000) }).parse(req.body);
+    const out = await capaStep(() => withTenantContext(prisma, s.tenancy, (tx) =>
+      investigateIncident(tx, clock, id, body.rootCause)));
+    await track(s, 'capa_investigate');
+    return out;
+  });
+
+  app.post('/api/v1/incidents/:id/actions', async (req) => {
+    const s = await requireSession(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const body = z.object({
+      type: z.enum(['CORRECTIVE', 'PREVENTIVE']),
+      description: z.string().min(1).max(1000),
+      responsibleEmployeeId: z.string().uuid(),
+      dueAt: z.string().datetime(),
+    }).parse(req.body);
+    const out = await capaStep(() => withTenantContext(prisma, s.tenancy, (tx) =>
+      addAction(tx, id, {
+        type: body.type,
+        description: body.description,
+        responsibleEmployeeId: body.responsibleEmployeeId,
+        dueAt: new Date(body.dueAt),
+      })));
+    await track(s, 'capa_add_action');
+    return out;
+  });
+
+  app.post('/api/v1/capa-actions/:id/complete', async (req) => {
+    const s = await requireSession(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const out = await capaStep(() => withTenantContext(prisma, s.tenancy, (tx) =>
+      completeAction(tx, clock, id)));
+    await track(s, 'capa_complete_action');
+    return out;
+  });
+
+  app.post('/api/v1/capa-actions/:id/verify', async (req) => {
+    const s = await requireSession(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const body = z.object({ note: z.string().max(500).optional() }).parse(req.body ?? {});
+    const out = await capaStep(() => withTenantContext(prisma, s.tenancy, (tx) =>
+      verifyAction(tx, clock, id, s.employeeId!, body.note)));
+    await track(s, 'capa_verify_action');
+    return out;
+  });
+
+  app.post('/api/v1/incidents/:id/close', async (req) => {
+    const s = await requireSession(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const out = await capaStep(() => withTenantContext(prisma, s.tenancy, (tx) =>
+      closeIncident(tx, clock, id)));
+    await track(s, 'capa_close');
+    return out;
   });
 
   app.get('/health', async () => ({ ok: true }));

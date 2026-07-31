@@ -252,6 +252,44 @@ export interface ChecklistAnswer {
 
 // ---- calls ------------------------------------------------------------------
 
+/** One corrective or preventive action on an incident. */
+export interface CapaAction {
+  id: string;
+  type: 'CORRECTIVE' | 'PREVENTIVE';
+  status: 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'VERIFIED';
+  description: string;
+  responsible: string;
+  responsibleName: string;
+  verifiedBy: string | null;
+  verificationNote: string | null;
+}
+
+/**
+ * An incident travelling the IMPROVE stage of the loop.
+ *
+ * `blockedBy` is the single next step in one clause. A status word tells you
+ * where a thing is; it does not tell you what to do — and a deviation nobody
+ * knows how to clear is just a different kind of list.
+ */
+export interface Incident {
+  id: string;
+  reference: string;
+  parameter: string;
+  priority: string;
+  status: 'OPEN' | 'CONTAINED' | 'INVESTIGATED' | 'ACTIONS_PLANNED' | 'VERIFYING' | 'CLOSED';
+  summary: string;
+  description: string | null;
+  immediateCorrection: string | null;
+  rootCause: string | null;
+  ageDays: number;
+  stage: number;
+  blockedBy: string | null;
+  openActions: number;
+  totalActions: number;
+  canClose: boolean;
+  actions: CapaAction[];
+}
+
 export const api = {
   login: (email: string, password: string) =>
     post<{ displayLabel: string; roleCodes: string[] }>('/api/v1/auth/login', { email, password }),
@@ -289,4 +327,17 @@ export const api = {
   check: (id: string) => call<CheckDetail>(`/api/v1/checks/${id}`),
   submitCheck: (id: string, result: 'PASS' | 'FAIL', comment?: string) =>
     post<{ status: string }>(`/api/v1/checks/${id}`, { result, ...(comment ? { comment } : {}) }),
+
+  incidents: () => call<Incident[]>('/api/v1/incidents'),
+  containIncident: (id: string, immediateCorrection: string) =>
+    post<Incident>(`/api/v1/incidents/${id}/contain`, { immediateCorrection }),
+  investigateIncident: (id: string, rootCause: string) =>
+    post<Incident>(`/api/v1/incidents/${id}/investigate`, { rootCause }),
+  addCapaAction: (id: string, type: 'CORRECTIVE' | 'PREVENTIVE', description: string) =>
+    post<Incident>(`/api/v1/incidents/${id}/actions`, { type, description }),
+  completeCapaAction: (id: string) =>
+    post<Incident>(`/api/v1/capa-actions/${id}/complete`, {}),
+  verifyCapaAction: (id: string, note?: string) =>
+    post<Incident>(`/api/v1/capa-actions/${id}/verify`, note ? { note } : {}),
+  closeIncident: (id: string) => post<Incident>(`/api/v1/incidents/${id}/close`, {}),
 };
