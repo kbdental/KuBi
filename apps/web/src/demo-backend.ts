@@ -54,6 +54,8 @@ interface Item { id: string; label: string; requiresValue?: boolean; unit?: stri
 interface Task {
   id: string;
   code: string;
+  /** Which half of the day this belongs to. Counted separately, always. */
+  process: 'Opening Readiness' | 'Closing Readiness';
   title: string;
   standard: string;
   assignee: string;
@@ -124,11 +126,13 @@ const PROBLEM_KINDS = [
 const OPENED_AT = Date.now();
 /** Opening was due 12 minutes ago: late enough to matter, not a disaster. */
 const OPENING_DUE = OPENED_AT - 12 * 60_000;
+/** Eleven hours after opening — the demo's day is a real clinic day long. */
+const CLOSING_DUE = OPENING_DUE + 660 * 60_000;
 
 function freshState() {
   const tasks: Task[] = [
     {
-      id: 't-004', code: 'OPN-004', title: 'Set up the clinic environment',
+      id: 't-004', code: 'OPN-004', process: 'Opening Readiness', title: 'Set up the clinic environment',
       standard: 'AC 24°C where applicable, diffuser and lights as schedule',
       assignee: 'e-priya', selfVerifyAllowed: true, checkerRoles: [],
       cantConfirm: null, minutesFromOpening: -30, status: 'DUE',
@@ -140,7 +144,7 @@ function freshState() {
       responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
     },
     {
-      id: 't-005', code: 'OPN-005', title: 'Check the emergency kit',
+      id: 't-005', code: 'OPN-005', process: 'Opening Readiness', title: 'Check the emergency kit',
       standard: 'Emergency equipment and critical items available and accessible',
       assignee: 'e-priya', selfVerifyAllowed: false, checkerRoles: ['CLINIC_MANAGER'],
       cantConfirm: "We can't confirm the emergency kit list yet",
@@ -154,7 +158,7 @@ function freshState() {
       responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
     },
     {
-      id: 't-001', code: 'OPN-001', title: 'Open the clinic',
+      id: 't-001', code: 'OPN-001', process: 'Opening Readiness', title: 'Open the clinic',
       standard: 'Required clinic areas opened before first patient',
       assignee: 'e-priya', selfVerifyAllowed: false, checkerRoles: ['CLINIC_MANAGER'],
       cantConfirm: null, minutesFromOpening: -15, status: 'DUE',
@@ -170,7 +174,7 @@ function freshState() {
     {
       // Already done and waiting on Anita, so a second pair of eyes has
       // something real to look at the moment you switch to her.
-      id: 't-002', code: 'OPN-002', title: 'Get treatment rooms ready',
+      id: 't-002', code: 'OPN-002', process: 'Opening Readiness', title: 'Get treatment rooms ready',
       standard: 'All scheduled operatories clean, stocked and functional',
       assignee: 'e-priya', selfVerifyAllowed: false, checkerRoles: ['SENIOR_ASSISTANT'],
       cantConfirm: null, minutesFromOpening: -15, status: 'COMPLETED',
@@ -191,7 +195,7 @@ function freshState() {
       blockedBy: null, releasedAt: null, completedBy: 'e-priya',
     },
     {
-      id: 't-003', code: 'OPN-003', title: 'Get reception ready',
+      id: 't-003', code: 'OPN-003', process: 'Opening Readiness', title: 'Get reception ready',
       standard: 'Reception open, systems on, waiting area presentable',
       assignee: 'e-kavita', selfVerifyAllowed: true, checkerRoles: [],
       cantConfirm: null, minutesFromOpening: -15, status: 'DUE',
@@ -205,7 +209,7 @@ function freshState() {
     // Already done before anyone opened the app — a real morning has history
     // behind it, and Anita has something genuine waiting to be checked.
     {
-      id: 't-006', code: 'OPN-006', title: 'Run the autoclave test cycle',
+      id: 't-006', code: 'OPN-006', process: 'Opening Readiness', title: 'Run the autoclave test cycle',
       standard: 'Daily steriliser test passed and recorded before instruments are used',
       assignee: 'e-anita', selfVerifyAllowed: false, checkerRoles: ['CLINIC_MANAGER'],
       cantConfirm: null, minutesFromOpening: -45, status: 'COMPLETED',
@@ -223,8 +227,54 @@ function freshState() {
       },
       blockedBy: null, releasedAt: null, completedBy: 'e-anita',
     },
+    // ---- the other half of the day ----
+    // Closing checks exist from the morning on purpose: a check nobody can see
+    // until 19:00 is a check nobody plans their afternoon around. They are
+    // counted separately from opening everywhere, because "2 of 11 areas ready"
+    // at 09:30 would be a lie about a clinic that is in fact ready.
+      {
+        id: 't-101', code: 'CLS-001', process: 'Closing Readiness',
+        title: 'Finish the sterilisation run',
+        standard: 'All used instruments processed, cycle recorded, nothing left in the dirty zone overnight',
+        assignee: 'e-priya', selfVerifyAllowed: false, checkerRoles: ['SENIOR_ASSISTANT', 'CLINIC_MANAGER'],
+        cantConfirm: null, minutesFromOpening: 615, status: 'DUE',
+        items: [
+          { id: 'i-1101', label: 'All used instruments through the cycle' },
+          { id: 'i-1102', label: 'Cycle result recorded' },
+          { id: 'i-1103', label: 'Dirty zone empty' },
+          { id: 'i-1104', label: 'Autoclave switched off' },
+        ],
+        responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
+      },
+      {
+        id: 't-102', code: 'CLS-002', process: 'Closing Readiness',
+        title: 'Lock up the drugs cupboard',
+        standard: 'Controlled and emergency drugs counted against the register, cupboard locked, keys accounted for',
+        assignee: 'e-anita', selfVerifyAllowed: false, checkerRoles: ['CLINIC_MANAGER'],
+        cantConfirm: null, minutesFromOpening: 630, status: 'DUE',
+        items: [
+          { id: 'i-1201', label: 'Count matches the register' },
+          { id: 'i-1202', label: 'Cupboard locked' },
+          { id: 'i-1203', label: 'Keys back in the safe' },
+        ],
+        responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
+      },
+      {
+        id: 't-103', code: 'CLS-004', process: 'Closing Readiness',
+        title: 'Secure the clinic',
+        standard: 'Equipment off, compressor drained, doors and shutters locked, alarm set',
+        assignee: 'e-kavita', selfVerifyAllowed: false, checkerRoles: ['CLINIC_MANAGER'],
+        cantConfirm: null, minutesFromOpening: 660, status: 'DUE',
+        items: [
+          { id: 'i-1301', label: 'All equipment powered down' },
+          { id: 'i-1302', label: 'Compressor drained' },
+          { id: 'i-1303', label: 'Doors and shutters locked' },
+          { id: 'i-1304', label: 'Alarm set' },
+        ],
+        responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
+      },
     {
-      id: 't-007', code: 'OPN-007', title: 'Check the fridge temperature',
+      id: 't-007', code: 'OPN-007', process: 'Opening Readiness', title: 'Check the fridge temperature',
       standard: 'Cold chain intact: 2–8°C, recorded daily',
       assignee: 'e-priya', selfVerifyAllowed: true, checkerRoles: [],
       cantConfirm: null, minutesFromOpening: 45, status: 'DUE',
@@ -266,7 +316,17 @@ function freshState() {
     },
   ];
 
-  return { tasks, visits, attention, signedIn: null as Person | null };
+  return {
+    tasks, visits, attention,
+    signedIn: null as Person | null,
+    /**
+     * Set by the demo's "Jump to the end of the day" control. A real clinic
+     * gets here by working through eleven hours; a person reviewing the app in
+     * five minutes should not have to. Nothing else in this file reads the
+     * wall clock differently — the flag only stands in for time having passed.
+     */
+    endOfDay: false,
+  };
 }
 
 /**
@@ -296,6 +356,36 @@ export function resetDemo() {
   db.signedIn = who;
 }
 
+/**
+ * Wind the demo forward to closing time.
+ *
+ * The morning is worked through — every opening check confirmed, most patients
+ * seen — and the end-of-day set becomes due. Deliberately NOT a clean day: one
+ * patient arrived and never went through, one never came, and the autoclave log
+ * line is still open. A handover with nothing on it proves nothing; the screen
+ * exists precisely for the days that do not end tidily.
+ */
+export function jumpToEndOfDay() {
+  db.endOfDay = true;
+  for (const t of db.tasks) {
+    if (t.process !== 'Opening Readiness') continue;
+    t.status = 'VERIFIED';
+    t.completedBy ??= t.assignee;
+    t.blockedBy = null;
+    // Everything the morning asked for was confirmed, so the checklists read
+    // as genuinely done rather than as blank rows marked complete.
+    for (const i of t.items) {
+      t.responses[i.id] = { checked: true, value: i.requiresValue ? 24 : null };
+    }
+  }
+  const seen = ['v1', 'v2', 'v5'];
+  for (const v of db.visits) {
+    if (seen.includes(v.id)) { v.status = 'COMPLETED'; continue; }
+    if (v.id === 'v3') { v.status = 'ARRIVED'; v.arrivedAt = Date.now() - 40 * 60_000; continue; }
+    if (v.id === 'v6') v.status = 'NO_SHOW';
+  }
+}
+
 export function signInAs(key: string) {
   db.signedIn = PEOPLE.find((p) => p.key === key) ?? null;
 }
@@ -322,6 +412,17 @@ function raise(a: Omit<Attention, 'id' | 'open'>) {
   const item: Attention = { ...a, id: `a-${db.attention.length + 1}`, open: true };
   db.attention.push(item);
   return item;
+}
+
+/**
+ * Counts for one half of the day. Null when that half does not exist, which is
+ * not the same as "none done" and must never render as a zero.
+ */
+function tally(process: Task['process']) {
+  const forProcess = db.tasks.filter((t) => t.process === process);
+  if (forProcess.length === 0) return null;
+  const done = forProcess.filter((t) => ['COMPLETED', 'VERIFIED'].includes(t.status)).length;
+  return { total: forProcess.length, done, complete: done === forProcess.length };
 }
 
 function nextVisit(): Visit | null {
@@ -398,10 +499,21 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
       });
     }
 
-    const done = db.tasks.filter((t) => ['COMPLETED', 'VERIFIED'].includes(t.status)).length;
-    const complete = done === db.tasks.length;
+    const opening = tally('Opening Readiness');
+    const closing = tally('Closing Readiness');
     const inChair = db.visits.some((v) => v.status === 'IN_CHAIR');
     const next = nextVisit();
+
+    const phase = (() => {
+      if (!opening) return null;
+      if (!opening.complete) return 'OPENING';
+      if (inChair) return 'SEEING_PATIENTS';
+      // Somebody still in the chair outranks the clock: the day is not closing
+      // down while a patient is being treated, whatever the time says.
+      if (closing?.complete) return 'CLOSED';
+      if (closing && (db.endOfDay || now >= CLOSING_DUE || closing.done > 0)) return 'CLOSING';
+      return 'OPEN';
+    })();
 
     return json({
       buckets,
@@ -410,12 +522,68 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         name: 'SYNTHETIC KB Dental Andheri',
         // The viewer's own zone, so a demo opened anywhere reads naturally.
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        phase: !complete ? 'OPENING' : inChair ? 'SEEING_PATIENTS' : 'OPEN',
-        opening: { total: db.tasks.length, done, complete },
+        phase,
+        opening,
+        closing,
         readyBy: new Date(OPENING_DUE).toISOString(),
+        closingAt: new Date(CLOSING_DUE).toISOString(),
         firstPatientAt: next ? new Date(visitStart(next)).toISOString() : null,
       },
-      opening: { total: db.tasks.length, done, complete },
+      opening,
+    });
+  }
+
+  // ---- what tomorrow inherits ----
+  if (path === '/api/v1/handover') {
+    const line = (headline: string, detail: string | null, severity: string) =>
+      ({ headline, detail, severity });
+    const rank: Record<string, number> = {
+      PATIENT_SAFETY: 0, CRITICAL: 1, IMPORTANT: 2, ROUTINE: 3,
+    };
+    const bySeverity = (a: { severity: string }, b: { severity: string }) =>
+      (rank[a.severity] ?? 9) - (rank[b.severity] ?? 9);
+    // Priority mirrors the seed: emergency and sterilisation are patient
+    // safety, opening and securing the building are critical, the rest routine.
+    const priorityOf = (t: Task) =>
+      t.code === 'OPN-005' || t.code === 'CLS-001' || t.code === 'CLS-002'
+        ? 'PATIENT_SAFETY'
+        : t.code === 'OPN-001' || t.code === 'CLS-004' ? 'CRITICAL' : 'IMPORTANT';
+
+    const unfinished = db.tasks
+      .filter((t) => t.status === 'DUE' || t.status === 'IN_PROGRESS')
+      .map((t) => line(
+        t.title,
+        t.blockedBy ? 'On hold — a problem was reported and is not sorted yet.' : t.standard,
+        priorityOf(t),
+      ))
+      .sort(bySeverity);
+
+    const waitingOnSomeone = db.tasks
+      .filter((t) => t.status === 'COMPLETED')
+      .map((t) => line(t.title, 'Finished, but still waiting for someone to confirm it.', priorityOf(t)))
+      .sort(bySeverity);
+
+    const stillOpen = db.attention.filter((a) => a.open)
+      .map((a) => line(a.headline, a.detail, a.severity))
+      .sort(bySeverity);
+
+    const patientsNotSeen = db.visits
+      .filter((v) => ['BOOKED', 'ARRIVED', 'NO_SHOW'].includes(v.status))
+      .map((v) => line(
+        `${v.visitType} was not seen`,
+        v.status === 'NO_SHOW'
+          ? 'Marked as not arrived.'
+          : v.status === 'ARRIVED'
+            ? 'Arrived but never went through — needs a call.'
+            : 'Still expected, and the day has ended.',
+        v.status === 'ARRIVED' ? 'CRITICAL' : 'IMPORTANT',
+      ));
+
+    return json({
+      periodKey: new Date().toISOString().slice(0, 10),
+      clear: unfinished.length === 0 && waitingOnSomeone.length === 0
+        && stillOpen.length === 0 && patientsNotSeen.length === 0,
+      unfinished, waitingOnSomeone, stillOpen, patientsNotSeen,
     });
   }
 
@@ -588,8 +756,12 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     const dayKey = (offsetDays: number) =>
       new Date(now - offsetDays * 86_400_000).toISOString().slice(0, 10);
 
-    const confirmed = db.tasks.filter((t) => t.status === 'VERIFIED');
-    const total = db.tasks.length;
+    // Readiness means "ready to see patients", so it is the opening set alone.
+    // Folding tonight's checks in would cap readiness in the low sixties every
+    // morning and never recover.
+    const openingTasks = db.tasks.filter((t) => t.process === 'Opening Readiness');
+    const confirmed = openingTasks.filter((t) => t.status === 'VERIFIED');
+    const total = openingTasks.length;
     const week = [
       ...HISTORY.map((h, i) => ({
         periodKey: dayKey(HISTORY.length - i),

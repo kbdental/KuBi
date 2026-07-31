@@ -112,6 +112,18 @@ export function IconAlert({ size = 18 }: Props) {
   );
 }
 
+/** HANDOVER — a page passed on: what the next shift inherits. */
+export function IconHandover({ size = 22, filled = false }: Props) {
+  return (
+    <svg {...base(size)}>
+      <path d="M7 3.5h7.5L19 8v12.5H7z" fill={filled ? 'currentColor' : 'none'} opacity={filled ? 0.12 : 1} />
+      <path d="M7 3.5h7.5L19 8v12.5H7z" />
+      <path d="M14.5 3.5V8H19" />
+      <path d="M10 12.5h6M10 16h4" />
+    </svg>
+  );
+}
+
 /** OVERVIEW — bars, because that is what the screen is. */
 export function IconOverview({ size = 22, filled = false }: Props) {
   return (

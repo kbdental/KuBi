@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import {
   api, ApiError,
   type Me, type MyDay, type TaskSheet, type AttentionRow, type CheckRow, type Schedule,
-  type Overview as OverviewData,
+  type Overview as OverviewData, type Handover as HandoverData,
 } from './api.js';
+import { Handover } from './screens/handover.js';
 import { SignIn } from './screens/sign-in.js';
 import { Today } from './screens/today.js';
 import { TaskSheetScreen } from './screens/task-sheet.js';
@@ -52,6 +53,7 @@ export function App() {
   const [data, setData] = useState<Loaded | null>(null);
   const [place, setPlace] = useState<Place>('TODAY');
   const [openTask, setOpenTask] = useState<TaskSheet | null>(null);
+  const [openHandover, setOpenHandover] = useState<HandoverData | null>(null);
   const [checking, setChecking] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -105,9 +107,34 @@ export function App() {
     );
   }
 
+  if (openHandover) {
+    return (
+      <div className="app">
+        <main className="main">
+          <div className="screen screen-tight">
+            <button className="back" type="button" onClick={() => setOpenHandover(null)}>
+              Back
+            </button>
+          </div>
+          <Handover data={openHandover} />
+        </main>
+      </div>
+    );
+  }
+
   async function open(id: string) {
     try {
       setOpenTask(await api.task(id));
+    } catch {
+      reload();
+    }
+  }
+
+  // Fetched on demand rather than with every refresh: it is read once at the
+  // end of a day, and paying for it on every poll all morning is waste.
+  async function openTheHandover() {
+    try {
+      setOpenHandover(await api.handover());
     } catch {
       reload();
     }
@@ -156,7 +183,12 @@ export function App() {
         />
       )}
       {place === 'TODAY' && (
-        <Today day={data.day} onOpenTask={(id) => void open(id)} onRefresh={reload} />
+        <Today
+          day={data.day}
+          onOpenTask={(id) => void open(id)}
+          onRefresh={reload}
+          onOpenHandover={() => void openTheHandover()}
+        />
       )}
       {place === 'CLINIC' && (
         <Clinic

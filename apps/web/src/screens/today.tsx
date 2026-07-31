@@ -31,11 +31,12 @@ function time(iso: string, timezone: string | undefined): string {
 }
 
 export function Today({
-  day, onOpenTask, onRefresh,
+  day, onOpenTask, onRefresh, onOpenHandover,
 }: {
   day: MyDay;
   onOpenTask: (id: string) => void;
   onRefresh: () => void;
+  onOpenHandover: () => void;
 }) {
   const total = SECTIONS.reduce((n, s) => n + day.buckets[s.key].length, 0);
 
@@ -49,6 +50,22 @@ export function Today({
     <div className="screen">
       {/* Where the clinic is, before what any one person has to do. */}
       {day.clinic && <ClinicHeader clinic={day.clinic} />}
+
+      {/* The handover appears when the day is actually ending, rather than as a
+          seventh tab sitting empty until 8pm. The owner asked for a small number
+          of primary screens, and a screen that is meaningless for ten hours a
+          day does not deserve permanent furniture. */}
+      {(day.clinic?.phase === 'CLOSING' || day.clinic?.phase === 'CLOSED') && (
+        <button type="button" className="handover-cue" onClick={onOpenHandover}>
+          <span className="handover-cue-main">
+            <span className="handover-cue-title">Read the handover</span>
+            <span className="handover-cue-note">
+              What tomorrow inherits. Check it before you lock up.
+            </span>
+          </span>
+          <span className="row-go"><IconGo /></span>
+        </button>
+      )}
 
       {/* Two columns on a laptop, stacked on a phone. The thing being done
           gets the wider side; what is still to come sits alongside instead of

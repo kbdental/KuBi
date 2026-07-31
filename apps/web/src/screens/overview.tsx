@@ -46,7 +46,7 @@ function WeekBars({ week }: { week: OverviewData['week'] }) {
     <div className="chart">
       <div className="chart-head">
         <span className="chart-title">Readiness this week</span>
-        <span className="chart-note">Confirmed work, per day</span>
+        <span className="chart-note">Opening confirmed, per day</span>
       </div>
       <div className="bars">
         {week.map((d) => {
@@ -75,6 +75,14 @@ const SEVERITY_LABEL: Record<string, string> = {
   CRITICAL: 'Needs immediate action',
   IMPORTANT: 'Needs attention',
   ROUTINE: 'Routine',
+};
+
+/** Written out, not derived: see the note in handover.tsx. */
+const SEVERITY_PILL: Record<string, string> = {
+  PATIENT_SAFETY: 'pill-safety',
+  CRITICAL: 'pill-critical',
+  IMPORTANT: 'pill-important',
+  ROUTINE: 'pill-routine',
 };
 
 /**
@@ -111,7 +119,7 @@ function NeedsYou({ items, onSeeAll }: { items: AttentionRow[]; onSeeAll: () => 
               <button type="button" className="panel-row" onClick={onSeeAll}>
                 <span className="panel-row-main">
                   <span className="panel-row-title">{a.headline}</span>
-                  <span className={`pill pill-${a.severity.toLowerCase().replace('_', '-')}`}>
+                  <span className={`pill ${SEVERITY_PILL[a.severity] ?? 'pill-routine'}`}>
                     {SEVERITY_LABEL[a.severity] ?? a.severity}
                   </span>
                 </span>

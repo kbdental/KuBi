@@ -23,7 +23,17 @@ export interface BootstrapOrganizationInput {
   clinic: { code: string; name: string; timezone: string };
   owner: { email: string; password: string; displayLabel: string; employeeCode: string };
   /** OD-19 — synthetic demo values, explicitly labelled temporary. */
-  openingConfig: { openingTimeLocal: string; workingDays: readonly number[] };
+  openingConfig: {
+    openingTimeLocal: string;
+    /**
+     * When the clinic closes, clinic-local. Optional because a clinic that has
+     * not set it must be told so rather than have one guessed: an invented
+     * closing time would produce end-of-day checks due at a time nobody agreed,
+     * and a check nobody trusts is worse than a check that is visibly missing.
+     */
+    closingTimeLocal?: string;
+    workingDays: readonly number[];
+  };
 }
 
 export interface BootstrapResult {
@@ -75,6 +85,21 @@ export async function bootstrapOrganization(
           },
         },
       });
+      if (input.openingConfig.closingTimeLocal) {
+        await tx.configValue.create({
+          data: {
+            organizationId,
+            clinicId,
+            scope: 'CLINIC',
+            key: 'clinic.closing_time',
+            valueJson: {
+              value: input.openingConfig.closingTimeLocal,
+              provenance: 'SYNTHETIC_DEMO_TEMPORARY',
+              note: 'OD-19: demo value only, not permanent KB Dental policy.',
+            },
+          },
+        });
+      }
       await tx.configValue.create({
         data: {
           organizationId,

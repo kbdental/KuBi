@@ -75,9 +75,13 @@ async function clinicContext(
    * at the clinic, whoever is looking and from wherever.
    */
   timezone: string;
-  phase: 'OPENING' | 'OPEN' | 'SEEING_PATIENTS' | null;
+  phase: 'OPENING' | 'OPEN' | 'SEEING_PATIENTS' | 'CLOSING' | 'CLOSED' | null;
   opening: { total: number; done: number; complete: boolean } | null;
+  /** The end-of-day set. Null when the clinic has no closing time configured. */
+  closing: { total: number; done: number; complete: boolean } | null;
   readyBy: Date | null;
+  /** The clinic's own configured closing time today. Never guessed. */
+  closingAt: Date | null;
   /**
    * When the next patient the clinic must be ready for is due. Real since
    * VS-02, and still null when there is genuinely nobody left today — which
@@ -93,37 +97,67 @@ async function clinicContext(
   if (!clinic) return null;
 
   const periodKey = clinicLocalDate(now, clinic.timezone);
+  // The process each instance belongs to, because opening and closing are two
+  // separate questions. Counting them together would report "2 of 11 areas
+  // ready" all morning and never let the clinic reach OPEN at all.
   const rows = await tx.activityInstance.findMany({
     where: { clinicId, periodKey },
-    select: { status: true },
+    select: { status: true, definition: { select: { process: true } } },
   });
 
   const firstPatientAt = await nextPatientAt(tx, clinicId, periodKey);
   const base = { name: clinic.name, timezone: clinic.timezone, firstPatientAt };
-  if (rows.length === 0) return { ...base, phase: null, opening: null, readyBy: null };
 
-  const done = rows.filter(
-    (r) => r.status === ActivityStatus.COMPLETED || r.status === ActivityStatus.VERIFIED,
-  ).length;
-  const complete = done === rows.length;
+  const tally = (process: string) => {
+    const forProcess = rows.filter((r) => r.definition.process === process);
+    if (forProcess.length === 0) return null;
+    const done = forProcess.filter(
+      (r) => r.status === ActivityStatus.COMPLETED || r.status === ActivityStatus.VERIFIED,
+    ).length;
+    return { total: forProcess.length, done, complete: done === forProcess.length };
+  };
 
-  // The deadline is the clinic's own configured opening time, read from
+  const opening = tally('Opening Readiness');
+  const closing = tally('Closing Readiness');
+
+  // Both deadlines are the clinic's own configured times, read from
   // configuration rather than assumed (D-01, OD-19).
-  const cfg = await tx.configValue.findFirst({
-    where: { organizationId: clinic.organizationId, clinicId, key: 'clinic.opening_time' },
+  const cfg = await tx.configValue.findMany({
+    where: {
+      organizationId: clinic.organizationId, clinicId,
+      key: { in: ['clinic.opening_time', 'clinic.closing_time'] },
+    },
   });
-  const openingTime = (cfg?.valueJson as { value?: string } | null)?.value ?? null;
+  const timeOf = (key: string) => {
+    const value = (cfg.find((c) => c.key === key)?.valueJson as { value?: string } | null)?.value;
+    return value ? clinicLocalTimeToUtc(periodKey, value, clinic.timezone) : null;
+  };
+  const readyBy = timeOf('clinic.opening_time');
+  const closingAt = timeOf('clinic.closing_time');
+
+  // No opening set today is not "closed for the day" and not "ready" — it is an
+  // absence, and the only honest phase for it is none at all.
+  if (!opening) {
+    return { ...base, phase: null, opening: null, closing, readyBy, closingAt };
+  }
 
   const inChair = await tx.appointment.count({
     where: { clinicId, periodKey, status: 'IN_CHAIR' },
   });
 
-  return {
-    ...base,
-    phase: !complete ? 'OPENING' : inChair > 0 ? 'SEEING_PATIENTS' : 'OPEN',
-    opening: { total: rows.length, done, complete },
-    readyBy: openingTime ? clinicLocalTimeToUtc(periodKey, openingTime, clinic.timezone) : null,
-  };
+  const phase = (() => {
+    if (!opening.complete) return 'OPENING' as const;
+    if (inChair > 0) return 'SEEING_PATIENTS' as const;
+    // Closing is a real moment the clinic configured, not "it feels late".
+    // Somebody still in the chair outranks it: the day is not closing down
+    // while a patient is being treated, whatever the clock says.
+    if (closing?.complete) return 'CLOSED' as const;
+    if (closing && closingAt && now >= closingAt) return 'CLOSING' as const;
+    if (closing && closing.done > 0) return 'CLOSING' as const;
+    return 'OPEN' as const;
+  })();
+
+  return { ...base, phase, opening, closing, readyBy, closingAt };
 }
 
 async function requireSession(req: FastifyRequest): Promise<ResolvedSession> {

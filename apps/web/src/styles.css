@@ -538,6 +538,67 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .pill-important { background: var(--warn-tint); color: var(--warn); border: 1px solid #ecd9a8; }
 .pill-routine { background: #eef2f6; color: var(--ink-soft); }
 
+/* ---- handover: what tomorrow inherits ------------------------------------ */
+
+/* The way in, shown on Today only while the day is actually ending. */
+.handover-cue {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  background: var(--card); border: 1px solid var(--accent-line, var(--line));
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius); box-shadow: var(--lift);
+  padding: 14px 16px; margin-bottom: 17px; cursor: pointer; min-height: var(--tap);
+}
+.handover-cue:hover { box-shadow: var(--lift-md); }
+.handover-cue-main { flex: 1; min-width: 0; }
+.handover-cue-title { display: block; font-weight: 640; font-size: 17px; letter-spacing: -0.012em; }
+.handover-cue-note { display: block; color: var(--ink-soft); font-size: 14.5px; margin-top: 3px; }
+
+.hand-clear {
+  display: flex; gap: 13px; align-items: flex-start;
+  background: var(--accent-soft); border: 1px solid var(--accent-line, var(--line));
+  border-radius: var(--radius); padding: 16px 18px; margin-bottom: 20px;
+}
+.hand-clear-mark {
+  color: var(--accent); flex: 0 0 auto; display: grid; place-items: center;
+  width: 34px; height: 34px; border-radius: 50%; background: var(--card);
+}
+.hand-clear-title { font-weight: 650; font-size: 17px; letter-spacing: -0.012em; }
+.hand-clear-note { color: var(--ink-soft); font-size: 15px; margin: 4px 0 0; line-height: 1.45; }
+
+.hand-warn {
+  display: flex; gap: 11px; align-items: flex-start;
+  background: var(--warn-tint); border: 1px solid var(--warn-line, #ecd9a8);
+  border-radius: var(--radius); padding: 13px 15px; margin-bottom: 22px;
+  color: var(--warn); font-size: 14.5px; line-height: 1.45;
+}
+
+.hand-section { margin-bottom: 26px; }
+.hand-title {
+  font-size: 18px; font-weight: 660; letter-spacing: -0.015em;
+  margin: 0 0 3px; display: flex; align-items: center; gap: 9px;
+}
+.hand-count {
+  font-size: 12.5px; font-weight: 700; color: var(--ink-soft);
+  background: var(--page); border: 1px solid var(--line);
+  border-radius: 999px; padding: 2px 9px; min-width: 26px; text-align: center;
+}
+.hand-note { color: var(--ink-faint); font-size: 14px; margin: 0 0 11px; }
+.hand-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.hand-line {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--lift); padding: 13px 15px;
+}
+/* Stacked, not side by side: a long activity title and a severity pill on one
+   row squeezes the pill into an unreadable sliver on a phone. */
+.hand-line-head { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.hand-line-title { font-weight: 620; font-size: 16.5px; letter-spacing: -0.01em; line-height: 1.35; }
+.hand-line-detail { color: var(--ink-soft); font-size: 14.5px; margin: 9px 0 0; line-height: 1.45; }
+@media (min-width: 620px) {
+  .hand-line-head { flex-direction: row; align-items: center; justify-content: space-between; gap: 14px; }
+}
+
+.screen-tight { padding-bottom: 0; }
+
 /* ---- buttons -------------------------------------------------------------- */
 
 .btn {
@@ -634,6 +695,11 @@ label.field-label {
   min-height: 36px; white-space: nowrap;
 }
 .demo-reset:hover { background: var(--page); color: var(--ink); }
+.demo-reset + .demo-reset { margin-left: 0; }
+/* Two controls do not fit next to a person menu on a phone, so the first one
+   shortens rather than pushing the avatar off the edge. */
+.demo-reset-long { display: none; }
+@media (min-width: 620px) { .demo-reset-long { display: inline; } }
 
 .who-menu { position: relative; }
 .who-button {

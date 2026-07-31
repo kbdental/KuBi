@@ -65,9 +65,45 @@ export interface GenerationResult {
 }
 
 /**
- * Generate today's opening tasks for one clinic. Safe to call repeatedly.
+ * What separates one daily set from another.
+ *
+ * Opening and closing are the same machinery pointed at a different anchor —
+ * so they share one generator. Writing a second copy for closing is how the
+ * two quietly drift: one gets the idempotency fix, the other keeps the bug.
  */
-export async function generateOpeningTasks(
+interface DailySet {
+  /** The `process` on the activity definitions that belong to this set. */
+  process: string;
+  /** The automation rule code recorded against every run. */
+  ruleCode: string;
+  /** The config key holding the clinic-local time the set is anchored to. */
+  anchorConfigKey: string;
+  /** What to tell a manager when that time is not configured. */
+  notConfiguredHeadline: string;
+  notConfiguredDetail: string;
+}
+
+const OPENING_SET: DailySet = {
+  process: 'Opening Readiness',
+  ruleCode: 'A02_OPENING_GENERATION',
+  anchorConfigKey: 'clinic.opening_time',
+  notConfiguredHeadline: "Opening times aren't set up for this clinic",
+  notConfiguredDetail:
+    'KuBi cannot create the morning checklists until opening time and working days are set.',
+};
+
+const CLOSING_SET: DailySet = {
+  process: 'Closing Readiness',
+  ruleCode: 'A03_CLOSING_GENERATION',
+  anchorConfigKey: 'clinic.closing_time',
+  notConfiguredHeadline: "Closing time isn't set up for this clinic",
+  notConfiguredDetail:
+    'KuBi cannot create the end-of-day checks until the clinic’s closing time is set. '
+    + 'Until then nobody is being asked to confirm the building was left safe.',
+};
+
+async function generateDailySet(
+  set: DailySet,
   prisma: TenantPrisma,
   clock: Clock,
   organizationId: string,
@@ -82,28 +118,28 @@ export async function generateOpeningTasks(
       const periodKey = clinicLocalDate(now, clinic.timezone);
 
       const cfg = await tx.configValue.findMany({
-        where: { organizationId, clinicId, key: { in: ['clinic.opening_time', 'clinic.working_days'] } },
+        where: { organizationId, clinicId, key: { in: [set.anchorConfigKey, 'clinic.working_days'] } },
       });
-      const openingTime =
-        (cfg.find((c) => c.key === 'clinic.opening_time')?.valueJson as { value?: string } | null)?.value ?? null;
+      const anchorTime =
+        (cfg.find((c) => c.key === set.anchorConfigKey)?.valueJson as { value?: string } | null)?.value ?? null;
       const workingDays =
         (cfg.find((c) => c.key === 'clinic.working_days')?.valueJson as { value?: number[] } | null)?.value ?? null;
 
-      if (!openingTime || !workingDays) {
+      if (!anchorTime || !workingDays) {
         // Unconfigured is not "no tasks" — it is a setup gap someone must fix.
         await tx.automationExecution.create({
           data: {
-            organizationId, clinicId, ruleCode: 'A02_OPENING_GENERATION', periodKey,
+            organizationId, clinicId, ruleCode: set.ruleCode, periodKey,
             outcome: 'NOT_CONFIGURED',
-            detail: { missing: !openingTime ? 'clinic.opening_time' : 'clinic.working_days' },
+            detail: { missing: !anchorTime ? set.anchorConfigKey : 'clinic.working_days' },
           },
         });
         await raiseAttentionItem(tx, clock, {
           organizationId, clinicId,
           code: 'SYS.GATE.NOT_CONFIGURED',
           severity: Priority.CRITICAL,
-          headline: "Opening times aren't set up for this clinic",
-          detail: 'KuBi cannot create the morning checklists until opening time and working days are set.',
+          headline: set.notConfiguredHeadline,
+          detail: set.notConfiguredDetail,
           ownerRoleCode: 'CLINIC_MANAGER',
         });
         return { clinicId, periodKey, created: 0, skippedExisting: 0, unassigned: 0, notAWorkingDay: false };
@@ -113,16 +149,16 @@ export async function generateOpeningTasks(
       if (!workingDays.includes(weekday)) {
         await tx.automationExecution.create({
           data: {
-            organizationId, clinicId, ruleCode: 'A02_OPENING_GENERATION', periodKey,
+            organizationId, clinicId, ruleCode: set.ruleCode, periodKey,
             outcome: 'SKIPPED_NON_WORKING_DAY', detail: { weekday },
           },
         });
         return { clinicId, periodKey, created: 0, skippedExisting: 0, unassigned: 0, notAWorkingDay: true };
       }
 
-      const openingInstant = clinicLocalTimeToUtc(periodKey, openingTime, clinic.timezone);
+      const openingInstant = clinicLocalTimeToUtc(periodKey, anchorTime, clinic.timezone);
       const definitions = await tx.activityDefinition.findMany({
-        where: { organizationId, enabled: true, process: 'Opening Readiness' },
+        where: { organizationId, enabled: true, process: set.process },
         orderBy: { code: 'asc' },
       });
 
@@ -173,7 +209,7 @@ export async function generateOpeningTasks(
 
       await tx.automationExecution.create({
         data: {
-          organizationId, clinicId, ruleCode: 'A02_OPENING_GENERATION', periodKey,
+          organizationId, clinicId, ruleCode: set.ruleCode, periodKey,
           outcome: created > 0 ? 'CREATED' : 'NO_OP',
           detail: { created, skippedExisting, unassigned },
         },
@@ -185,8 +221,32 @@ export async function generateOpeningTasks(
 }
 
 /**
+ * Generate today's opening tasks for one clinic. Safe to call repeatedly.
+ */
+export const generateOpeningTasks = (
+  prisma: TenantPrisma, clock: Clock, organizationId: string, clinicId: string,
+): Promise<GenerationResult> =>
+  generateDailySet(OPENING_SET, prisma, clock, organizationId, clinicId);
+
+/**
+ * Generate today's closing checks for one clinic. Safe to call repeatedly.
+ *
+ * Anchored to the clinic's closing time, so the definitions' negative offsets
+ * mean "before we close" — a sterilisation run started at closing time is a run
+ * nobody waits for. Generated in the same pass as opening rather than late in
+ * the day: a closing check nobody can see until 19:00 is a check nobody plans
+ * their afternoon around.
+ */
+export const generateClosingTasks = (
+  prisma: TenantPrisma, clock: Clock, organizationId: string, clinicId: string,
+): Promise<GenerationResult> =>
+  generateDailySet(CLOSING_SET, prisma, clock, organizationId, clinicId);
+
+/**
  * Move past-due, incomplete tasks to OVERDUE and raise a PROBLEM.
- * Implements A29 (task overdue) for the opening set.
+ * Implements A29 (task overdue) for every daily set — each instance is judged
+ * against its own dueAt, so a closing check is late at its own deadline and not
+ * at the morning's.
  */
 export async function sweepOverdue(
   prisma: TenantPrisma,
@@ -215,7 +275,10 @@ export async function sweepOverdue(
         });
         await raiseAttentionItem(tx, clock, {
           organizationId, clinicId,
-          code: `OPN.OVERDUE.${inst.definition.code.replace('-', '_')}`,
+          // The prefix says which half of the day it belongs to, because the
+          // code is what deduplication matches on and what a report groups by.
+          code: `${inst.definition.process === 'Closing Readiness' ? 'CLS' : 'OPN'}`
+            + `.OVERDUE.${inst.definition.code.replace('-', '_')}`,
           severity: inst.definition.priority,
           headline: `"${inst.definition.title}" is late`,
           detail: inst.definition.failureDefinition,

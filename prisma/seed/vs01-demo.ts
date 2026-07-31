@@ -39,7 +39,11 @@ export async function seedVs01Demo(suffix: string): Promise<DemoEnvironment> {
       employeeCode: `EMP-OWNER-${suffix}`,
     },
     // OD-19 approved synthetic demo values.
-    openingConfig: { openingTimeLocal: '09:00', workingDays: [1, 2, 3, 4, 5, 6] },
+    openingConfig: {
+      openingTimeLocal: '09:00',
+      closingTimeLocal: '20:00',
+      workingDays: [1, 2, 3, 4, 5, 6],
+    },
   });
 
   // Second clinic, for cross-clinic isolation testing.

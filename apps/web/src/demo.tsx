@@ -1,7 +1,9 @@
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app.js';
-import { installDemoBackend, signInAs, resetDemo, PEOPLE } from './demo-backend.js';
+import {
+  installDemoBackend, signInAs, resetDemo, jumpToEndOfDay, PEOPLE,
+} from './demo-backend.js';
 import './styles.css';
 
 /**
@@ -37,6 +39,7 @@ function Demo() {
   const [epoch, setEpoch] = useState(0);
   const [ready, setReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [evening, setEvening] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,6 +71,15 @@ function Demo() {
 
   function startOver() {
     resetDemo();
+    setEvening(false);
+    setEpoch((n) => n + 1);
+  }
+
+  // A real clinic reaches closing time by working through eleven hours. Someone
+  // reviewing the app in five minutes should not have to.
+  function toEndOfDay() {
+    jumpToEndOfDay();
+    setEvening(true);
     setEpoch((n) => n + 1);
   }
 
@@ -82,6 +94,11 @@ function Demo() {
         <span className="demo-sep" aria-hidden="true">/</span>
         <span className="demo-where">SYNTHETIC KB Dental Andheri</span>
 
+        {!evening && (
+          <button type="button" className="demo-reset" onClick={toEndOfDay}>
+            <span className="demo-reset-long">Jump to </span>closing
+          </button>
+        )}
         <button type="button" className="demo-reset" onClick={startOver}>
           Start again
         </button>

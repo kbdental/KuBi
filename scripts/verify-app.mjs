@@ -101,6 +101,41 @@ for (const s of SIZES) {
     await shot(page, `${s.name}-${name}`);
   }
 
+  // The end of the day: the handover only exists once the clinic is closing,
+  // so reaching it is the only way to prove the screen renders at all.
+  await page.click('.demo-reset:has-text("closing")');
+  await page.waitForTimeout(900);
+  await page.click('.tab:has-text("Today")');
+  await page.waitForTimeout(500);
+  const cue = await page.$('.handover-cue');
+  if (!cue) {
+    problems.push(`${s.name}: no handover appears on Today once the clinic is closing`);
+  } else {
+    await cue.click();
+    await page.waitForTimeout(700);
+    await sideways('Handover');
+    await shot(page, `${s.name}-06-handover`);
+    const sections = await page.$$eval('.hand-section', (e) => e.length);
+    // The demo's day deliberately ends untidy — a handover with nothing on it
+    // would mean the screen was never actually exercised.
+    if (sections === 0) problems.push(`${s.name}: the handover rendered with no sections`);
+    const named = await page.$$eval('.hand-line-title', (e) => e.map((x) => x.textContent ?? ''));
+    // Q6: no reporter or completer names on operational screens, ever.
+    for (const t of named) {
+      if (/SYNTHETIC/.test(t)) problems.push(`${s.name}: handover names a person — "${t}"`);
+    }
+  }
+
+  // A severity pill with no background is a pill whose class matched no rule —
+  // which once made PATIENT_SAFETY, the most serious level in the system,
+  // render as plain text. Silent, and exactly backwards.
+  const flat = await page.$$eval('.pill', (els) =>
+    els.filter((e) => {
+      const bg = getComputedStyle(e).backgroundColor;
+      return bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent';
+    }).map((e) => `${e.textContent?.trim()} (${e.className})`));
+  for (const p of flat) problems.push(`${s.name}: severity pill has no styling — ${p}`);
+
   // Anything you tap must be big enough to tap. 36px is the floor; the design
   // target is 44px, and --tap enforces it on the primary controls.
   const small = await page.$$eval('button, a[href], input, select', (els) =>

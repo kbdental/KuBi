@@ -53,8 +53,17 @@ export async function buildOverview(
   const days = recentDays(now, timezone, DAYS_BACK);
   const today = days[days.length - 1]!;
 
+  // Readiness means "is this clinic ready to see patients?", so it is the
+  // opening set and only the opening set. Folding the end-of-day checks in
+  // would cap readiness in the low sixties every morning and never recover:
+  // the closing work is not late at 09:30, it simply has not happened yet.
+  // Whether the clinic closed properly is a different question, and it has its
+  // own screen — the handover.
   const instances = await tx.activityInstance.findMany({
-    where: { clinicId, periodKey: { in: days } },
+    where: {
+      clinicId, periodKey: { in: days },
+      definition: { process: 'Opening Readiness' },
+    },
     select: { periodKey: true, status: true, dueAt: true, completedAt: true },
   });
 

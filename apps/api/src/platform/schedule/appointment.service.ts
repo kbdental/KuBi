@@ -210,11 +210,16 @@ export async function checkReadinessAgainstFirstPatient(
   const minutes = Math.round((firstAt.getTime() - now.getTime()) / 60_000);
   if (minutes > warnWithin) return { raised: false, reason: 'first patient is not close yet' };
 
+  // Only the opening set. Tonight's closing checks are outstanding at 09:30 by
+  // design, and counting them here would tell the clinic it is not ready for
+  // its first patient every single morning — which is how a warning that
+  // matters becomes one nobody reads.
   const outstanding = await tx.activityInstance.count({
     where: {
       clinicId: input.clinicId,
       periodKey: input.periodKey,
       status: { in: ['DUE', 'IN_PROGRESS', 'OVERDUE'] },
+      definition: { process: 'Opening Readiness' },
     },
   });
   if (outstanding === 0) return { raised: false, reason: 'clinic is ready' };

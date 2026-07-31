@@ -86,11 +86,15 @@ export interface ClinicContext {
   /** The clinic's timezone. Every time on screen is formatted with this. */
   timezone: string;
   /** null when there is no opening set today. Absent is not ready. */
-  phase: 'OPENING' | 'OPEN' | 'SEEING_PATIENTS' | null;
+  phase: 'OPENING' | 'OPEN' | 'SEEING_PATIENTS' | 'CLOSING' | 'CLOSED' | null;
   opening: OpeningStatus | null;
+  /** The end-of-day set. Null when this clinic has no closing time configured. */
+  closing: OpeningStatus | null;
   /** The clinic's own configured opening time for today. */
   readyBy: string | null;
-  /** Always null until appointment integration lands. Never guessed. */
+  /** The clinic's own configured closing time for today. Never guessed. */
+  closingAt: string | null;
+  /** When the next patient is due, or null when there is genuinely nobody. */
   firstPatientAt: string | null;
 }
 
@@ -198,6 +202,23 @@ export interface Overview {
   independentChecks: { independent: number; total: number; percent: number | null };
 }
 
+/** One line of the handover. Plain clinic language, and never a person's name. */
+export interface HandoverLine {
+  headline: string;
+  detail: string | null;
+  severity: 'PATIENT_SAFETY' | 'CRITICAL' | 'IMPORTANT' | 'ROUTINE';
+}
+
+export interface Handover {
+  periodKey: string | null;
+  /** True when nothing is being carried into tomorrow. */
+  clear: boolean;
+  unfinished: HandoverLine[];
+  waitingOnSomeone: HandoverLine[];
+  stillOpen: HandoverLine[];
+  patientsNotSeen: HandoverLine[];
+}
+
 export interface ChecklistAnswer {
   itemId: string;
   checked: boolean;
@@ -227,6 +248,7 @@ export const api = {
     post<{ ok: boolean }>(`/api/v1/attention/${id}/resolve`, { note }),
 
   overview: () => call<Overview>('/api/v1/overview'),
+  handover: () => call<Handover>('/api/v1/handover'),
   schedule: () => call<Schedule>('/api/v1/schedule'),
   setAppointmentStatus: (
     id: string,
