@@ -13,6 +13,7 @@ import type { TenantPrisma } from '../tenancy/rls-context.js';
 import type { Clock } from '../../shared/clock.js';
 import { ActivityStatus, ExceptionStatus } from '@kubi/contracts';
 import { clinicLocalDate } from '../workflow/scheduler.service.js';
+import { buildOperationalHealth, type OperationalHealth } from './parameter-score.service.js';
 
 export interface DayPoint {
   periodKey: string;
@@ -22,6 +23,8 @@ export interface DayPoint {
 }
 
 export interface Overview {
+  /** The 16 control parameters rolled into one score. Worst first. */
+  health: OperationalHealth;
   /** Today's readiness as a percentage of the day's activities confirmed. */
   readiness: { done: number; total: number; percent: number | null };
   patients: { seen: number; expected: number; waiting: number; notSeen: number };
@@ -120,6 +123,7 @@ export async function buildOverview(
   const independent = verifications.filter((v) => !v.selfVerified).length;
 
   return {
+    health: await buildOperationalHealth(tx, clock, clinicId, today),
     readiness: {
       done: doneToday,
       total: todays.length,

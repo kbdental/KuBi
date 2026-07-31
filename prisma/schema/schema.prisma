@@ -449,6 +449,10 @@ model ActivityDefinition {
   title             String
   /// Matrix "Standard / Expected Result" — shown as supporting text.
   standardText      String   @map("standard_text")
+  /// One of the 16 control parameters (see Parameter in contracts). The axis
+  /// the owner's dashboard rolls up. Distinct from `process`: a parameter is
+  /// what kind of control this is, a process is the workflow it sits in.
+  parameter         String
   process           String
   priority          String
   executionMode     String   @map("execution_mode")

@@ -16,7 +16,7 @@
  */
 import {
   Priority, ExecutionMode, Recurrence, InstanceScope, DueRuleKind, SodPolicy,
-  EvidenceType, CapaRequirement, RoleCode, FunctionalAssignmentType,
+  EvidenceType, CapaRequirement, RoleCode, FunctionalAssignmentType, Parameter,
 } from '@kubi/contracts';
 
 export interface ChecklistItemSeed {
@@ -31,6 +31,14 @@ export interface ActivityDefinitionSeed {
   code: string;
   title: string;
   standardText: string;
+  /**
+   * Typed against the union rather than widened to `string`, unlike the fields
+   * around it. Those widenings are why `SodPolicy.STANDARD` — a member that
+   * does not exist — once seeded as `undefined` and was only caught by Prisma
+   * at runtime. A parameter typo would be worse: the activity would seed fine
+   * and simply never appear in any score.
+   */
+  parameter: Parameter;
   process: string;
   priority: string;
   executionMode: string;
@@ -73,6 +81,7 @@ const AT_OPENING = {
 export const OPENING_ACTIVITIES: readonly ActivityDefinitionSeed[] = [
   {
     code: 'OPN-001',
+    parameter: Parameter.OPENING_READINESS,
     title: 'Open the clinic',
     standardText: 'Required clinic areas opened before first patient',
     process: 'Opening Readiness',
@@ -105,6 +114,7 @@ export const OPENING_ACTIVITIES: readonly ActivityDefinitionSeed[] = [
   },
   {
     code: 'OPN-002',
+    parameter: Parameter.ROOM_CHAIR_READINESS,
     title: 'Get treatment rooms ready',
     standardText: 'All scheduled operatories clean, stocked and functional',
     process: 'Opening Readiness',
@@ -139,6 +149,7 @@ export const OPENING_ACTIVITIES: readonly ActivityDefinitionSeed[] = [
   },
   {
     code: 'OPN-003',
+    parameter: Parameter.OPENING_READINESS,
     title: 'Get reception ready',
     standardText: 'Phones, appointment list, payment/reception systems ready',
     process: 'Opening Readiness',
@@ -171,6 +182,7 @@ export const OPENING_ACTIVITIES: readonly ActivityDefinitionSeed[] = [
   },
   {
     code: 'OPN-004',
+    parameter: Parameter.OPENING_READINESS,
     title: 'Set up the clinic environment',
     standardText: 'AC 24°C where applicable, diffuser/lights as schedule',
     process: 'Opening Readiness',
@@ -204,6 +216,7 @@ export const OPENING_ACTIVITIES: readonly ActivityDefinitionSeed[] = [
   },
   {
     code: 'OPN-005',
+    parameter: Parameter.SAFETY_EMERGENCY,
     title: 'Check the emergency kit',
     standardText: 'Emergency equipment/critical items available and accessible',
     process: 'Opening Readiness',

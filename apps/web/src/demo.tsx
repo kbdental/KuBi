@@ -112,9 +112,10 @@ function Demo() {
             onClick={() => setMenuOpen((o) => !o)}
           >
             <span className="who-avatar" aria-hidden="true">{initials(current.name)}</span>
-            <span>
+            {/* No <br> between these: on a phone both are hidden and a stray
+                line break would still take up a line inside the button. */}
+            <span className="who-who">
               <span className="who-name">{current.name}</span>
-              <br />
               <span className="who-role">{current.role}</span>
             </span>
             <span className="who-caret" aria-hidden="true">▾</span>
@@ -134,9 +135,8 @@ function Demo() {
                     onClick={() => switchTo(p.key)}
                   >
                     <span className="who-avatar" aria-hidden="true">{initials(w.name)}</span>
-                    <span>
+                    <span className="who-who">
                       <span className="who-option-name">{w.name}</span>
-                      <br />
                       <span className="who-option-role">{w.role}</span>
                     </span>
                   </button>

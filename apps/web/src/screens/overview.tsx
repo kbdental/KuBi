@@ -1,5 +1,147 @@
-import type { Overview as OverviewData, AttentionRow, Schedule } from '../api.js';
+import type {
+  Overview as OverviewData, AttentionRow, Schedule, ParameterScore, RagStatus,
+} from '../api.js';
 import { IconGo } from '../icons.js';
+
+/**
+ * What each of the 16 control parameters is called on screen.
+ *
+ * Held here rather than imported from contracts so the web bundle does not
+ * pull in the enum register; the server sends the key, the screen names it.
+ * A key with no entry falls back to the key itself, visibly wrong rather than
+ * silently blank — a nameless tile is one nobody can act on.
+ */
+const PARAMETER_LABEL: Record<string, string> = {
+  ATTENDANCE_LEAVE: 'Attendance & leave',
+  OPENING_READINESS: 'Opening readiness',
+  CLEANLINESS: 'Cleanliness',
+  MAINTENANCE_UTILITIES: 'Maintenance & utilities',
+  INFECTION_CONTROL: 'Infection control',
+  ROOM_CHAIR_READINESS: 'Room & chair readiness',
+  APPOINTMENT_CONTROL: 'Appointments',
+  PATIENT_JOURNEY: 'Patient journey',
+  CLINICAL_DOCUMENTATION: 'Clinical records',
+  SURGICAL_HIGH_RISK: 'Surgery & high-risk care',
+  FOLLOWUP_EXPERIENCE: 'Follow-up & experience',
+  LABORATORY: 'Laboratory',
+  INVENTORY_IMPLANTS: 'Inventory & implants',
+  STAFF_CONDUCT: 'Team & coordination',
+  SAFETY_EMERGENCY: 'Safety & emergency',
+  QUALITY_CAPA: 'Quality & CAPA',
+};
+
+const RAG_WORD: Record<RagStatus, string> = {
+  GREEN: 'On track',
+  AMBER: 'Needs attention',
+  RED: 'Needs action',
+  GREY: 'Nothing to measure',
+};
+
+/**
+ * Operational health, and the 16 parameters underneath it.
+ *
+ * The requirement is explicit about what this screen is for: "management needs
+ * to see the exceptions, not 18 green ticks". So the parameters arrive
+ * worst-first from the server, every tile that is not green says why in one
+ * line, and the ones with nothing to measure are drawn as absent and sink to
+ * the bottom rather than padding the screen with reassuring zeros.
+ */
+function Health({ health }: { health: OverviewData['health'] }) {
+  const h = health;
+  const needsAction = h.parameters.filter((p) => p.status === 'RED' || p.status === 'AMBER');
+  const fine = h.parameters.filter((p) => p.status === 'GREEN');
+  const unmeasured = h.parameters.filter((p) => p.status === 'GREY');
+
+  return (
+    <>
+      <div className={`health is-${h.status.toLowerCase()}`}>
+        <div className="health-main">
+          <div className="health-label">Operational health</div>
+          <div className="health-value">{h.percent === null ? '—' : `${h.percent}%`}</div>
+          <div className="health-word">{RAG_WORD[h.status]}</div>
+        </div>
+        <div className="health-counts">
+          <div className="health-count">
+            <span className="health-count-n is-critical">{h.needsAttention.critical}</span>
+            <span className="health-count-l">Need you today</span>
+          </div>
+          <div className="health-count">
+            <span className="health-count-n">{h.needsAttention.attention}</span>
+            <span className="health-count-l">Can wait</span>
+          </div>
+        </div>
+      </div>
+
+      {needsAction.length > 0 && (
+        <ParameterGroup
+          title="Look at these"
+          note="Worst first. Everything else is running."
+          rows={needsAction}
+        />
+      )}
+
+      {needsAction.length === 0 && fine.length > 0 && (
+        <p className="param-allclear">
+          Every parameter with something to measure today is on track.
+        </p>
+      )}
+
+      {fine.length > 0 && (
+        <ParameterGroup title="On track" note={null} rows={fine} />
+      )}
+
+      {unmeasured.length > 0 && (
+        <details className="param-rest">
+          <summary>
+            {unmeasured.length} {unmeasured.length === 1 ? 'parameter' : 'parameters'} with
+            nothing to measure today
+          </summary>
+          {/* Listed, not scored. These are shown so nobody wonders whether the
+              clinic forgot them — an absence stated is not the same as an
+              absence hidden, and neither is a zero. */}
+          <ul className="param-none">
+            {unmeasured.map((p) => (
+              <li key={p.parameter}>{PARAMETER_LABEL[p.parameter] ?? p.parameter}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </>
+  );
+}
+
+function ParameterGroup({
+  title, note, rows,
+}: {
+  title: string;
+  note: string | null;
+  rows: ParameterScore[];
+}) {
+  return (
+    <section className="param-group">
+      <div className="param-group-head">
+        <h2 className="param-group-title">{title}</h2>
+        {note && <span className="param-group-note">{note}</span>}
+      </div>
+      <div className="params">
+        {rows.map((p) => (
+          <div className={`param is-${p.status.toLowerCase()}`} key={p.parameter}>
+            <div className="param-head">
+              <span className="param-name">{PARAMETER_LABEL[p.parameter] ?? p.parameter}</span>
+              <span className="param-pct">{p.percent === null ? '—' : `${p.percent}%`}</span>
+            </div>
+            <div className="param-bar">
+              <div className="param-fill" style={{ width: `${p.percent ?? 0}%` }} />
+            </div>
+            {/* Only when there is something to say. "All good" under a green
+                tile is noise, and noise is what makes a dashboard wallpaper. */}
+            {p.because && <div className="param-because">{p.because}</div>}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 /**
  * The clinic at a glance — what an owner opens the app for.
@@ -203,7 +345,6 @@ export function Overview({
   onGoToAttention: () => void;
   onGoToClinic: () => void;
 }) {
-  const r = data.readiness;
   const p = data.patients;
   const ind = data.independentChecks;
 
@@ -212,26 +353,18 @@ export function Overview({
       <h1 className="screen-title">Overview</h1>
       <p className="screen-sub">How the clinic is running today.</p>
 
+      <Health health={data.health} />
+
+      {/* Two numbers, not four. "Ready today" and "Open problems" both moved
+          into the health block above — the same figure stated twice in two
+          shapes on one screen makes a reader check which one is right instead
+          of acting on either. What survives is what the block does not say. */}
       <div className="stats">
-        <Stat
-          label="Ready today"
-          value={r.percent === null ? '—' : `${r.percent}%`}
-          sub={r.total === 0 ? 'Nothing scheduled' : `${r.done} of ${r.total} confirmed`}
-          tone={r.percent === null ? undefined : r.percent >= 90 ? 'good' : r.percent >= 60 ? 'warn' : 'bad'}
-        />
         <Stat
           label="Patients"
           value={`${p.seen}/${p.expected}`}
           sub={p.waiting > 0 ? `${p.waiting} waiting now` : 'Nobody waiting'}
           tone={p.waiting > 1 ? 'warn' : undefined}
-        />
-        <Stat
-          label="Open problems"
-          value={String(data.problems.open)}
-          sub={data.problems.patientSafety > 0
-            ? `${data.problems.patientSafety} patient safety`
-            : data.problems.overdue > 0 ? `${data.problems.overdue} past due` : 'None overdue'}
-          tone={data.problems.patientSafety > 0 ? 'bad' : data.problems.open > 0 ? 'warn' : 'good'}
         />
         <Stat
           label="Independent checks"

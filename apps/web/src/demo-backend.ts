@@ -51,9 +51,23 @@ const MAY_SEE_CLINIC: Role[] = ['CLINIC_MANAGER'];
 
 interface Item { id: string; label: string; requiresValue?: boolean; unit?: string }
 
+/**
+ * The 16 control parameters. The axis the owner's dashboard rolls up — what
+ * KIND of control an activity is, as opposed to which workflow it sits in.
+ */
+const PARAMETERS = [
+  'ATTENDANCE_LEAVE', 'OPENING_READINESS', 'CLEANLINESS', 'MAINTENANCE_UTILITIES',
+  'INFECTION_CONTROL', 'ROOM_CHAIR_READINESS', 'APPOINTMENT_CONTROL', 'PATIENT_JOURNEY',
+  'CLINICAL_DOCUMENTATION', 'SURGICAL_HIGH_RISK', 'FOLLOWUP_EXPERIENCE', 'LABORATORY',
+  'INVENTORY_IMPLANTS', 'STAFF_CONDUCT', 'SAFETY_EMERGENCY', 'QUALITY_CAPA',
+] as const;
+type ParameterKey = (typeof PARAMETERS)[number];
+
 interface Task {
   id: string;
   code: string;
+  /** Which of the 16 control heads this belongs to. */
+  parameter: ParameterKey;
   /** Which half of the day this belongs to. Counted separately, always. */
   process: 'Opening Readiness' | 'Closing Readiness';
   title: string;
@@ -132,7 +146,7 @@ const CLOSING_DUE = OPENING_DUE + 660 * 60_000;
 function freshState() {
   const tasks: Task[] = [
     {
-      id: 't-004', code: 'OPN-004', process: 'Opening Readiness', title: 'Set up the clinic environment',
+      id: 't-004', code: 'OPN-004', parameter: 'OPENING_READINESS', process: 'Opening Readiness', title: 'Set up the clinic environment',
       standard: 'AC 24°C where applicable, diffuser and lights as schedule',
       assignee: 'e-priya', selfVerifyAllowed: true, checkerRoles: [],
       cantConfirm: null, minutesFromOpening: -30, status: 'DUE',
@@ -144,7 +158,7 @@ function freshState() {
       responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
     },
     {
-      id: 't-005', code: 'OPN-005', process: 'Opening Readiness', title: 'Check the emergency kit',
+      id: 't-005', code: 'OPN-005', parameter: 'SAFETY_EMERGENCY', process: 'Opening Readiness', title: 'Check the emergency kit',
       standard: 'Emergency equipment and critical items available and accessible',
       assignee: 'e-priya', selfVerifyAllowed: false, checkerRoles: ['CLINIC_MANAGER'],
       cantConfirm: "We can't confirm the emergency kit list yet",
@@ -158,7 +172,7 @@ function freshState() {
       responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
     },
     {
-      id: 't-001', code: 'OPN-001', process: 'Opening Readiness', title: 'Open the clinic',
+      id: 't-001', code: 'OPN-001', parameter: 'OPENING_READINESS', process: 'Opening Readiness', title: 'Open the clinic',
       standard: 'Required clinic areas opened before first patient',
       assignee: 'e-priya', selfVerifyAllowed: false, checkerRoles: ['CLINIC_MANAGER'],
       cantConfirm: null, minutesFromOpening: -15, status: 'DUE',
@@ -174,7 +188,7 @@ function freshState() {
     {
       // Already done and waiting on Anita, so a second pair of eyes has
       // something real to look at the moment you switch to her.
-      id: 't-002', code: 'OPN-002', process: 'Opening Readiness', title: 'Get treatment rooms ready',
+      id: 't-002', code: 'OPN-002', parameter: 'ROOM_CHAIR_READINESS', process: 'Opening Readiness', title: 'Get treatment rooms ready',
       standard: 'All scheduled operatories clean, stocked and functional',
       assignee: 'e-priya', selfVerifyAllowed: false, checkerRoles: ['SENIOR_ASSISTANT'],
       cantConfirm: null, minutesFromOpening: -15, status: 'COMPLETED',
@@ -195,21 +209,31 @@ function freshState() {
       blockedBy: null, releasedAt: null, completedBy: 'e-priya',
     },
     {
-      id: 't-003', code: 'OPN-003', process: 'Opening Readiness', title: 'Get reception ready',
+      // Kavita got reception open and confirmed it herself — this activity is
+      // on the OD-02 self-verify allowlist. Done and CONFIRMED rather than
+      // merely done, so the dashboard has something real in it: a clinic
+      // thirty minutes into its morning with literally nothing confirmed is
+      // an unusually bad day, not a representative one.
+      id: 't-003', code: 'OPN-003', parameter: 'OPENING_READINESS', process: 'Opening Readiness', title: 'Get reception ready',
       standard: 'Reception open, systems on, waiting area presentable',
       assignee: 'e-kavita', selfVerifyAllowed: true, checkerRoles: [],
-      cantConfirm: null, minutesFromOpening: -15, status: 'DUE',
+      cantConfirm: null, minutesFromOpening: -15, status: 'VERIFIED',
       items: [
         { id: 'i-301', label: 'Computers and card machine on' },
         { id: 'i-302', label: 'Appointment list printed' },
         { id: 'i-303', label: 'Waiting area tidy' },
       ],
-      responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
+      responses: {
+        'i-301': { checked: true, value: null },
+        'i-302': { checked: true, value: null },
+        'i-303': { checked: true, value: null },
+      },
+      blockedBy: null, releasedAt: null, completedBy: 'e-kavita',
     },
     // Already done before anyone opened the app — a real morning has history
     // behind it, and Anita has something genuine waiting to be checked.
     {
-      id: 't-006', code: 'OPN-006', process: 'Opening Readiness', title: 'Run the autoclave test cycle',
+      id: 't-006', code: 'OPN-006', parameter: 'INFECTION_CONTROL', process: 'Opening Readiness', title: 'Run the autoclave test cycle',
       standard: 'Daily steriliser test passed and recorded before instruments are used',
       assignee: 'e-anita', selfVerifyAllowed: false, checkerRoles: ['CLINIC_MANAGER'],
       cantConfirm: null, minutesFromOpening: -45, status: 'COMPLETED',
@@ -233,7 +257,7 @@ function freshState() {
     // counted separately from opening everywhere, because "2 of 11 areas ready"
     // at 09:30 would be a lie about a clinic that is in fact ready.
       {
-        id: 't-101', code: 'CLS-001', process: 'Closing Readiness',
+        id: 't-101', code: 'CLS-001', parameter: 'INFECTION_CONTROL', process: 'Closing Readiness',
         title: 'Finish the sterilisation run',
         standard: 'All used instruments processed, cycle recorded, nothing left in the dirty zone overnight',
         assignee: 'e-priya', selfVerifyAllowed: false, checkerRoles: ['SENIOR_ASSISTANT', 'CLINIC_MANAGER'],
@@ -247,7 +271,7 @@ function freshState() {
         responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
       },
       {
-        id: 't-102', code: 'CLS-002', process: 'Closing Readiness',
+        id: 't-102', code: 'CLS-002', parameter: 'SAFETY_EMERGENCY', process: 'Closing Readiness',
         title: 'Lock up the drugs cupboard',
         standard: 'Controlled and emergency drugs counted against the register, cupboard locked, keys accounted for',
         assignee: 'e-anita', selfVerifyAllowed: false, checkerRoles: ['CLINIC_MANAGER'],
@@ -260,7 +284,7 @@ function freshState() {
         responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
       },
       {
-        id: 't-103', code: 'CLS-004', process: 'Closing Readiness',
+        id: 't-103', code: 'CLS-004', parameter: 'SAFETY_EMERGENCY', process: 'Closing Readiness',
         title: 'Secure the clinic',
         standard: 'Equipment off, compressor drained, doors and shutters locked, alarm set',
         assignee: 'e-kavita', selfVerifyAllowed: false, checkerRoles: ['CLINIC_MANAGER'],
@@ -274,7 +298,7 @@ function freshState() {
         responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
       },
     {
-      id: 't-007', code: 'OPN-007', process: 'Opening Readiness', title: 'Check the fridge temperature',
+      id: 't-007', code: 'OPN-007', parameter: 'INVENTORY_IMPLANTS', process: 'Opening Readiness', title: 'Check the fridge temperature',
       standard: 'Cold chain intact: 2–8°C, recorded daily',
       assignee: 'e-priya', selfVerifyAllowed: true, checkerRoles: [],
       cantConfirm: null, minutesFromOpening: 45, status: 'DUE',
@@ -423,6 +447,91 @@ function tally(process: Task['process']) {
   if (forProcess.length === 0) return null;
   const done = forProcess.filter((t) => ['COMPLETED', 'VERIFIED'].includes(t.status)).length;
   return { total: forProcess.length, done, complete: done === forProcess.length };
+}
+
+/**
+ * The 16 parameters rolled into one score — a faithful copy of the server's
+ * rules, including the three that stop a dashboard lying:
+ *
+ *   - nothing to measure is GREY and null, never a zero
+ *   - GREY is excluded from the roll-up rather than averaged in as an absence
+ *   - a patient-safety problem makes its parameter RED whatever the arithmetic
+ */
+function operationalHealth() {
+  const GREEN_AT = 95;
+  const AMBER_AT = 80;
+
+  const rag = (percent: number | null, hasPatientSafety: boolean) => {
+    if (hasPatientSafety) return 'RED';
+    if (percent === null) return 'GREY';
+    if (percent >= GREEN_AT) return 'GREEN';
+    if (percent >= AMBER_AT) return 'AMBER';
+    return 'RED';
+  };
+
+  const parameterOf = (a: Attention): ParameterKey => {
+    const t = db.tasks.find((x) => x.id === a.instanceId);
+    // Anything we cannot place goes to quality rather than being dropped: an
+    // exception nobody can see is worse than one filed under the wrong head.
+    return t?.parameter ?? 'QUALITY_CAPA';
+  };
+
+  const open = db.attention.filter((a) => a.open);
+
+  const parameters = PARAMETERS.map((parameter) => {
+    const mine = db.tasks.filter((t) => t.parameter === parameter);
+    // Confirmed by someone, not merely claimed by the doer.
+    const done = mine.filter((t) => t.status === 'VERIFIED').length;
+    const myProblems = open.filter((a) => parameterOf(a) === parameter);
+    const patientSafety = myProblems.filter((a) => a.severity === 'PATIENT_SAFETY').length;
+    const percent = mine.length === 0 ? null : Math.round((done / mine.length) * 100);
+    const outstanding = mine.length - done;
+
+    const because = patientSafety > 0
+      ? (patientSafety === 1
+        ? 'A patient safety problem is open.'
+        : `${patientSafety} patient safety problems are open.`)
+      : outstanding > 0 && myProblems.length > 0
+        ? `${outstanding} not confirmed, ${myProblems.length} ${myProblems.length === 1 ? 'problem' : 'problems'} open.`
+        : outstanding > 0
+          ? `${outstanding} of ${mine.length} not confirmed yet.`
+          : myProblems.length > 0
+            ? `${myProblems.length} ${myProblems.length === 1 ? 'problem' : 'problems'} still open.`
+            : null;
+
+    return {
+      parameter,
+      percent,
+      status: rag(percent, patientSafety > 0),
+      done,
+      total: mine.length,
+      openProblems: myProblems.length,
+      patientSafetyProblems: patientSafety,
+      because,
+    };
+  });
+
+  const measured = parameters.filter((p) => p.percent !== null);
+  const overall = measured.length === 0
+    ? null
+    : Math.round(measured.reduce((n, p) => n + p.percent!, 0) / measured.length);
+
+  const RANK: Record<string, number> = { RED: 0, AMBER: 1, GREEN: 2, GREY: 3 };
+  parameters.sort((a, b) =>
+    RANK[a.status]! - RANK[b.status]!
+    || b.patientSafetyProblems - a.patientSafetyProblems
+    || b.openProblems - a.openProblems
+    || (a.percent ?? 101) - (b.percent ?? 101));
+
+  return {
+    percent: overall,
+    status: rag(overall, parameters.some((p) => p.patientSafetyProblems > 0)),
+    parameters,
+    needsAttention: {
+      critical: open.filter((a) => a.severity === 'PATIENT_SAFETY' || a.severity === 'CRITICAL').length,
+      attention: open.filter((a) => a.severity !== 'PATIENT_SAFETY' && a.severity !== 'CRITICAL').length,
+    },
+  };
 }
 
 function nextVisit(): Visit | null {
@@ -790,6 +899,7 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     const visitCount = (s: Visit['status']) => db.visits.filter((v) => v.status === s).length;
 
     return json({
+      health: operationalHealth(),
       readiness: {
         done: confirmed.length,
         total,

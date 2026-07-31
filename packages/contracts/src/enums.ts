@@ -151,6 +151,76 @@ export const Priority = {
 } as const;
 export type Priority = (typeof Priority)[keyof typeof Priority];
 
+/**
+ * The 16 control parameters (Operations App requirements, §1 and §"CAPA").
+ *
+ * These are the operational control heads the whole system hangs from —
+ * every activity belongs to exactly one, and the owner's dashboard is these
+ * rolled up. Deliberately NOT the same axis as `process`: a parameter is what
+ * kind of control this is, a process is the workflow it sits in. Infection
+ * Control has a sterilisation process and a waste process; Opening Readiness
+ * appears in the opening process and, for a room reopened after a repair, the
+ * maintenance one.
+ *
+ * The IDs never change. Wording and ownership may.
+ */
+export const Parameter = {
+  ATTENDANCE_LEAVE: 'ATTENDANCE_LEAVE',
+  OPENING_READINESS: 'OPENING_READINESS',
+  CLEANLINESS: 'CLEANLINESS',
+  MAINTENANCE_UTILITIES: 'MAINTENANCE_UTILITIES',
+  INFECTION_CONTROL: 'INFECTION_CONTROL',
+  ROOM_CHAIR_READINESS: 'ROOM_CHAIR_READINESS',
+  APPOINTMENT_CONTROL: 'APPOINTMENT_CONTROL',
+  PATIENT_JOURNEY: 'PATIENT_JOURNEY',
+  CLINICAL_DOCUMENTATION: 'CLINICAL_DOCUMENTATION',
+  SURGICAL_HIGH_RISK: 'SURGICAL_HIGH_RISK',
+  FOLLOWUP_EXPERIENCE: 'FOLLOWUP_EXPERIENCE',
+  LABORATORY: 'LABORATORY',
+  INVENTORY_IMPLANTS: 'INVENTORY_IMPLANTS',
+  STAFF_CONDUCT: 'STAFF_CONDUCT',
+  SAFETY_EMERGENCY: 'SAFETY_EMERGENCY',
+  /** The 16th: quality, incident and CAPA — how the clinic learns. */
+  QUALITY_CAPA: 'QUALITY_CAPA',
+} as const;
+export type Parameter = (typeof Parameter)[keyof typeof Parameter];
+
+/** What each parameter is called on screen. Clinic words, not system words. */
+export const PARAMETER_LABEL: Record<Parameter, string> = {
+  ATTENDANCE_LEAVE: 'Attendance & leave',
+  OPENING_READINESS: 'Opening readiness',
+  CLEANLINESS: 'Cleanliness',
+  MAINTENANCE_UTILITIES: 'Maintenance & utilities',
+  INFECTION_CONTROL: 'Infection control',
+  ROOM_CHAIR_READINESS: 'Room & chair readiness',
+  APPOINTMENT_CONTROL: 'Appointments',
+  PATIENT_JOURNEY: 'Patient journey',
+  CLINICAL_DOCUMENTATION: 'Clinical records',
+  SURGICAL_HIGH_RISK: 'Surgery & high-risk care',
+  FOLLOWUP_EXPERIENCE: 'Follow-up & experience',
+  LABORATORY: 'Laboratory',
+  INVENTORY_IMPLANTS: 'Inventory & implants',
+  STAFF_CONDUCT: 'Team & coordination',
+  SAFETY_EMERGENCY: 'Safety & emergency',
+  QUALITY_CAPA: 'Quality & CAPA',
+};
+
+/**
+ * The four management outcomes every activity ends in (Operations App §8).
+ *
+ * GREY is the one that matters and the one most systems get wrong: it means
+ * "there was nothing to measure here", which is NOT the same as zero. A
+ * parameter with no activities today drawn as 0% is a lie about the clinic,
+ * and averaging GREY into a score fabricates a number out of an absence.
+ */
+export const RagStatus = {
+  GREEN: 'GREEN',
+  AMBER: 'AMBER',
+  RED: 'RED',
+  GREY: 'GREY',
+} as const;
+export type RagStatus = (typeof RagStatus)[keyof typeof RagStatus];
+
 /** DERIVED — all three sources. */
 export const TriggerType = {
   TIME: 'TIME',
@@ -660,7 +730,7 @@ export type FunctionalAssignmentType =
 /** Registry of every enum in this file, for the contract-drift test. */
 export const ENUM_REGISTER = {
   EvaluationResult, EnforcementMode, GateDecision, OverrideAuthority,
-  ActivityStatus, Priority, TriggerType, EvidenceType, ExecutionMode,
+  ActivityStatus, Priority, Parameter, RagStatus, TriggerType, EvidenceType, ExecutionMode,
   Recurrence, InstanceScope, DueRuleKind, SodPolicy, CapaRequirement,
   ReadinessStatus, ActorRefKind, RoleCode, PermissionClass, CompetencyLevel,
   ExceptionStatus, ExceptionCategory, ExceptionModule, EscalationLevel,

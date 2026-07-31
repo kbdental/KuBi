@@ -66,6 +66,20 @@ for (const s of SIZES) {
   await page.goto(pathToFileURL(FILE).href);
   await page.waitForSelector('.demo-bar');
   await page.waitForTimeout(700);
+
+  // Nothing may spill out of the top bar. A bar that clips its own contents
+  // does not scroll sideways, so the page-width check below cannot see it —
+  // the person menu once burst out of it at 390px and looked broken.
+  const spill = await page.$$eval('.demo-bar > *', (els) => {
+    const bar = els[0].parentElement.getBoundingClientRect();
+    return els
+      .map((e) => ({ what: (e.className || e.tagName).toString(), box: e.getBoundingClientRect() }))
+      .filter((x) => x.box.height > 0
+        && (x.box.top < bar.top - 1 || x.box.bottom > bar.bottom + 1 || x.box.right > bar.right + 1))
+      .map((x) => x.what);
+  });
+  for (const w of spill) problems.push(`${s.name}: "${w}" spills out of the top bar`);
+
   await sideways('Today');
   await shot(page, `${s.name}-01-today`);
 

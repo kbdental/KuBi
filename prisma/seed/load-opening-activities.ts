@@ -24,6 +24,7 @@ export async function loadOpeningActivities(
         version: 1,
         title: seed.title,
         standardText: seed.standardText,
+        parameter: seed.parameter,
         process: seed.process,
         priority: seed.priority,
         executionMode: seed.executionMode,

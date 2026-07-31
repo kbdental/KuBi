@@ -41,6 +41,14 @@ See docs/design-principle.md.
 - **Every tenant-scoped query runs inside `prisma.$transaction`.** RLS context
   is transaction-scoped; a query outside a transaction returns zero rows by
   design. Do not "fix" this by widening policies. See ADR-008.
+- **A data-backfill UPDATE in a migration silently matches zero rows.**
+  Tenant tables carry `FORCE ROW LEVEL SECURITY`, which binds the table owner
+  too — so `kubi_migrator` sees nothing. The statement reports success and the
+  migration fails later, somewhere unrelated. Wrap the backfill in
+  `NO FORCE ROW LEVEL SECURITY` / `FORCE ROW LEVEL SECURITY` and put nothing
+  that can fail between them: migrations are **not** atomic here (a failed run
+  was observed leaving its added column behind), so statement ordering is the
+  only thing keeping the table from being left unforced. See migration 0012.
 - **No `new Date()` / `Date.now()`.** Inject the `Clock` port. Enforced by lint.
 - **No `delete`.** Master data is archived; transactional and clinical data is
   cancelled or superseded.

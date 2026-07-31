@@ -20,7 +20,7 @@
  */
 import {
   Priority, ExecutionMode, Recurrence, InstanceScope, DueRuleKind, SodPolicy,
-  EvidenceType, CapaRequirement, RoleCode, FunctionalAssignmentType,
+  EvidenceType, CapaRequirement, RoleCode, FunctionalAssignmentType, Parameter,
 } from '@kubi/contracts';
 import type { ActivityDefinitionSeed } from './opening-activities.js';
 
@@ -44,6 +44,7 @@ const AT_CLOSE = {
 export const CLOSING_ACTIVITIES: readonly ActivityDefinitionSeed[] = [
   {
     code: 'CLS-001',
+    parameter: Parameter.INFECTION_CONTROL,
     title: 'Finish the sterilisation run',
     standardText: 'All used instruments processed, cycle recorded, nothing left in the dirty zone overnight',
     process: 'Closing Readiness',
@@ -77,6 +78,7 @@ export const CLOSING_ACTIVITIES: readonly ActivityDefinitionSeed[] = [
   },
   {
     code: 'CLS-002',
+    parameter: Parameter.SAFETY_EMERGENCY,
     title: 'Lock up the drugs cupboard',
     standardText: 'Controlled and emergency drugs counted against the register, cupboard locked, keys accounted for',
     process: 'Closing Readiness',
@@ -107,6 +109,7 @@ export const CLOSING_ACTIVITIES: readonly ActivityDefinitionSeed[] = [
   },
   {
     code: 'CLS-003',
+    parameter: Parameter.INFECTION_CONTROL,
     title: 'Clear the day’s waste',
     standardText: 'Clinical and sharps waste bagged, labelled and moved to the store; nothing left in treatment rooms',
     process: 'Closing Readiness',
@@ -137,6 +140,7 @@ export const CLOSING_ACTIVITIES: readonly ActivityDefinitionSeed[] = [
   },
   {
     code: 'CLS-004',
+    parameter: Parameter.SAFETY_EMERGENCY,
     title: 'Secure the clinic',
     standardText: 'Equipment off, compressor drained, doors and shutters locked, alarm set',
     process: 'Closing Readiness',

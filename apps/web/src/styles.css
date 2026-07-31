@@ -229,6 +229,93 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .bar-value { font-size: 12.5px; font-weight: 650; color: var(--ink-soft); }
 .bar-day { font-size: 12px; color: var(--ink-faint); text-transform: uppercase; }
 
+/* ---- operational health, and the 16 parameters under it -------------------
+ *
+ * The screen the owner opens. Its job is stated in the requirements: show the
+ * exceptions, not eighteen green ticks. So the tiles that need action come
+ * first and say why; the ones that are fine are quiet; the ones with nothing
+ * to measure are folded away rather than padding the page with zeros.
+ * ------------------------------------------------------------------------- */
+
+.health {
+  display: flex; flex-wrap: wrap; gap: 18px 26px; align-items: center;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--lift); padding: 20px 22px; margin-bottom: 22px;
+  border-top: 3px solid var(--line);
+}
+.health.is-green { border-top-color: var(--accent); }
+.health.is-amber { border-top-color: #c9902b; }
+.health.is-red { border-top-color: var(--safety); }
+.health-main { flex: 1; min-width: 190px; }
+.health-label {
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.health-value { font-size: 46px; font-weight: 720; letter-spacing: -0.04em; line-height: 1.05; margin-top: 6px; }
+.health.is-green .health-value { color: var(--accent); }
+.health.is-amber .health-value { color: #8a5a00; }
+.health.is-red .health-value { color: var(--safety); }
+.health-word { font-size: 15px; color: var(--ink-soft); margin-top: 4px; }
+.health-counts { display: flex; gap: 26px; }
+.health-count { display: flex; flex-direction: column; gap: 2px; }
+.health-count-n { font-size: 27px; font-weight: 700; letter-spacing: -0.03em; }
+.health-count-n.is-critical { color: var(--safety); }
+.health-count-l { font-size: 13px; color: var(--ink-faint); }
+
+.param-group { margin-bottom: 22px; }
+.param-group-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 11px;
+}
+.param-group-title { font-size: 17px; font-weight: 660; letter-spacing: -0.015em; margin: 0; }
+.param-group-note { font-size: 13.5px; color: var(--ink-faint); }
+.param-allclear { color: var(--ink-soft); font-size: 15px; margin: 0 0 20px; }
+
+.params { display: grid; gap: 11px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.param {
+  background: var(--card); border: 1px solid var(--line); border-radius: 13px;
+  padding: 13px 15px; border-left: 3px solid var(--line);
+}
+.param.is-green { border-left-color: var(--accent); }
+.param.is-amber { border-left-color: #c9902b; }
+.param.is-red { border-left-color: var(--safety); }
+.param-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.param-name { font-size: 15px; font-weight: 620; letter-spacing: -0.01em; }
+.param-pct { font-size: 15.5px; font-weight: 700; color: var(--ink-soft); }
+.param.is-red .param-pct { color: var(--safety); }
+.param-bar { height: 5px; border-radius: 3px; background: #eef2f5; margin-top: 10px; overflow: hidden; }
+.param-fill { height: 100%; border-radius: 3px; background: var(--ink-faint); transition: width .4s ease; }
+.param.is-green .param-fill { background: var(--accent); }
+.param.is-amber .param-fill { background: #c9902b; }
+.param.is-red .param-fill { background: var(--safety); }
+.param-because { font-size: 13.5px; color: var(--ink-soft); margin-top: 9px; line-height: 1.4; }
+
+.param-rest { margin-bottom: 22px; }
+.param-rest summary {
+  cursor: pointer; font-size: 14px; color: var(--ink-soft);
+  padding: 10px 12px; min-height: 40px; display: flex; align-items: center; gap: 8px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  list-style: none;   /* the default marker sits badly against a flex row */
+}
+.param-rest summary::-webkit-details-marker { display: none; }
+/* Drawn rather than inherited, so it points the right way in every browser. */
+.param-rest summary::before {
+  content: ''; flex: 0 0 auto;
+  border: 5px solid transparent; border-left-color: var(--ink-faint);
+  margin-left: 2px; transition: transform .15s ease;
+}
+.param-rest[open] summary::before { transform: rotate(90deg) translateX(-2px); }
+.param-rest summary:hover { color: var(--ink); }
+.param-none {
+  list-style: none; margin: 4px 0 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 7px;
+}
+.param-none li {
+  font-size: 13.5px; color: var(--ink-faint);
+  background: var(--page); border: 1px solid var(--line);
+  border-radius: 999px; padding: 5px 11px;
+}
+
 /* ---- the two working panels under the numbers -----------------------------
  *
  * Counting problems and then making the reader go and find them is what turns
@@ -713,9 +800,18 @@ label.field-label {
   display: grid; place-items: center; font-size: 12px; font-weight: 700;
   letter-spacing: 0.02em;
 }
-.who-name { font-size: 13.5px; font-weight: 600; }
-.who-role { font-size: 12px; color: var(--ink-faint); }
-.who-caret { color: var(--ink-faint); font-size: 10px; }
+/* On a phone the avatar is the whole control. With two other buttons in a
+   54px bar there is no room for a name and a role beside it — they wrapped to
+   two lines and spilled out of the bar. The names are all still there the
+   moment the menu opens, which is the only place they are needed. */
+.who-name, .who-role, .who-caret { display: none; }
+.who-button { padding: 5px; }
+@media (min-width: 620px) {
+  .who-button { padding: 5px 11px 5px 5px; }
+  .who-name { display: block; font-size: 13.5px; font-weight: 600; }
+  .who-role { display: block; font-size: 12px; color: var(--ink-faint); }
+  .who-caret { display: block; color: var(--ink-faint); font-size: 10px; }
+}
 
 .who-panel {
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 70;
@@ -734,6 +830,7 @@ label.field-label {
 }
 .who-option:hover { background: var(--page); }
 .who-option.is-on { background: var(--accent-soft); }
+.who-who { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.3; }
 .who-option-name { font-size: 14.5px; font-weight: 600; }
 .who-option-role { font-size: 12.5px; color: var(--ink-faint); }
 

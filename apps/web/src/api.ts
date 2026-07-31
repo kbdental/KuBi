@@ -193,7 +193,32 @@ export interface Schedule {
   timezone?: string;
 }
 
+export type RagStatus = 'GREEN' | 'AMBER' | 'RED' | 'GREY';
+
+/** One of the 16 control parameters, scored. */
+export interface ParameterScore {
+  parameter: string;
+  /** Null when there was nothing to measure. Never rendered as zero. */
+  percent: number | null;
+  status: RagStatus;
+  done: number;
+  total: number;
+  openProblems: number;
+  patientSafetyProblems: number;
+  /** One clinic-readable line saying why it is not green. Null when it is. */
+  because: string | null;
+}
+
+export interface OperationalHealth {
+  percent: number | null;
+  status: RagStatus;
+  /** Worst first — the order the owner should look at them in. */
+  parameters: ParameterScore[];
+  needsAttention: { critical: number; attention: number };
+}
+
 export interface Overview {
+  health: OperationalHealth;
   readiness: { done: number; total: number; percent: number | null };
   patients: { seen: number; expected: number; waiting: number; notSeen: number };
   problems: { open: number; patientSafety: number; overdue: number };
