@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:ui": "vitest run --config vitest.ui.config.ts",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration": "pnpm test:reset && vitest run --config vitest.integration.config.ts",
     "test:all": "pnpm test && pnpm test:ui && pnpm test:integration",
     "dev:api": "tsx watch apps/api/src/main.ts",
     "dev:web": "pnpm --filter @kubi/web dev",
@@ -21,7 +21,8 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed/index.ts",
     "build:app": "pnpm --filter @kubi/web build:demo && node scripts/build-try-it.mjs",
-    "verify:app": "pnpm build:app && node scripts/verify-app.mjs"
+    "verify:app": "pnpm build:app && node scripts/verify-app.mjs",
+    "test:reset": "bash scripts/reset-test-db.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

@@ -51,8 +51,12 @@ model Organization {
   automationExecutions  AutomationExecution[]
   appointments          Appointment[]
 
-  incidents    Incident[]
-  capaActions  CapaAction[]
+  incidents         Incident[]
+  capaActions       CapaAction[]
+  procedures        Procedure[]
+  patientProcedures PatientProcedure[]
+  consents          Consent[]
+  followups         Followup[]
 
   @@map("organizations")
 }
@@ -94,6 +98,10 @@ model Patient {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id])
+
+  patientProcedures PatientProcedure[]
+  consents          Consent[]
+  followups         Followup[]
 
   @@unique([organizationId, uhid])
   @@index([organizationId, clinicId])
@@ -859,4 +867,182 @@ model CapaAction {
   @@index([organizationId, incidentId])
   @@index([responsibleEmployeeId, status])
   @@map("capa_actions")
+}
+
+/// A procedure protocol — the master record that decides what must be true
+/// before this kind of treatment may start.
+///
+/// The Operations App calls this the point where "KuBi becomes significantly
+/// more useful than ordinary clinic software": the selected procedure
+/// determines the required checklist, so an RCT and an implant surgery ask for
+/// different things without anyone remembering to.
+model Procedure {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  code String
+  name String
+  /// OD-06 is OPEN: only SURGERY and IMPLANT_SURGERY are confirmed by the
+  /// Build Pack. No protocol may be seeded against an unconfirmed category.
+  category String
+
+  /// Follow-up offsets in days, generated when the procedure completes.
+  /// FUP-002 makes the day-after call mandatory for surgery.
+  followupOffsetDays Int[] @default([]) @map("followup_offset_days")
+
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization      Organization           @relation(fields: [organizationId], references: [id])
+  requirements      ProcedureRequirement[]
+  patientProcedures PatientProcedure[]
+
+  @@unique([organizationId, code])
+  @@map("procedures")
+}
+
+/// One thing that must be true before a procedure may start.
+///
+/// Enforcement is per-requirement rather than global: a missing consent blocks
+/// hard, a missing pre-op photograph warns. The mode is data, not code, which
+/// is what "configuration before hard-coding" means in practice.
+model ProcedureRequirement {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  procedureId String @map("procedure_id") @db.Uuid
+
+  /// What is being required — CONSENT, MEDICAL_HISTORY, RADIOGRAPH, and so on.
+  kind  String
+  label String
+  /// ADVISORY | BLOCK_OVERRIDABLE | BLOCK_HARD. Drives the enforcement matrix.
+  enforcement String
+  /// Gate code, where this requirement corresponds to a registered gate.
+  /// The immutable BLOCK_HARD gates have no override permission in existence.
+  gateCode    String? @map("gate_code")
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  procedure Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+
+  @@unique([procedureId, kind])
+  @@map("procedure_requirements")
+}
+
+/// A procedure booked or performed for one patient.
+model PatientProcedure {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  clinicId       String @map("clinic_id") @db.Uuid
+
+  patientId     String  @map("patient_id") @db.Uuid
+  procedureId   String  @map("procedure_id") @db.Uuid
+  appointmentId String? @map("appointment_id") @db.Uuid
+
+  status String @default("PLANNED")
+
+  /// Last evaluated readiness. A cache of the evaluation, never the authority:
+  /// the gate is recomputed server-side at the moment of starting, because a
+  /// stored READY from an hour ago is not evidence that it is ready now.
+  readiness           String    @default("PENDING")
+  readinessEvaluatedAt DateTime? @map("readiness_evaluated_at") @db.Timestamptz(6)
+
+  /// Set only when an authorised person overrode a BLOCK_OVERRIDABLE gate.
+  /// BLOCK_HARD has no override path at all — enforced by the absence of a
+  /// permission, not by a check here.
+  overriddenByEmployeeId String?   @map("overridden_by_employee_id") @db.Uuid
+  overrideReason         String?   @map("override_reason")
+  overriddenAt           DateTime? @map("overridden_at") @db.Timestamptz(6)
+
+  startedAt   DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  patient      Patient      @relation(fields: [patientId], references: [id])
+  procedure    Procedure    @relation(fields: [procedureId], references: [id])
+  consents     Consent[]
+  followups    Followup[]
+
+  @@index([organizationId, clinicId, status])
+  @@index([patientId])
+  @@map("patient_procedures")
+}
+
+/// A recorded consent. Signed, versioned, and never editable after the fact.
+model Consent {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  clinicId       String @map("clinic_id") @db.Uuid
+
+  patientId          String  @map("patient_id") @db.Uuid
+  patientProcedureId String? @map("patient_procedure_id") @db.Uuid
+
+  consentType String @map("consent_type")
+  /// The template version signed. A consent is only evidence of what the
+  /// patient actually saw, so the version is part of the record.
+  templateCode    String @map("template_code")
+  templateVersion Int    @map("template_version")
+
+  signedAt          DateTime @map("signed_at") @db.Timestamptz(6)
+  witnessEmployeeId String?  @map("witness_employee_id") @db.Uuid
+  /// Consent can be withdrawn. A withdrawn consent stops satisfying its gate.
+  withdrawnAt DateTime? @map("withdrawn_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  patient          Patient           @relation(fields: [patientId], references: [id])
+  patientProcedure PatientProcedure? @relation(fields: [patientProcedureId], references: [id])
+
+  @@index([organizationId, patientId])
+  @@map("consents")
+}
+
+/// A follow-up generated by a completed procedure (FUP-001, FUP-002).
+///
+/// The response is structured rather than a "called" tick, because the
+/// requirement is explicit that it must be: pain, swelling, bleeding and
+/// medication are each recorded, and a red-flag combination raises a clinical
+/// review by itself rather than relying on whoever made the call to judge it.
+model Followup {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  clinicId       String @map("clinic_id") @db.Uuid
+
+  patientId          String @map("patient_id") @db.Uuid
+  patientProcedureId String @map("patient_procedure_id") @db.Uuid
+
+  dueAt              DateTime @map("due_at") @db.Timestamptz(6)
+  assignedEmployeeId String?  @map("assigned_employee_id") @db.Uuid
+
+  outcome String @default("PENDING")
+
+  /// NONE | MILD | MODERATE | SEVERE
+  pain String?
+  /// EXPECTED | EXCESSIVE
+  swelling String?
+  /// NO | YES
+  bleeding String?
+  /// TAKING | PROBLEM
+  medication String?
+  otherComplaint Boolean? @map("other_complaint")
+
+  /// Set by the engine, not by the caller. Whoever makes the call records
+  /// symptoms; deciding whether they are dangerous is not their job.
+  redFlag         Boolean   @default(false) @map("red_flag")
+  redFlagReason   String?   @map("red_flag_reason")
+  escalatedItemId String?   @map("escalated_item_id") @db.Uuid
+  contactedAt     DateTime? @map("contacted_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization     Organization     @relation(fields: [organizationId], references: [id])
+  patient          Patient          @relation(fields: [patientId], references: [id])
+  patientProcedure PatientProcedure @relation(fields: [patientProcedureId], references: [id])
+
+  @@index([organizationId, clinicId, outcome])
+  @@index([dueAt])
+  @@map("followups")
 }
