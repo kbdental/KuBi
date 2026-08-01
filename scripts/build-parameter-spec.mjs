@@ -11,22 +11,30 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const TSV = 'docs/requirements/master-activity-matrix-v2.tsv';
+const PROPOSALS = 'docs/requirements/matrix-v3-proposals.tsv';
 const OUT = 'docs/kubi-parameters.html';
 
-// The TSV is written CRLF, so every line carries a trailing \r that would
-// otherwise end up inside the LAST column's name and value -- making
-// `a['CAPA Requirement']` undefined on every row while the other 22 columns
-// look perfect. Strip it at the boundary rather than at each use.
-const lines = readFileSync(TSV, 'utf8').trim().split(/\r?\n/);
-const head = lines[0].split('\t').map((h) => h.trim());
-// Trailing empty cells vanish when a TSV line is split, so a row that ends in
-// blanks comes back short. Pad to the header before zipping, or the last
-// columns silently read as undefined on exactly the rows that left them empty.
-const acts = lines.slice(1).map((l) => {
-  const cells = l.split('\t').map((c) => c.trim());
-  while (cells.length < head.length) cells.push('');
-  return Object.fromEntries(head.map((h, i) => [h, cells[i] ?? '']));
-});
+const acts = readTsv(TSV);
+const proposed = readTsv(PROPOSALS);
+
+/**
+ * Proposed rows for Matrix v3.0, covering the two parameters v2.0 leaves
+ * empty. Kept in a separate file and rendered separately, because v2.0 is
+ * frozen and a proposal that renders identically to a frozen requirement will
+ * be mistaken for one inside a week.
+ */
+function readTsv(path) {
+  // Written CRLF, so every line carries a trailing \r that would otherwise end
+  // up inside the LAST column's name and value -- making `CAPA Requirement`
+  // undefined on every row while the other 22 columns look perfect.
+  const lines = readFileSync(path, 'utf8').trim().split(/\r?\n/);
+  const h = lines[0].split('\t').map((x) => x.trim());
+  return lines.slice(1).map((l) => {
+    const cells = l.split('\t').map((c) => c.trim());
+    while (cells.length < h.length) cells.push('');
+    return Object.fromEntries(h.map((k, i) => [k, cells[i] ?? '']));
+  });
+}
 
 /**
  * The 15 control parameters of Operations App §1 (Table 1), plus the 16th the
@@ -95,7 +103,16 @@ const UNPLACED = 'Closing & Facility';
 const PRIORITY_RANK = { PATIENT_SAFETY: 0, CRITICAL: 1, IMPORTANT: 2, ROUTINE: 3 };
 const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
+/**
+ * An undecidable field renders as a visible gap, never as blank or plausible
+ * text. A guess that looks like a requirement becomes one.
+ */
+const cell = (v) => v === 'DECISION_REQUIRED'
+  ? '<span class="dec">open</span>'
+  : (v ? esc(v) : '<span class="none">—</span>');
+
 const forParam = (p) => acts.filter((a) => p.matrix.includes(a.Parameter));
+const proposedFor = (p) => proposed.filter((a) => a.Parameter === p.name);
 const covered = new Set(PARAMETERS.flatMap((p) => p.matrix));
 const orphans = acts.filter((a) => !covered.has(a.Parameter));
 
@@ -117,12 +134,12 @@ function activityTable(rows) {
   <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
   <tbody>${sorted.map((a) => `<tr>
     <td class="id">${esc(a['Activity ID'])}</td>
-    <td class="act">${esc(a.Activity)}</td>
+    <td class="act">${esc(a.Activity)}${a['Sub-Process'] && a['Sub-Process'] !== 'DECISION_REQUIRED' ? `<br><span class="sp">${esc(a['Sub-Process'])}</span>` : a['Sub-Process'] === 'DECISION_REQUIRED' ? '<br><span class="dec">sub-process open</span>' : ''}</td>
     <td class="std">${esc(a['Standard / Expected Result'])}</td>
-    <td><span class="trig">${esc(a.Trigger)}</span><br><span class="freq">${esc(a.Frequency)}</span></td>
-    <td class="due">${esc(a['Due Rule'])}</td>
+    <td><span class="trig">${cell(a.Trigger)}</span><br><span class="freq">${cell(a.Frequency)}</span></td>
+    <td class="due">${cell(a['Due Rule'])}</td>
     <td class="who">${esc(a.Doer)}${a.Checker ? `<br><span class="chk">✓ ${esc(a.Checker)}</span>` : ''}</td>
-    <td class="ev">${esc(a['Evidence Type'])}</td>
+    <td class="ev">${cell(a['Evidence Type'])}</td>
     <td class="gate">${a['Dependency / Gate'] ? esc(a['Dependency / Gate']) : '<span class="none">—</span>'}</td>
     <td>${pill(a.Priority)}</td>
     <td class="capa">${a['CAPA Requirement'] === 'NONE' ? '<span class="none">—</span>' : esc(a['CAPA Requirement'].replace(/_/g, ' ').toLowerCase())}</td>
@@ -142,6 +159,8 @@ const SCORES = [
 
 const sections = PARAMETERS.map((p) => {
   const rows = forParam(p);
+  const prop = proposedFor(p);
+  const openCount = prop.reduce((n, r) => n + Object.values(r).filter((v) => v === 'DECISION_REQUIRED').length, 0);
   const sev = bySeverity(rows);
   const kpis = [...new Set(rows.map((r) => r.KPI).filter(Boolean))];
   const gap = rows.length === 0;
@@ -162,11 +181,20 @@ const sections = PARAMETERS.map((p) => {
       ${sev.PATIENT_SAFETY ? `<span class="sep">·</span>${pill('PATIENT_SAFETY')} ${sev.PATIENT_SAFETY}` : ''}
       ${sev.CRITICAL ? `<span class="sep">·</span>${pill('CRITICAL')} ${sev.CRITICAL}` : ''}
     </div>
-    ${gap ? `<p class="gapnote"><strong>No activities defined in Matrix v2.0.</strong>
-      This control head exists in the requirement and has nothing behind it, so it can never
-      score anything but GREY. It is a gap in the dictionary, not in the code.</p>` : ''}
+    ${gap ? `<p class="gapnote"><strong>No activities in the frozen Matrix v2.0.</strong>
+      This control head exists in the requirement with nothing behind it, so it can only ever
+      score GREY. ${prop.length ? `${prop.length} activities are <strong>proposed below for v3.0</strong>,
+      derived from source material rather than invented — ${openCount} fields could not be derived
+      and are left open.` : ''}</p>` : ''}
     ${kpis.length ? `<p class="kpis"><span class="mk">KPIs</span> ${kpis.map((k) => `<code>${esc(k)}</code>`).join(' ')}</p>` : ''}
     ${activityTable(rows)}
+    ${prop.length ? `<div class="proposed">
+      <h4>Proposed for Matrix v3.0 <span class="pbadge">not yet approved</span></h4>
+      <p class="pnote">${esc([...new Set(prop.map((r) => r.Provenance.split(';')[0].replace(/^OVERLAPS /, 'Overlaps ').replace(/^DERIVED from /, 'Derived from ')))].join('; '))}.
+      Fields marked <span class="dec">open</span> could not be derived from any source and need a decision —
+      they are not filled with a plausible guess.</p>
+      ${activityTable(prop)}
+    </div>` : ''}
   </section>`;
 }).join('\n');
 
@@ -237,6 +265,18 @@ padding:2px 6px;border-radius:4px;white-space:nowrap;text-transform:uppercase}
 .pri-critical{background:#fae9e3;color:var(--crit)}
 .pri-important{background:#f7f0da;color:var(--imp)}
 .pri-routine{background:#eef2f6;color:var(--rout)}
+/* A proposal must never be mistaken for a frozen requirement, so it is set
+   apart rather than merely labelled: dashed border, its own heading, and a
+   badge that says so. */
+.proposed{margin-top:18px;padding:14px 15px;border:1.5px dashed var(--line);border-radius:11px;background:var(--bg)}
+.proposed h4{margin:0 0 6px;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pbadge{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+padding:2px 7px;border-radius:4px;background:#f7f0da;color:var(--imp)}
+.pnote{margin:0 0 10px;font-size:12.5px;color:var(--soft)}
+/* An undecidable field. Loud on purpose — it is a question, not a value. */
+.dec{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+padding:2px 6px;border-radius:4px;background:#f7e4e5;color:var(--ps)}
+.sp{font-size:10.5px;font-weight:400;color:var(--soft)}
 .scores{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
 .score{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:13px 15px}
 .score b{display:block;font-size:14px;margin-bottom:3px}
@@ -253,7 +293,10 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:v
 .pri-routine{background:#232b33;color:#9fb0bf}
 td{border-bottom-color:#1c232b}
 .kpis code,.loop{background:#0e1319}
-.none{color:#3a444f}}
+.none{color:#3a444f}
+.pbadge{background:#332d18;color:#dbc478}
+.dec{background:#3d1f22;color:#e79aa0}
+.proposed{background:#0e1319;border-color:#2c353f}}
 </style></head><body><div class="wrap">
 
 <h1>The 16 control parameters</h1>
@@ -265,7 +308,7 @@ td{border-bottom-color:#1c232b}
   <div class="stat"><b>${total}</b><span>defined activities</span></div>
   <div class="stat"><b>${sev.PATIENT_SAFETY}</b><span>patient-safety</span></div>
   <div class="stat"><b>${sev.CRITICAL}</b><span>critical</span></div>
-  <div class="stat"><b>${gaps.length}</b><span>parameters with no activities</span></div>
+  <div class="stat"><b>${proposed.length}</b><span>proposed for v3.0</span></div>
 </div>
 
 <div class="note">
