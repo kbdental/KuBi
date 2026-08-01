@@ -243,6 +243,28 @@ interface DemoBatch {
   cycleResult: 'PASS' | 'FAIL' | 'INCONCLUSIVE' | null;
 }
 
+/**
+ * A laboratory case. `delivery.ready` is the crown gate — received AND
+ * QC-passed — and the reason is carried so the screen can say why, not merely
+ * refuse.
+ */
+interface DemoLabCase {
+  id: string;
+  reference: string;
+  patientLabel: string;
+  vendor: string;
+  workType: string;
+  toothRef: string;
+  status: string;
+  expectedLabel: string | null;
+  overdue: boolean;
+  qcResult: 'PASS' | 'FAIL' | null;
+  remakeCount: number;
+  nextStep: string | null;
+  deliveryReady: boolean;
+  deliveryReason: string | null;
+}
+
 interface Visit {
   id: string;
   patientLabel: string;
@@ -661,6 +683,45 @@ function freshState() {
     { id: 'i5', brand: 'Straumann', line: 'BLT', platform: 'RC', componentType: 'IMPLANT', size: '4.1×8', quantity: 1, expiringSoon: true },
   ];
 
+  /**
+   * Lab cases at four points of the lifecycle, including the requirement's own
+   * worst case: a crown that has arrived but has not been checked, which is
+   * exactly the state a booking screen is most likely to treat as good enough.
+   */
+  const labCases: DemoLabCase[] = [
+    {
+      id: 'l1', reference: 'LAB-2026-0031', patientLabel: 'SYNTHETIC Priyanka N.',
+      vendor: 'Precision Dental Lab', workType: 'Crown', toothRef: '26',
+      status: 'QC_PENDING', expectedLabel: 'yesterday', overdue: false,
+      qcResult: null, remakeCount: 0, nextStep: 'Doctor to check the case',
+      deliveryReady: false,
+      deliveryReason: 'LAB-2026-0031 has arrived but has not been checked.',
+    },
+    {
+      id: 'l2', reference: 'LAB-2026-0029', patientLabel: 'SYNTHETIC Imran Q.',
+      vendor: 'Precision Dental Lab', workType: 'Bridge', toothRef: '34–36',
+      status: 'IN_PROGRESS_VENDOR', expectedLabel: '3 days ago', overdue: true,
+      qcResult: null, remakeCount: 0, nextStep: 'Waiting on the laboratory',
+      deliveryReady: false,
+      deliveryReason: 'LAB-2026-0029 has not arrived from the laboratory yet.',
+    },
+    {
+      id: 'l3', reference: 'LAB-2026-0027', patientLabel: 'SYNTHETIC Meera J.',
+      vendor: 'Apex Ceramics', workType: 'Crown', toothRef: '16',
+      status: 'REMAKE', expectedLabel: null, overdue: false,
+      qcResult: 'FAIL', remakeCount: 2, nextStep: 'Re-dispatch for remake',
+      deliveryReady: false,
+      deliveryReason: 'LAB-2026-0027 failed its check and is being remade.',
+    },
+    {
+      id: 'l4', reference: 'LAB-2026-0024', patientLabel: 'SYNTHETIC Arjun P.',
+      vendor: 'Precision Dental Lab', workType: 'Veneer', toothRef: '11',
+      status: 'PATIENT_READY', expectedLabel: 'last Tuesday', overdue: false,
+      qcResult: 'PASS', remakeCount: 0, nextStep: 'Book the delivery appointment',
+      deliveryReady: true, deliveryReason: null,
+    },
+  ];
+
   const batches: DemoBatch[] = [
     { id: 'b1', batchRef: 'STER-0912', stage: 'RELEASED', packCount: 12, operator: 'Priya', cycleResult: 'PASS' },
     { id: 'b2', batchRef: 'STER-0913', stage: 'AUTOCLAVED', packCount: 9, operator: 'Priya', cycleResult: 'PASS' },
@@ -670,7 +731,7 @@ function freshState() {
 
   return {
     tasks, visits, attention, incidents, patientProcedures, followups,
-    assets, stock, implants, batches,
+    assets, stock, implants, batches, labCases,
     nextIncidentNumber: 8,
     signedIn: null as Person | null,
     /**
@@ -1673,6 +1734,7 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
       stock: db.stock,
       implants: db.implants,
       batches: db.batches,
+      labCases: db.labCases,
       // Counted here rather than in the screen, so the badge and the list can
       // never disagree about how many things are wrong.
       counts: {
@@ -1682,6 +1744,8 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         reorders: db.stock.filter((s) => s.state === 'REORDER').length,
         implantGaps: db.implants.filter((i) => i.quantity === 0).length,
         batchesPending: db.batches.filter((b) => b.stage !== 'RELEASED').length,
+        labOverdue: db.labCases.filter((l) => l.overdue).length,
+        labBlocked: db.labCases.filter((l) => !l.deliveryReady).length,
       },
     });
   }
@@ -1724,6 +1788,53 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     if (i < 0 || i === ORDER.length - 1) return json(batch);
     batch.stage = ORDER[i + 1]!;
     return json(batch);
+  }
+
+  const labMatch = /^\/api\/v1\/lab-cases\/([^/]+)\/(\w+)$/.exec(path);
+  if (labMatch) {
+    const c = db.labCases.find((l) => l.id === labMatch[1]);
+    if (!c) return json({ error: 'Not found' }, 404);
+
+    if (labMatch[2] === 'book') {
+      // The rule, enforced here exactly as the server enforces it. A demo that
+      // let this through would be teaching the opposite of the product.
+      if (!c.deliveryReady) {
+        return json({ error: `Case not ready for delivery appointment. ${c.deliveryReason}` }, 409);
+      }
+      c.status = 'DELIVERED';
+      c.nextStep = null;
+      return json(c);
+    }
+
+    if (labMatch[2] === 'qc') {
+      if (c.status !== 'QC_PENDING') {
+        return json({ error: `${c.reference} must be received before it can be checked.` }, 409);
+      }
+      if (body.result === 'FAIL') {
+        const note = String(body.note ?? '').trim();
+        if (!note) return json({ error: 'A failed check must say what is wrong with the case.' }, 409);
+        c.status = 'REMAKE';
+        c.qcResult = 'FAIL';
+        c.remakeCount += 1;
+        c.nextStep = 'Re-dispatch for remake';
+        c.deliveryReady = false;
+        c.deliveryReason = `${c.reference} failed its check and is being remade.`;
+        raise({
+          code: 'LAB.QC.FAILED',
+          severity: c.remakeCount > 1 ? 'CRITICAL' : 'IMPORTANT',
+          headline: `${c.reference} failed check — remake needed`,
+          detail: `${c.workType}, tooth ${c.toothRef}, ${c.vendor}. ${note}`,
+          owner: 'e-rahul', dueAt: Date.now(), instanceId: null, needsAuthorisation: false,
+        });
+        return json(c);
+      }
+      c.status = 'PATIENT_READY';
+      c.qcResult = 'PASS';
+      c.nextStep = 'Book the delivery appointment';
+      c.deliveryReady = true;
+      c.deliveryReason = null;
+      return json(c);
+    }
   }
 
   // ---- PATIENTS: readiness before the chair, and follow-ups after it ----

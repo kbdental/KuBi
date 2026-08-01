@@ -1443,3 +1443,12 @@ label.field-label {
 .ops-table .row-gap { background: #fdf6f6; }
 .ops-table .zero { color: var(--safety); }
 .ops-table .tag { margin-left: 6px; }
+
+/* Why a delivery cannot be booked, said before anybody tries. */
+.lab-block {
+  margin: 6px 0 0;
+  padding: 7px 10px;
+  border-left: 3px solid var(--safety);
+  background: #fdf4f4;
+  border-radius: 0 7px 7px 0;
+}

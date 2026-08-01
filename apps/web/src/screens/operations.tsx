@@ -20,7 +20,8 @@
  *   absent rather than present-and-refusing.
  */
 import { useEffect, useState } from 'react';
-import { api, type Operations, type DemoAsset, type DemoStock } from '../api';
+import { useState as useLocalState } from 'react';
+import { api, type Operations, type DemoAsset, type DemoStock, type DemoLabCase } from '../api';
 
 const ASSET_STATUS: Record<string, { label: string; cls: string }> = {
   OPERATIONAL: { label: 'In service', cls: 'ok' },
@@ -78,6 +79,7 @@ export function Operations({ onChanged }: { onChanged?: () => void }) {
         <Tile n={c.shortages} label="shortages" bad={c.shortages > 0} />
         <Tile n={c.implantGaps} label="implant gaps" bad={c.implantGaps > 0} />
         <Tile n={c.batchesPending} label="batches in progress" bad={false} />
+        <Tile n={c.labOverdue} label="lab overdue" bad={c.labOverdue > 0} />
       </div>
 
       {/* What blocks care, first. */}
@@ -163,6 +165,15 @@ export function Operations({ onChanged }: { onChanged?: () => void }) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <h2 className="group-head">Laboratory</h2>
+      <p className="row-note ops-note">
+        A delivery appointment needs the case to have arrived <strong>and</strong> passed its
+        check. Neither one alone is enough.
+      </p>
+      <div className="ops-list">
+        {ops.labCases.map((l) => <LabRow key={l.id} l={l} onAct={act} />)}
       </div>
 
       <h2 className="group-head">Sterilisation</h2>
@@ -282,6 +293,103 @@ function StockRow({ s }: { s: DemoStock }) {
           {s.expired > 0 && ` · ${s.expired} expired ${s.expired === 1 ? 'batch' : 'batches'}`}
           {s.expiringSoon > 0 && ` · ${s.expiringSoon} expiring soon`}
         </div>
+      </div>
+    </div>
+  );
+}
+
+const LAB_STATUS: Record<string, string> = {
+  CREATED: 'Created',
+  DISPATCHED: 'With the lab',
+  IN_PROGRESS_VENDOR: 'With the lab',
+  RECEIVED_CLINIC: 'Received',
+  QC_PENDING: 'Needs checking',
+  QC_PASSED: 'Checked',
+  PATIENT_READY: 'Ready for the patient',
+  REMAKE: 'Being remade',
+  DELIVERED: 'Delivered',
+};
+
+function LabRow({
+  l, onAct,
+}: {
+  l: DemoLabCase;
+  onAct: (fn: () => Promise<unknown>) => Promise<void>;
+}) {
+  const [note, setNote] = useLocalState('');
+  const [failing, setFailing] = useLocalState(false);
+
+  return (
+    <div className="row row-static">
+      <div className="row-main">
+        <div className="inc-head">
+          <span className={`ops-state ops-${l.deliveryReady ? 'ok' : l.overdue ? 'bad' : 'warn'}`}>
+            {LAB_STATUS[l.status] ?? l.status}
+          </span>
+          <span className="inc-ref">{l.reference}</span>
+          <span className="inc-meta">
+            {l.workType}, tooth {l.toothRef} · {l.vendor}
+          </span>
+          {/* A second remake is a vendor problem, not bad luck, so it is said
+              on the row rather than buried in a history somewhere. */}
+          {l.remakeCount > 0 && (
+            <span className="pill pill-important">
+              remake {l.remakeCount > 1 ? `×${l.remakeCount}` : ''}
+            </span>
+          )}
+        </div>
+
+        <div className="row-title">{l.patientLabel}</div>
+        <div className="row-note">
+          {l.expectedLabel ? `Expected ${l.expectedLabel}` : 'No return date yet'}
+          {l.overdue && <span className="overdue"> · overdue</span>}
+        </div>
+
+        {l.nextStep && <div className="next-step">Next: {l.nextStep}</div>}
+
+        {/* The gate, stated before it is hit rather than as an error after. */}
+        {!l.deliveryReady && l.deliveryReason && (
+          <p className="row-note lab-block">{l.deliveryReason}</p>
+        )}
+
+        <div className="pt-actions">
+          {l.status === 'QC_PENDING' && !failing && (
+            <>
+              <button className="btn btn-quiet" type="button"
+                onClick={() => void onAct(() => api.labQc(l.id, 'PASS'))}>Passed</button>
+              <button className="btn btn-quiet" type="button"
+                onClick={() => setFailing(true)}>Failed</button>
+            </>
+          )}
+          {l.deliveryReady && l.status !== 'DELIVERED' && (
+            <button className="btn" type="button"
+              onClick={() => void onAct(() => api.bookDelivery(l.id))}>
+              Book delivery
+            </button>
+          )}
+        </div>
+
+        {failing && (
+          <div className="override">
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="What is wrong with the case?"
+            />
+            <button
+              className="btn btn-quiet"
+              type="button"
+              disabled={!note.trim()}
+              onClick={() => void onAct(async () => {
+                await api.labQc(l.id, 'FAIL', note);
+                setFailing(false);
+                setNote('');
+              })}
+            >
+              Record failure
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

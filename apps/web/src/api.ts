@@ -376,6 +376,17 @@ export interface DemoStock {
   expiringSoon: number; expired: number;
 }
 
+export interface DemoLabCase {
+  id: string; reference: string; patientLabel: string; vendor: string;
+  workType: string; toothRef: string; status: string;
+  expectedLabel: string | null; overdue: boolean;
+  qcResult: 'PASS' | 'FAIL' | null; remakeCount: number;
+  nextStep: string | null;
+  /** Received AND QC-passed. The crown gate. */
+  deliveryReady: boolean;
+  deliveryReason: string | null;
+}
+
 export interface Operations {
   assets: DemoAsset[];
   stock: DemoStock[];
@@ -387,9 +398,11 @@ export interface Operations {
     id: string; batchRef: string; stage: string; packCount: number;
     operator: string; cycleResult: 'PASS' | 'FAIL' | 'INCONCLUSIVE' | null;
   }>;
+  labCases: DemoLabCase[];
   counts: {
     assetsDown: number; serviceDue: number; shortages: number;
     reorders: number; implantGaps: number; batchesPending: number;
+    labOverdue: number; labBlocked: number;
   };
 }
 
@@ -465,4 +478,8 @@ export const api = {
     post<DemoAsset>(`/api/v1/assets/${id}/check`, { result }),
   advanceBatch: (id: string) =>
     post<{ stage: string }>(`/api/v1/sterilization/${id}/advance`, {}),
+
+  labQc: (id: string, result: 'PASS' | 'FAIL', note?: string) =>
+    post<DemoLabCase>(`/api/v1/lab-cases/${id}/qc`, { result, ...(note ? { note } : {}) }),
+  bookDelivery: (id: string) => post<DemoLabCase>(`/api/v1/lab-cases/${id}/book`, {}),
 };

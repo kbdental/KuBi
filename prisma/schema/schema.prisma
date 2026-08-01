@@ -65,6 +65,7 @@ model Organization {
   stockBatches      StockBatch[]
   implantSkus       ImplantSku[]
   sterilizationBatches SterilizationBatch[]
+  labCases             LabCase[]
 
   @@map("organizations")
 }
@@ -110,6 +111,8 @@ model Patient {
   patientProcedures PatientProcedure[]
   consents          Consent[]
   followups         Followup[]
+
+  labCases          LabCase[]
 
   @@unique([organizationId, uhid])
   @@index([organizationId, clinicId])
@@ -1296,4 +1299,60 @@ model SterilizationBatch {
   @@unique([organizationId, batchRef])
   @@index([organizationId, clinicId, stage])
   @@map("sterilization_batches")
+}
+
+/// A laboratory case, through the lifecycle sheet K sets out:
+/// Created → Dispatched → In production → Received → QC → Patient ready →
+/// Delivered → Closed, with QC failure branching to Remake.
+///
+/// The rule this table exists to enforce is the requirement's most-cited
+/// example: a crown delivery appointment requires Lab Received = YES **AND**
+/// QC = PASSED. Booking one before both are true is the failure that the CAPA
+/// parameter was introduced to learn from, and it is now impossible rather
+/// than merely regrettable.
+model LabCase {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  clinicId       String @map("clinic_id") @db.Uuid
+
+  /// Human-facing reference, LAB-YYYY-NNNN. Stable once issued.
+  reference String
+  patientId String @map("patient_id") @db.Uuid
+
+  vendor   String
+  workType String  @map("work_type")
+  toothRef String  @map("tooth_ref")
+  shade    String?
+  material String?
+
+  status String @default("CREATED")
+
+  dispatchedAt   DateTime? @map("dispatched_at") @db.Timestamptz(6)
+  /// Mandatory at dispatch (LAB-007). A case with no expected return cannot be
+  /// late, which is the same as never being chased.
+  expectedReturnAt DateTime? @map("expected_return_at") @db.Timestamptz(6)
+  receivedAt     DateTime? @map("received_at") @db.Timestamptz(6)
+
+  /// Doctor QC (LAB-005). PASS | FAIL, and null until somebody has looked.
+  qcResult             String?   @map("qc_result")
+  qcByEmployeeId       String?   @map("qc_by_employee_id") @db.Uuid
+  qcAt                 DateTime? @map("qc_at") @db.Timestamptz(6)
+  qcNote               String?   @map("qc_note")
+
+  /// How many times this case has been remade. A second remake is a different
+  /// conversation from a first, and only visible if the count survives.
+  remakeCount Int @default(0) @map("remake_count")
+
+  deliveredAt DateTime? @map("delivered_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  patient      Patient      @relation(fields: [patientId], references: [id])
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, clinicId, status])
+  @@index([expectedReturnAt])
+  @@map("lab_cases")
 }
