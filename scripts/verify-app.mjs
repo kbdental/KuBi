@@ -64,6 +64,16 @@ for (const s of SIZES) {
   };
 
   await page.goto(pathToFileURL(FILE).href);
+
+  // The app opens on the entry screen now, so check that first and then go in
+  // as the assistant -- which is where every check below assumes it starts.
+  await page.waitForSelector('.entry');
+  await sideways('the entry screen');
+  const tooSmall = await page.$$eval('.persona', (els) =>
+    els.filter((e) => e.getBoundingClientRect().height < 44).length);
+  if (tooSmall > 0) problems.push(`${s.name}: ${tooSmall} persona buttons under 44px tall`);
+
+  await page.click('.persona:has-text("Priya")');
   await page.waitForSelector('.demo-bar');
   await page.waitForTimeout(700);
 

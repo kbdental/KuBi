@@ -336,6 +336,28 @@ export interface Followup {
   redFlagReason: string | null;
 }
 
+export interface MisDomain {
+  name: string;
+  score: number | null;
+  target: number;
+  trend: number[];
+  note: string;
+  status: 'GREEN' | 'AMBER' | 'RED' | 'GREY';
+  /** False when the module behind this domain does not exist yet. */
+  built: boolean;
+}
+
+export interface OwnerMis {
+  clinicName: string;
+  /** Null when nothing is measurable. Never rendered as zero. */
+  health: number | null;
+  domains: MisDomain[];
+  critical: Array<{ id: string; headline: string; detail: string | null }>;
+  attention: Array<{ id: string; headline: string; detail: string | null }>;
+  repeatFailures: Array<{ reference: string; summary: string; attempts: number }>;
+  capa: { open: number; awaitingEffectiveness: number; closed: number };
+}
+
 export const api = {
   login: (email: string, password: string) =>
     post<{ displayLabel: string; roleCodes: string[] }>('/api/v1/auth/login', { email, password }),
@@ -400,4 +422,6 @@ export const api = {
     id: string,
     r: { pain: string; swelling: string; bleeding: string; medication: string },
   ) => post<Followup>(`/api/v1/followups/${id}/respond`, r),
+
+  ownerMis: () => call<OwnerMis>('/api/v1/owner-mis'),
 };

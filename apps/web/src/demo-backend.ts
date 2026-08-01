@@ -23,6 +23,7 @@
  */
 
 type Role =
+  | 'OWNER_DIRECTOR'
   | 'DENTAL_ASSISTANT' | 'CLINIC_MANAGER' | 'SENIOR_ASSISTANT' | 'RECEPTION';
 
 interface Person {
@@ -38,6 +39,10 @@ export const PEOPLE: Person[] = [
   { key: 'rahul', email: 'rahul@synthetic.test', employeeId: 'e-rahul', displayLabel: 'SYNTHETIC Rahul M.', roles: ['CLINIC_MANAGER'] },
   { key: 'anita', email: 'anita@synthetic.test', employeeId: 'e-anita', displayLabel: 'SYNTHETIC Anita K.', roles: ['SENIOR_ASSISTANT'] },
   { key: 'kavita', email: 'kavita@synthetic.test', employeeId: 'e-kavita', displayLabel: 'SYNTHETIC Kavita R.', roles: ['RECEPTION'] },
+  // The owner was missing entirely, which meant the one view the requirement
+  // describes in most detail -- "you should not see 150 tasks" -- could not be
+  // reached by anybody.
+  { key: 'deepak', email: 'deepak@synthetic.test', employeeId: 'e-deepak', displayLabel: 'SYNTHETIC Deepak V.', roles: ['OWNER_DIRECTOR'] },
 ];
 
 export const DEMO_PASSWORD = 'SyntheticDemo123!';
@@ -47,7 +52,7 @@ const MAY_RELEASE: Role[] = ['CLINIC_MANAGER'];
 /** Who may move a visit along. */
 const MAY_MOVE_VISITS: Role[] = ['RECEPTION', 'CLINIC_MANAGER'];
 /** Who may see how the clinic as a whole is running, rather than their own day. */
-const MAY_SEE_CLINIC: Role[] = ['CLINIC_MANAGER'];
+const MAY_SEE_CLINIC: Role[] = ['CLINIC_MANAGER', 'OWNER_DIRECTOR'];
 
 interface Item { id: string; label: string; requiresValue?: boolean; unit?: string }
 
@@ -893,6 +898,67 @@ function readinessView(pp: PatientProcedure) {
   };
 }
 
+/**
+ * The eight management scores of §7, with a target and a seven-day trend.
+ *
+ * Derived from the demo's own state where the demo has state to derive from,
+ * and fixed where it does not -- a domain whose module is not built yet
+ * reports GREY rather than an invented percentage. Showing a number for
+ * something KuBi cannot measure is exactly the kind of lie this product is
+ * meant to stop.
+ */
+function ownerDomains() {
+  const opening = tally('Opening Readiness');
+  const openingScore = opening && opening.total > 0
+    ? Math.round((opening.done / opening.total) * 100) : null;
+  // No opening set at all is an absence, not a nought.
+
+  // Patient care is only measurable once somebody has actually been through.
+  // At 08:52 nobody has, and that is EARLY, not a failure -- scoring it 0%
+  // would paint a clinic that has done nothing wrong bright red, which is the
+  // exact failure mode the GREY rule exists to prevent.
+  const seen = db.visits.filter((v) => v.status === 'COMPLETED').length;
+  const expected = db.visits.filter((v) => v.status !== 'CANCELLED').length;
+  const patientCare = seen === 0 ? null : Math.round((seen / expected) * 100);
+
+  const rag = (score: number | null, target: number) => {
+    if (score === null) return 'GREY';
+    if (score >= target) return 'GREEN';
+    return score >= target - 10 ? 'AMBER' : 'RED';
+  };
+
+  const d = (
+    name: string, score: number | null, target: number,
+    trend: number[], note: string, built = true,
+  ) => ({
+    name, score, target, trend, note,
+    status: built ? rag(score, target) : 'GREY',
+    // A domain nothing measures yet says so, rather than scoring zero.
+    built,
+  });
+
+  return [
+    d('Clinic Readiness', openingScore, 100,
+      openingScore === null ? [] : [100, 86, 100, 71, 100, 100, openingScore],
+      'No opening set generated today',
+      openingScore !== null),
+    d('Patient Care', patientCare, 95,
+      patientCare === null ? [] : [96, 94, 97, 93, 96, 95, patientCare],
+      'No patients have been through yet today',
+      patientCare !== null),
+    d('Clinical Documentation', 88, 100, [92, 90, 88, 91, 89, 87, 88],
+      'Cases with complete required records'),
+    d('Infection Control', 100, 100, [100, 100, 96, 100, 100, 100, 100],
+      'Sterilisation, PPE and biomedical waste'),
+    d('Appointments', 83, 95, [88, 91, 86, 84, 82, 85, 83],
+      'Confirmation, cancellation, no-show, utilisation'),
+    d('Lab', null, 90, [], 'Lab case module not built yet', false),
+    d('Inventory', null, 95, [], 'Inventory module not built yet', false),
+    d('Team', 94, 95, [96, 95, 92, 94, 95, 93, 94],
+      'Attendance, task completion, SOP adherence, training'),
+  ];
+}
+
 function handle(url: string, method: string, body: Record<string, unknown>): Response {
   const path = url.replace(/^https?:\/\/[^/]+/, '').split('?')[0]!;
   const me = db.signedIn;
@@ -1436,6 +1502,55 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     );
     if (allDone && inc.status === 'ACTIONS_PLANNED') inc.status = 'VERIFYING';
     return json(incidentView(inc));
+  }
+
+  /**
+   * The Owner MIS.
+   *
+   * The requirement is unusually specific about this one screen: "You should
+   * not see 150 tasks. You should see: Operational Health, eight domains,
+   * requires your attention." So this returns eight scores and the exceptions
+   * behind them -- never a task list.
+   *
+   * The eight are §7's management scores, which sit between the 16 control
+   * parameters and the single health number. Sixteen numbers is a report; one
+   * number is a slogan; eight is what an owner can act on.
+   */
+  if (path === '/api/v1/owner-mis' && method === 'GET') {
+    if (!MAY_SEE_CLINIC.some((r) => me.roles.includes(r))) return json({ error: 'Forbidden' }, 403);
+    const domains = ownerDomains();
+    // GREY never counts. A domain with nothing to measure is not a zero, and
+    // averaging it in would let a quiet week look like a failing one.
+    const scored = domains.filter((d) => d.status !== 'GREY' && d.score !== null);
+    const health = scored.length
+      ? Math.round(scored.reduce((a, d) => a + (d.score ?? 0), 0) / scored.length)
+      : null;
+
+    const critical = db.attention.filter((a) => a.open && a.severity === 'PATIENT_SAFETY');
+    const attention = db.attention.filter(
+      (a) => a.open && (a.severity === 'CRITICAL' || a.severity === 'IMPORTANT'),
+    );
+
+    return json({
+      clinicName: 'SYNTHETIC KB Dental Andheri',
+      health,
+      domains,
+      critical: critical.map((a) => ({ id: a.id, headline: a.headline, detail: a.detail })),
+      attention: attention.map((a) => ({ id: a.id, headline: a.headline, detail: a.detail })),
+      // "Recurring failures become root-cause/CAPA learning" — the owner's
+      // real question is not what broke, it is what keeps breaking.
+      repeatFailures: db.incidents
+        .filter((i) => i.actions.some((a) => a.ineffectiveCount > 0))
+        .map((i) => ({
+          reference: i.reference, summary: i.summary,
+          attempts: 1 + Math.max(...i.actions.map((a) => a.ineffectiveCount)),
+        })),
+      capa: {
+        open: db.incidents.filter((i) => i.status !== 'CLOSED').length,
+        awaitingEffectiveness: db.incidents.filter((i) => i.status === 'VERIFYING').length,
+        closed: db.incidents.filter((i) => i.status === 'CLOSED').length,
+      },
+    });
   }
 
   // ---- PATIENTS: readiness before the chair, and follow-ups after it ----

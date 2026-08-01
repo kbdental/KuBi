@@ -9,6 +9,7 @@ import { SignIn } from './screens/sign-in.js';
 import { Today } from './screens/today.js';
 import { TaskSheetScreen } from './screens/task-sheet.js';
 import { Attention } from './screens/attention.js';
+import { OwnerMIS } from './screens/owner-mis.js';
 import { Patients } from './screens/patients.js';
 import { Quality } from './screens/quality.js';
 import { Checks } from './screens/checks.js';
@@ -40,7 +41,7 @@ const CAN_MOVE_VISITS = [
   'TREATING_DOCTOR', 'CLINICAL_DIRECTOR',
 ];
 
-type Place = 'OVERVIEW' | 'TODAY' | 'CLINIC' | 'PATIENTS' | 'ATTENTION' | 'QUALITY' | 'CHECKS' | 'ME';
+type Place = 'MIS' | 'OVERVIEW' | 'TODAY' | 'CLINIC' | 'PATIENTS' | 'ATTENTION' | 'QUALITY' | 'CHECKS' | 'ME';
 
 interface Loaded {
   me: Me;
@@ -144,6 +145,13 @@ export function App() {
   }
 
   const showChecks = data.checks.length > 0;
+  // The owner's KuBi is a different app, not a filtered one.
+  const isOwner = data.me.roleCodes.includes('OWNER_DIRECTOR');
+  // TODAY does not exist for an owner, so landing there would show an empty
+  // frame. Resolved at render rather than by an effect: a redirect that runs
+  // after paint shows the wrong screen first, which is the flicker every
+  // dashboard has and nobody admits to.
+  const here: Place = isOwner && place === 'TODAY' ? 'MIS' : place;
 
   return (
     <div className="app">
@@ -153,28 +161,34 @@ export function App() {
           {data.day.clinic && <span className="nav-clinic">{data.day.clinic.name}</span>}
         </div>
         <div className="nav-items">
-          {data.overview && <Tab id="OVERVIEW" label="Overview" now={place} go={setPlace} />}
-          <Tab id="TODAY" label="Today" now={place} go={setPlace} />
-          {data.schedule.rows.length > 0 && (
-            <Tab id="CLINIC" label="Clinic" now={place} go={setPlace} />
+          {/* An owner is not a manager with more permissions. "You should not
+              see 150 tasks" is a different screen, not a filtered one — so the
+              owner gets the MIS and none of the operational tabs. */}
+          {isOwner && <Tab id="MIS" label="Dashboard" now={here} go={setPlace} />}
+          {!isOwner && data.overview && <Tab id="OVERVIEW" label="Overview" now={here} go={setPlace} />}
+          {!isOwner && <Tab id="TODAY" label="Today" now={here} go={setPlace} />}
+          {!isOwner && data.schedule.rows.length > 0 && (
+            <Tab id="CLINIC" label="Clinic" now={here} go={setPlace} />
           )}
           {/* Readiness before the chair, follow-up after it. Clinical work, so
               it follows the same permission as the clinic-wide views. */}
-          {data.overview && <Tab id="PATIENTS" label="Patients" now={place} go={setPlace} />}
-          <Tab
-            id="ATTENTION"
-            label="Attention"
-            now={place}
-            go={setPlace}
-            count={data.attention.length}
-          />
-          {showChecks && (
-            <Tab id="CHECKS" label="Checks" now={place} go={setPlace} count={data.checks.length} />
+          {!isOwner && data.overview && <Tab id="PATIENTS" label="Patients" now={here} go={setPlace} />}
+          {!isOwner && (
+            <Tab
+              id="ATTENTION"
+              label="Attention"
+              now={place}
+              go={setPlace}
+              count={data.attention.length}
+            />
+          )}
+          {!isOwner && showChecks && (
+            <Tab id="CHECKS" label="Checks" now={here} go={setPlace} count={data.checks.length} />
           )}
           {/* The IMPROVE stage. Clinic-wide, like Overview: an assistant has a
               day, a manager has a clinic — and learning is a clinic's job. */}
-          {data.overview && <Tab id="QUALITY" label="Quality" now={place} go={setPlace} />}
-          <Tab id="ME" label="Me" now={place} go={setPlace} />
+          {data.overview && <Tab id="QUALITY" label="Quality" now={here} go={setPlace} />}
+          <Tab id="ME" label="Me" now={here} go={setPlace} />
         </div>
         <div className="nav-who">
           <span className="nav-who-name">{data.me.displayLabel}</span>
@@ -182,7 +196,7 @@ export function App() {
       </nav>
 
       <main className="main">
-      {place === 'OVERVIEW' && data.overview && (
+      {here === 'OVERVIEW' && data.overview && (
         <Overview
           data={data.overview}
           attention={data.attention}
@@ -191,7 +205,7 @@ export function App() {
           onGoToClinic={() => setPlace('CLINIC')}
         />
       )}
-      {place === 'TODAY' && (
+      {here === 'TODAY' && (
         <Today
           day={data.day}
           onOpenTask={(id) => void open(id)}
@@ -199,24 +213,25 @@ export function App() {
           onOpenHandover={() => void openTheHandover()}
         />
       )}
-      {place === 'CLINIC' && (
+      {here === 'CLINIC' && (
         <Clinic
           schedule={data.schedule}
           canAct={CAN_MOVE_VISITS.some((r) => data.me.roleCodes.includes(r))}
           onChanged={reload}
         />
       )}
-      {place === 'ATTENTION' && (
+      {here === 'ATTENTION' && (
         <Attention
           items={data.attention}
           onResolved={reload}
           onOpenTask={(id) => void open(id)}
         />
       )}
-      {place === 'PATIENTS' && <Patients onChanged={reload} />}
-      {place === 'QUALITY' && <Quality onChanged={reload} />}
-      {place === 'CHECKS' && <Checks items={data.checks} onDone={reload} />}
-      {place === 'ME' && (
+      {here === 'MIS' && <OwnerMIS onGoToQuality={() => setPlace('QUALITY')} />}
+      {here === 'PATIENTS' && <Patients onChanged={reload} />}
+      {here === 'QUALITY' && <Quality onChanged={reload} />}
+      {here === 'CHECKS' && <Checks items={data.checks} onDone={reload} />}
+      {here === 'ME' && (
         <MeScreen me={data.me} onSignedOut={() => { setData(null); setPlace('TODAY'); }} />
       )}
       </main>
@@ -229,6 +244,7 @@ const TAB_ICON: Record<Place, (p: { filled: boolean }) => ReactElement> = {
   TODAY: ({ filled }) => <IconToday filled={filled} />,
   CLINIC: ({ filled }) => <IconClinic filled={filled} />,
   ATTENTION: ({ filled }) => <IconAttention filled={filled} />,
+  MIS: ({ filled }) => <IconOverview filled={filled} />,
   PATIENTS: ({ filled }) => <IconPatients filled={filled} />,
   QUALITY: ({ filled }) => <IconQuality filled={filled} />,
   CHECKS: ({ filled }) => <IconChecks filled={filled} />,

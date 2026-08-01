@@ -1,6 +1,7 @@
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app.js';
+import { Entry, PERSONAS } from './screens/entry.js';
 import {
   installDemoBackend, signInAs, resetDemo, jumpToEndOfDay, PEOPLE,
 } from './demo-backend.js';
@@ -24,28 +25,24 @@ import './styles.css';
 
 installDemoBackend();
 
-const WHO: Record<string, { name: string; role: string }> = {
-  priya: { name: 'Priya S.', role: 'Dental assistant' },
-  rahul: { name: 'Rahul M.', role: 'Clinic manager' },
-  anita: { name: 'Anita K.', role: 'Senior assistant' },
-  kavita: { name: 'Kavita R.', role: 'Reception' },
-};
+/** One list, so the entry screen and the person menu cannot disagree. */
+const WHO: Record<string, { name: string; role: string }> =
+  Object.fromEntries(PERSONAS.map((p) => [p.key, { name: p.name, role: p.role }]));
 
 const initials = (name: string) =>
   name.replace(/[^A-Za-z ]/g, '').split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2);
 
 function Demo() {
-  const [who, setWho] = useState('priya');
+  // Null until somebody chooses. Opening straight into a stranger's shift at
+  // 08:52 with no explanation is what made this feel abrupt.
+  const [who, setWho] = useState<string | null>(null);
   const [epoch, setEpoch] = useState(0);
   const [ready, setReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [evening, setEvening] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    signInAs('priya');
-    setReady(true);
-  }, []);
+  useEffect(() => { setReady(true); }, []);
 
   // A menu that only closes by picking something from it is a trap on a phone.
   useEffect(() => {
@@ -72,6 +69,8 @@ function Demo() {
   function startOver() {
     resetDemo();
     setEvening(false);
+    // All the way back to the front door, not to whoever you happened to be.
+    setWho(null);
     setEpoch((n) => n + 1);
   }
 
@@ -84,6 +83,10 @@ function Demo() {
   }
 
   if (!ready) return null;
+
+  if (!who) {
+    return <Entry onPick={(key) => { signInAs(key); setWho(key); }} />;
+  }
 
   const current = WHO[who]!;
 
