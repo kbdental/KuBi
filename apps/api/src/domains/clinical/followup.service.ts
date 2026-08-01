@@ -69,6 +69,73 @@ export function redFlagReason(r: FollowupResponse): string | null {
 }
 
 /**
+ * The other half of the Patient Event engine: BOOKING creates work too.
+ *
+ * The requirement draws it as one flow — "Implant Surgery booked ↓ system
+ * automatically creates: pre-op medication reminder, consent requirement,
+ * medical history verification, implant inventory check, surgical kit
+ * readiness, pre-op scan requirement." Only the completion half existed, which
+ * meant KuBi generated the follow-up call and left every pre-op requirement to
+ * somebody's memory — the exact dependency the product exists to remove.
+ *
+ * These are raised as attention items rather than activity instances on
+ * purpose. An activity instance belongs to a scheduled set with a period key;
+ * this work belongs to a CASE, arrives whenever the case is booked, and is
+ * finished when the case is ready rather than when the day ends.
+ *
+ * Idempotent per case: booking, rescheduling and re-saving a case must not
+ * produce three copies of the same reminder.
+ */
+export async function generatePreOpWork(
+  client: TenantPrisma,
+  clock: Clock,
+  patientProcedureId: string,
+): Promise<{ created: number }> {
+  const pp = await client.patientProcedure.findUnique({
+    where: { id: patientProcedureId },
+    include: { procedure: { include: { requirements: true } } },
+  });
+  if (!pp) throw new FollowupError('No such patient procedure.', 'NO_PROCEDURE');
+
+  const now = clock.now();
+  let created = 0;
+
+  for (const req of pp.procedure.requirements) {
+    const headline = `${pp.procedure.name}: ${req.label.toLowerCase()}`;
+    const already = await client.attentionItem.findFirst({
+      where: {
+        organizationId: pp.organizationId,
+        clinicId: pp.clinicId,
+        code: 'PRE_OP.REQUIREMENT.OUTSTANDING',
+        headline,
+        status: {
+          in: [ExceptionStatus.OPEN, ExceptionStatus.ACKNOWLEDGED, ExceptionStatus.ACTION_IN_PROGRESS],
+        },
+      },
+    });
+    if (already) continue;
+
+    await client.attentionItem.create({
+      data: {
+        organizationId: pp.organizationId,
+        clinicId: pp.clinicId,
+        code: 'PRE_OP.REQUIREMENT.OUTSTANDING',
+        // A pre-op requirement inherits the seriousness of its gate: a
+        // consent that blocks hard is not the same kind of outstanding item
+        // as a photograph that merely warns.
+        severity: req.enforcement === 'BLOCK_HARD' ? Priority.PATIENT_SAFETY : Priority.IMPORTANT,
+        headline,
+        detail: 'Must be satisfied before the procedure can start.',
+        status: ExceptionStatus.OPEN,
+        dueAt: now,
+      },
+    });
+    created += 1;
+  }
+  return { created };
+}
+
+/**
  * Generate the protocol follow-ups for a completed procedure (FUP-001).
  *
  * Idempotent: called again for the same procedure it creates nothing, because

@@ -199,10 +199,20 @@ describe('procedure readiness', () => {
 
       const report = await evaluateReadiness(tx, clock, pp.id);
       const implant = report.requirements.find((r) => r.kind === RequirementKind.IMPLANT_AVAILABLE)!;
-      // AP-1: no evaluator is NOT_CONFIGURED, which blocks. It is emphatically
-      // not PASS and not NOT_APPLICABLE.
-      expect(implant.result).toBe(EvaluationResult.NOT_CONFIGURED);
+      // The Inventory engine now evaluates this one, and with no component
+      // list recorded for the case it returns UNKNOWN — "we asked and could
+      // not tell", which is a stronger statement than the NOT_CONFIGURED it
+      // used to give ("nothing here can even ask").
+      //
+      // Both block identically under AP-1. Keeping them distinct is what lets
+      // a recurring UNKNOWN be read as a data problem and a recurring
+      // NOT_CONFIGURED as an unbuilt evaluator — different fixes entirely.
+      expect(implant.result).toBe(EvaluationResult.UNKNOWN);
       expect(implant.decision).toBe(GateDecision.BLOCK_OVERRIDABLE);
+
+      // And a requirement that genuinely has no evaluator still reports so.
+      const stillUnbuilt = await evaluateRequirementKind(tx, clock, pp.id, RequirementKind.MEDICAL_HISTORY);
+      expect(stillUnbuilt).toBe(EvaluationResult.NOT_CONFIGURED);
       // And the whole procedure is PENDING, not READY and not NOT_READY:
       // "could not be determined" is its own answer.
       expect(report.status).toBe(ReadinessStatus.PENDING);
@@ -379,3 +389,34 @@ describe('what counts as a red flag', () => {
     })).toBeNull();
   });
 });
+
+/**
+ * Evaluate one requirement kind against a case, by adding it to the protocol
+ * and reading the result back.
+ *
+ * Round-trips through the real evaluator rather than calling a private
+ * function: what matters is what the engine reports to a caller, and a test
+ * that reaches past the public surface stops protecting it.
+ */
+async function evaluateRequirementKind(
+  tx: never,
+  clock: FixedClock,
+  patientProcedureId: string,
+  kind: string,
+): Promise<string> {
+  const client = tx as never as typeof prisma;
+  const pp = await client.patientProcedure.findUniqueOrThrow({
+    where: { id: patientProcedureId },
+  });
+  await client.procedureRequirement.create({
+    data: {
+      procedureId: pp.procedureId,
+      kind,
+      label: kind,
+      enforcement: 'ADVISORY',
+      sortOrder: 99,
+    },
+  });
+  const report = await evaluateReadiness(tx, clock, patientProcedureId);
+  return report.requirements.find((r) => r.kind === kind)!.result;
+}

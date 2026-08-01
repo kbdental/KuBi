@@ -38,6 +38,8 @@ import {
 } from '@kubi/contracts';
 import type { TenantPrisma } from '../../platform/tenancy/rls-context.js';
 import type { Clock } from '../../shared/clock.js';
+import { categoryAvailable } from '../operations/equipment.service.js';
+import { implantReadiness, type ComponentRequirement } from '../operations/inventory.service.js';
 
 export class ReadinessError extends Error {
   constructor(message: string, readonly code: string) {
@@ -94,7 +96,7 @@ export interface ReadinessReport {
 async function evaluateRequirement(
   client: TenantPrisma,
   clock: Clock,
-  pp: { id: string; patientId: string },
+  pp: { id: string; patientId: string; clinicId: string; componentRequirements?: unknown },
   req: { kind: string; label: string },
 ): Promise<{ result: EvaluationResult; detail: string }> {
   switch (req.kind) {
@@ -119,6 +121,47 @@ async function evaluateRequirement(
         result: EvaluationResult.PASS,
         detail: `Signed ${consent.templateCode} v${consent.templateVersion}.`,
       };
+    }
+
+    case RequirementKind.IMPLANT_AVAILABLE: {
+      // Answered per component, so the block names the missing part rather
+      // than sending somebody to go and look.
+      const required = (pp.componentRequirements ?? []) as ComponentRequirement[];
+      if (required.length === 0) {
+        return {
+          result: EvaluationResult.UNKNOWN,
+          detail: 'No component list recorded for this case, so availability cannot be checked.',
+        };
+      }
+      const { ready, answers } = await implantReadiness(client, clock, pp.clinicId, required);
+      if (ready) return { result: EvaluationResult.PASS, detail: 'All components in stock and in date.' };
+      const worst = answers.find((a) => a.result === EvaluationResult.FAIL) ?? answers[0]!;
+      return { result: worst.result, detail: worst.detail };
+    }
+
+    case RequirementKind.STERILE_KIT: {
+      // A released batch is the evidence. Sheet L is explicit that a failed
+      // cycle cannot release packs, so "released" already carries the cycle
+      // result — this does not re-derive it.
+      const released = await client.sterilizationBatch.findFirst({
+        where: { clinicId: pp.clinicId, stage: 'RELEASED' },
+        orderBy: { releasedAt: 'desc' },
+      });
+      if (!released) {
+        return {
+          result: EvaluationResult.UNKNOWN,
+          detail: 'No sterilisation batch has been released for this clinic.',
+        };
+      }
+      return {
+        result: EvaluationResult.PASS,
+        detail: `Batch ${released.batchRef} released.`,
+      };
+    }
+
+    case RequirementKind.EMERGENCY_READY: {
+      const answer = await categoryAvailable(client, pp.clinicId, 'EMERGENCY');
+      return answer;
     }
 
     // Everything else is declared and not yet evaluable. Returning

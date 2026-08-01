@@ -57,6 +57,14 @@ model Organization {
   patientProcedures PatientProcedure[]
   consents          Consent[]
   followups         Followup[]
+  assets            Asset[]
+  maintenancePlans  MaintenancePlan[]
+  assetChecks       AssetCheck[]
+  breakdowns        Breakdown[]
+  items             Item[]
+  stockBatches      StockBatch[]
+  implantSkus       ImplantSku[]
+  sterilizationBatches SterilizationBatch[]
 
   @@map("organizations")
 }
@@ -945,6 +953,12 @@ model PatientProcedure {
   readiness           String    @default("PENDING")
   readinessEvaluatedAt DateTime? @map("readiness_evaluated_at") @db.Timestamptz(6)
 
+  /// The implant components this specific case needs, as recorded when it was
+  /// planned. Held on the case rather than derived from the procedure, because
+  /// two implant surgeries of the same protocol need different platforms and
+  /// dimensions — which is precisely why counting implants is insufficient.
+  componentRequirements Json? @map("component_requirements")
+
   /// Set only when an authorised person overrode a BLOCK_OVERRIDABLE gate.
   /// BLOCK_HARD has no override path at all — enforced by the absence of a
   /// permission, not by a check here.
@@ -1045,4 +1059,241 @@ model Followup {
   @@index([organizationId, clinicId, outcome])
   @@index([dueAt])
   @@map("followups")
+}
+
+// ---------------------------------------------------------------------------
+// Equipment engine — "every important asset should have its own digital record"
+// ---------------------------------------------------------------------------
+
+/// One piece of equipment the clinic depends on.
+///
+/// `status` is the field that matters operationally: a failed daily check must
+/// take the asset out of service, and an out-of-service chair must stop being
+/// allocatable. That is the requirement's own rule — "if OPEN-004 dental chair
+/// = FAIL, that chair becomes NOT AVAILABLE FOR PATIENT ALLOCATION" — and it
+/// only works if availability is derived from this column rather than from
+/// somebody remembering.
+model Asset {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  clinicId       String @map("clinic_id") @db.Uuid
+
+  /// Human-facing tag, e.g. AUTOCLAVE-01. Stable for the asset's life.
+  code     String
+  name     String
+  category String
+  location String?
+
+  /// OPERATIONAL | RESTRICTED | OUT_OF_SERVICE | UNDER_REPAIR | RETIRED
+  status String @default("OPERATIONAL")
+
+  /// Who is accountable for this asset, distinct from whoever uses it.
+  responsibleEmployeeId String? @map("responsible_employee_id") @db.Uuid
+
+  amcVendor   String?   @map("amc_vendor")
+  amcExpiryAt DateTime? @map("amc_expiry_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  maintenancePlans MaintenancePlan[]
+  breakdowns       Breakdown[]
+  checks           AssetCheck[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, clinicId, status])
+  @@map("assets")
+}
+
+/// A recurring service or calibration schedule. "Next service = today"
+/// generates the task, which is the whole of the Equipment engine's time half.
+model MaintenancePlan {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  assetId        String @map("asset_id") @db.Uuid
+
+  kind          String
+  intervalDays  Int     @map("interval_days")
+  /// How many days before the due date the task should appear. A service task
+  /// created on the morning it is due is a service that happens tomorrow.
+  leadTimeDays  Int     @default(7) @map("lead_time_days")
+
+  lastServicedAt DateTime? @map("last_serviced_at") @db.Timestamptz(6)
+  nextDueAt      DateTime  @map("next_due_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, nextDueAt])
+  @@map("maintenance_plans")
+}
+
+/// A daily functional check on an asset (EQP-001). A FAIL is not a note — it
+/// changes the asset's status and raises a patient-safety exception.
+model AssetCheck {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  assetId        String   @map("asset_id") @db.Uuid
+  periodKey      String   @map("period_key")
+  result         String
+  note           String?
+  checkedByEmployeeId String? @map("checked_by_employee_id") @db.Uuid
+  checkedAt      DateTime @default(now()) @map("checked_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, periodKey])
+  @@map("asset_checks")
+}
+
+model Breakdown {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  assetId        String    @map("asset_id") @db.Uuid
+  reportedAt     DateTime  @default(now()) @map("reported_at") @db.Timestamptz(6)
+  reportedByEmployeeId String? @map("reported_by_employee_id") @db.Uuid
+  description    String
+  /// Return to service is a decision somebody makes and signs, never a
+  /// timestamp that arrives on its own (EQP-006).
+  repairedAt     DateTime? @map("repaired_at") @db.Timestamptz(6)
+  verifiedByEmployeeId String? @map("verified_by_employee_id") @db.Uuid
+  verifiedAt     DateTime? @map("verified_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, assetId])
+  @@map("breakdowns")
+}
+
+// ---------------------------------------------------------------------------
+// Inventory engine
+// ---------------------------------------------------------------------------
+
+model Item {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  clinicId       String @map("clinic_id") @db.Uuid
+
+  code     String
+  name     String
+  category String
+  unit     String
+
+  minimumQty  Int @map("minimum_qty")
+  reorderQty  Int @map("reorder_qty")
+  /// Reorder level is the trigger; minimum is the floor. Below reorder raises
+  /// a purchase requirement; below minimum is a shortage, which is worse.
+  reorderLevel Int @map("reorder_level")
+
+  supplier String?
+  location String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  batches      StockBatch[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, clinicId])
+  @@map("items")
+}
+
+/// Stock held as batches, because expiry is per batch and FEFO needs it.
+/// Expired stock is excluded from usable stock rather than deleted — the
+/// history of what was held and when it expired is the audit trail.
+model StockBatch {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  itemId         String    @map("item_id") @db.Uuid
+  batchRef       String    @map("batch_ref")
+  quantity       Int
+  expiryAt       DateTime? @map("expiry_at") @db.Timestamptz(6)
+  receivedAt     DateTime  @default(now()) @map("received_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  item         Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, itemId])
+  @@index([expiryAt])
+  @@map("stock_batches")
+}
+
+/// Implant stock, tracked to the component.
+///
+/// The requirement is explicit that quantity alone is clinically insufficient:
+/// "merely knowing 10 implants available" says nothing about whether the right
+/// platform, diameter and length are present, let alone the healing abutment
+/// and prosthetic components that make the case possible.
+model ImplantSku {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  clinicId       String @map("clinic_id") @db.Uuid
+
+  brand    String
+  line     String
+  platform String
+  /// Millimetres. Null on components that are not dimension-specific.
+  diameterMm Float? @map("diameter_mm")
+  lengthMm   Float? @map("length_mm")
+
+  /// IMPLANT | HEALING_ABUTMENT | IMPRESSION_COMPONENT | PROSTHETIC_COMPONENT
+  componentType String @map("component_type")
+
+  quantity  Int       @default(0)
+  batchRef  String?   @map("batch_ref")
+  expiryAt  DateTime? @map("expiry_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, clinicId, componentType])
+  @@map("implant_skus")
+}
+
+// ---------------------------------------------------------------------------
+// Sterilization — a batch, not a closing tick
+// ---------------------------------------------------------------------------
+
+/// Sheet L is emphatic: "don't manage sterilization as one closing tick."
+/// A batch travels stages, and a failed cycle cannot release packs.
+model SterilizationBatch {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  clinicId       String @map("clinic_id") @db.Uuid
+
+  batchRef String @map("batch_ref")
+  /// COLLECTED → ULTRASONIC → INSPECTED → PACKED → AUTOCLAVED → VERIFIED →
+  /// RELEASED, with QUARANTINED and FAILED as terminal branches.
+  stage    String @default("COLLECTED")
+
+  operatorEmployeeId String? @map("operator_employee_id") @db.Uuid
+  packCount          Int     @default(0) @map("pack_count")
+
+  cycleNumber   String?   @map("cycle_number")
+  cycleStartAt  DateTime? @map("cycle_start_at") @db.Timestamptz(6)
+  cycleEndAt    DateTime? @map("cycle_end_at") @db.Timestamptz(6)
+  /// PASS | FAIL | INCONCLUSIVE. Inconclusive holds the batch rather than
+  /// forcing a two-valued answer — see the CycleResult enum.
+  cycleResult   String?   @map("cycle_result")
+
+  releasedByEmployeeId String?   @map("released_by_employee_id") @db.Uuid
+  releasedAt           DateTime? @map("released_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, batchRef])
+  @@index([organizationId, clinicId, stage])
+  @@map("sterilization_batches")
 }
