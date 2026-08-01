@@ -237,50 +237,101 @@ export async function addAction(
   return action;
 }
 
-/** Step 4 — the owner says it is done. Not the same as verified. */
-export async function completeAction(client: TenantPrisma, clock: Clock, actionId: string) {
+/**
+ * Step 4 — the action was carried out.
+ *
+ * IMPLEMENTED, not "done": whether it worked is a separate question asked on a
+ * separate date. Matrix v2.0 INC-006 makes the effectiveness check its own
+ * activity for exactly this reason.
+ */
+export async function implementAction(
+  client: TenantPrisma,
+  clock: Clock,
+  actionId: string,
+  effectivenessAfterDays = 30,
+) {
   const action = await client.capaAction.findUnique({ where: { id: actionId } });
   if (!action) throw new CapaRuleError('No such action.', 'NO_ACTION');
-  if (action.status === CapaActionStatus.VERIFIED) {
-    throw new CapaRuleError('That action is already verified.', 'ALREADY_VERIFIED');
+  if (action.status === CapaActionStatus.EFFECTIVE || action.status === CapaActionStatus.CLOSED) {
+    throw new CapaRuleError('That action has already been through its effectiveness check.', 'ALREADY_EFFECTIVE');
   }
+  const now = clock.now();
   const updated = await client.capaAction.update({
     where: { id: actionId },
-    data: { status: CapaActionStatus.COMPLETED, completedAt: clock.now() },
+    data: {
+      status: CapaActionStatus.EFFECTIVENESS_PENDING,
+      implementedAt: now,
+      // The check falls due later on purpose. Asking "did it work?" the same
+      // afternoon answers nothing -- the failure has had no chance to recur.
+      effectivenessDueAt: new Date(now.getTime() + effectivenessAfterDays * 86_400_000),
+    },
   });
   await maybeAdvanceToVerifying(client, action.incidentId);
   return updated;
 }
 
 /**
- * Step 5 — someone else confirms it.
+ * Step 5 — the effectiveness check. Did it actually work?
  *
- * Self-verification is refused for the same reason a doer cannot confirm their
- * own activity: a fix nobody independently looked at is a claim, not a fix.
+ * FRS §6: "ineffective loops back". A failed check does not fail the incident;
+ * it returns the action to ACTION_IN_PROGRESS so somebody tries something else.
+ * That return path is the whole reason CAPA is a loop rather than a form —
+ * without it, "we fixed it" and "it stopped happening" become the same record
+ * and a clinic can close the same failure for ever.
+ *
+ * Self-checking is refused for the same reason a doer cannot confirm their own
+ * activity: a fix nobody independent looked at is a claim, not a fix.
  */
-export async function verifyAction(
+export async function checkEffectiveness(
   client: TenantPrisma,
   clock: Clock,
   actionId: string,
-  verifierEmployeeId: string,
+  checkerEmployeeId: string,
+  effective: boolean,
   note?: string,
 ) {
   const action = await client.capaAction.findUnique({ where: { id: actionId } });
   if (!action) throw new CapaRuleError('No such action.', 'NO_ACTION');
-  if (action.status !== CapaActionStatus.COMPLETED) {
-    throw new CapaRuleError('An action must be completed before it can be verified.', 'NOT_COMPLETED');
-  }
-  if (action.responsibleEmployeeId === verifierEmployeeId) {
+  if (action.status !== CapaActionStatus.EFFECTIVENESS_PENDING) {
     throw new CapaRuleError(
-      'A CAPA action must be verified by someone other than the person responsible for it.',
+      'An action must be implemented before its effectiveness can be checked.',
+      'NOT_IMPLEMENTED',
+    );
+  }
+  if (action.responsibleEmployeeId === checkerEmployeeId) {
+    throw new CapaRuleError(
+      'A CAPA action must be checked by someone other than the person responsible for it.',
       'SELF_VERIFICATION',
     );
   }
+
+  if (!effective) {
+    // Back round the loop. The count survives, because a CAPA on its third
+    // attempt is a different conversation from one on its first.
+    const reopened = await client.capaAction.update({
+      where: { id: actionId },
+      data: {
+        status: CapaActionStatus.ACTION_IN_PROGRESS,
+        implementedAt: null,
+        effectivenessDueAt: null,
+        verificationNote: note ?? null,
+        ineffectiveCount: { increment: 1 },
+      },
+    });
+    // The incident cannot stay in VERIFYING when one of its actions has gone
+    // back to being work in progress.
+    await client.incident.updateMany({
+      where: { id: action.incidentId, status: IncidentStatus.VERIFYING },
+      data: { status: IncidentStatus.ACTIONS_PLANNED },
+    });
+    return reopened;
+  }
+
   const updated = await client.capaAction.update({
     where: { id: actionId },
     data: {
-      status: CapaActionStatus.VERIFIED,
-      verifiedByEmployeeId: verifierEmployeeId,
+      status: CapaActionStatus.EFFECTIVE,
+      verifiedByEmployeeId: checkerEmployeeId,
       verifiedAt: clock.now(),
       verificationNote: note ?? null,
     },
@@ -309,11 +360,16 @@ export async function closeIncident(client: TenantPrisma, clock: Clock, incident
       'NO_PREVENTIVE',
     );
   }
-  const unverified = actions.filter((a) => a.status !== CapaActionStatus.VERIFIED).length;
-  if (unverified > 0) {
+  // FRS §7: "CAPA effectiveness is verified before closure." Implemented is
+  // not enough -- the question is whether the failure stopped, not whether
+  // somebody did the thing.
+  const unproven = actions.filter(
+    (a) => a.status !== CapaActionStatus.EFFECTIVE && a.status !== CapaActionStatus.CLOSED,
+  ).length;
+  if (unproven > 0) {
     throw new CapaRuleError(
-      `${inc.reference} has ${unverified} action${unverified === 1 ? '' : 's'} still unverified.`,
-      'UNVERIFIED_ACTIONS',
+      `${inc.reference} has ${unproven} action${unproven === 1 ? '' : 's'} not yet proven effective.`,
+      'UNPROVEN_ACTIONS',
     );
   }
 
@@ -329,8 +385,9 @@ async function maybeAdvanceToVerifying(client: TenantPrisma, incidentId: string)
     select: { status: true },
   });
   const allDone = actions.length > 0
-    && actions.every((a) => a.status === CapaActionStatus.COMPLETED
-      || a.status === CapaActionStatus.VERIFIED);
+    && actions.every((a) => a.status === CapaActionStatus.EFFECTIVENESS_PENDING
+      || a.status === CapaActionStatus.EFFECTIVE
+      || a.status === CapaActionStatus.CLOSED);
   if (!allDone) return;
   await client.incident.updateMany({
     where: { id: incidentId, status: IncidentStatus.ACTIONS_PLANNED },
@@ -389,7 +446,8 @@ export async function listIncidents(
   const now = clock.now().getTime();
   return rows.map((r) => {
     const total = r.actions.length;
-    const open = r.actions.filter((a) => a.status !== CapaActionStatus.VERIFIED).length;
+    const open = r.actions.filter((a) => a.status !== CapaActionStatus.EFFECTIVE
+      && a.status !== CapaActionStatus.CLOSED).length;
     return {
       id: r.id,
       reference: r.reference,
@@ -428,12 +486,14 @@ function nextStepFor(
         : 'Add a preventive action — what stops the next one';
     case IncidentStatus.ACTIONS_PLANNED: {
       const n = actions.filter((a) => a.status === CapaActionStatus.OPEN
-        || a.status === CapaActionStatus.IN_PROGRESS).length;
+        || a.status === CapaActionStatus.ACTION_IN_PROGRESS).length;
       return n > 0 ? `${n} action${n === 1 ? '' : 's'} still to do` : null;
     }
     case IncidentStatus.VERIFYING: {
-      const n = actions.filter((a) => a.status === CapaActionStatus.COMPLETED).length;
-      return n > 0 ? `${n} action${n === 1 ? '' : 's'} waiting to be checked` : null;
+      const n = actions.filter((a) => a.status === CapaActionStatus.EFFECTIVENESS_PENDING).length;
+      return n > 0
+        ? `${n} action${n === 1 ? '' : 's'} waiting on an effectiveness check — did it actually work?`
+        : null;
     }
     default:
       return null;

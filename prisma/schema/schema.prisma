@@ -832,13 +832,23 @@ model CapaAction {
   responsibleEmployeeId String   @map("responsible_employee_id") @db.Uuid
   dueAt                 DateTime @map("due_at") @db.Timestamptz(6)
 
-  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  /// Carried out. Emphatically not the same as "it worked".
+  implementedAt DateTime? @map("implemented_at") @db.Timestamptz(6)
 
-  /// Verification is by someone other than the responsible person, for the
-  /// same reason a doer cannot confirm their own activity.
+  /// When the effectiveness check falls due (Matrix v2.0 INC-006 — a
+  /// configured date, not immediately). Set when the action is implemented.
+  effectivenessDueAt DateTime? @map("effectiveness_due_at") @db.Timestamptz(6)
+
+  /// The effectiveness check is by someone other than the responsible person,
+  /// for the same reason a doer cannot confirm their own activity.
   verifiedByEmployeeId String?   @map("verified_by_employee_id") @db.Uuid
   verifiedAt           DateTime? @map("verified_at") @db.Timestamptz(6)
   verificationNote     String?   @map("verification_note")
+
+  /// How many times this action was found ineffective and sent back. A CAPA on
+  /// its third attempt is a different conversation from one on its first, and
+  /// that is only visible if the count survives the loop.
+  ineffectiveCount Int @default(0) @map("ineffective_count")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)

@@ -256,7 +256,10 @@ export interface ChecklistAnswer {
 export interface CapaAction {
   id: string;
   type: 'CORRECTIVE' | 'PREVENTIVE';
-  status: 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'VERIFIED';
+  status: 'OPEN' | 'ACTION_IN_PROGRESS' | 'IMPLEMENTED' | 'EFFECTIVENESS_PENDING'
+    | 'EFFECTIVE' | 'CLOSED';
+  /** How many times this fix was found ineffective and sent back. */
+  ineffectiveCount: number;
   description: string;
   responsible: string;
   responsibleName: string;
@@ -335,9 +338,11 @@ export const api = {
     post<Incident>(`/api/v1/incidents/${id}/investigate`, { rootCause }),
   addCapaAction: (id: string, type: 'CORRECTIVE' | 'PREVENTIVE', description: string) =>
     post<Incident>(`/api/v1/incidents/${id}/actions`, { type, description }),
-  completeCapaAction: (id: string) =>
-    post<Incident>(`/api/v1/capa-actions/${id}/complete`, {}),
-  verifyCapaAction: (id: string, note?: string) =>
-    post<Incident>(`/api/v1/capa-actions/${id}/verify`, note ? { note } : {}),
+  implementCapaAction: (id: string) =>
+    post<Incident>(`/api/v1/capa-actions/${id}/implement`, {}),
+  /** `effective: false` sends the action back round the loop — not an error. */
+  checkCapaEffectiveness: (id: string, effective: boolean, note?: string) =>
+    post<Incident>(`/api/v1/capa-actions/${id}/effectiveness`,
+      { effective, ...(note ? { note } : {}) }),
   closeIncident: (id: string) => post<Incident>(`/api/v1/incidents/${id}/close`, {}),
 };

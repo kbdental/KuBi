@@ -16,11 +16,11 @@ import { prisma, withTenantContext } from '../../apps/api/src/platform/tenancy/r
 import { seedVs01Demo, type DemoEnvironment } from '../../prisma/seed/vs01-demo.js';
 import {
   raiseIncident, containIncident, investigateIncident, addAction,
-  completeAction, verifyAction, closeIncident, listIncidents,
+  implementAction, checkEffectiveness, closeIncident, listIncidents,
   capaRequired,
 } from '../../apps/api/src/platform/quality/capa.service.js';
 import {
-  IncidentStatus, CapaActionType, CapaRequirement, Priority, Parameter,
+  IncidentStatus, CapaActionType, CapaActionStatus, CapaRequirement, Priority, Parameter,
 } from '../../packages/contracts/src/enums.js';
 import { FixedClock } from '../../apps/api/src/shared/clock.js';
 
@@ -103,8 +103,8 @@ describe('the CAPA loop', () => {
         responsibleEmployeeId: env.reception.employeeId,
         dueAt: new Date('2026-08-05T10:00:00Z'),
       });
-      await completeAction(tx, clock, corrective.id);
-      await verifyAction(tx, clock, corrective.id, env.manager.employeeId);
+      await implementAction(tx, clock, corrective.id);
+      await checkEffectiveness(tx, clock, corrective.id, env.manager.employeeId, true);
 
       // This is the requirement's central point, made executable: "simply
       // correcting today's appointment doesn't solve the operational problem."
@@ -112,7 +112,7 @@ describe('the CAPA loop', () => {
     });
   });
 
-  it('refuses to let somebody verify their own fix', async () => {
+  it('refuses to let somebody check their own fix', async () => {
     await inClinic(async (tx) => {
       const inc = await newIncident(tx);
       await containIncident(tx, clock, inc.id, 'Rebooked');
@@ -123,11 +123,11 @@ describe('the CAPA loop', () => {
         responsibleEmployeeId: env.reception.employeeId,
         dueAt: new Date('2026-08-10T10:00:00Z'),
       });
-      await completeAction(tx, clock, a.id);
+      await implementAction(tx, clock, a.id);
       // Same reason a doer cannot confirm their own activity: a fix nobody
       // independently looked at is a claim, not a fix.
       await expect(
-        verifyAction(tx, clock, a.id, env.reception.employeeId),
+        checkEffectiveness(tx, clock, a.id, env.reception.employeeId, true),
       ).rejects.toThrow(/other than the person responsible/i);
     });
   });
@@ -149,10 +149,10 @@ describe('the CAPA loop', () => {
         responsibleEmployeeId: env.manager.employeeId,
         dueAt: new Date('2026-08-10T10:00:00Z'),
       });
-      await completeAction(tx, clock, prev.id);
-      await verifyAction(tx, clock, prev.id, env.reception.employeeId);
+      await implementAction(tx, clock, prev.id);
+      await checkEffectiveness(tx, clock, prev.id, env.reception.employeeId, true);
 
-      await expect(closeIncident(tx, clock, inc.id)).rejects.toThrow(/still unverified/i);
+      await expect(closeIncident(tx, clock, inc.id)).rejects.toThrow(/not yet proven effective/i);
     });
   });
 
@@ -179,13 +179,13 @@ describe('the CAPA loop', () => {
       const planned = await tx.incident.findUnique({ where: { id: inc.id } });
       expect(planned!.status).toBe(IncidentStatus.ACTIONS_PLANNED);
 
-      await completeAction(tx, clock, corr.id);
-      await completeAction(tx, clock, prev.id);
+      await implementAction(tx, clock, corr.id);
+      await implementAction(tx, clock, prev.id);
       const verifying = await tx.incident.findUnique({ where: { id: inc.id } });
       expect(verifying!.status).toBe(IncidentStatus.VERIFYING);
 
-      await verifyAction(tx, clock, corr.id, env.manager.employeeId);
-      await verifyAction(tx, clock, prev.id, env.reception.employeeId, 'Booking screen now blocks it');
+      await checkEffectiveness(tx, clock, corr.id, env.manager.employeeId, true);
+      await checkEffectiveness(tx, clock, prev.id, env.reception.employeeId, true, 'Booking screen now blocks it');
 
       const closed = await closeIncident(tx, clock, inc.id);
       expect(closed.status).toBe(IncidentStatus.CLOSED);
@@ -213,6 +213,78 @@ describe('the CAPA loop', () => {
       list = await listIncidents(tx, clock, env.organizationId, env.clinicId);
       mine = list.find((i) => i.id === inc.id)!;
       expect(mine.blockedBy).toMatch(/preventive action/i);
+    });
+  });
+
+  it('sends an ineffective fix back round the loop instead of closing it', async () => {
+    await inClinic(async (tx) => {
+      const inc = await newIncident(tx, 'Confirmation cutoff missed again');
+      await containIncident(tx, clock, inc.id, 'Called them late');
+      await investigateIncident(tx, clock, inc.id, 'Nobody owns the list before 09:45');
+      // Both kinds, so the incident actually reaches ACTIONS_PLANNED — an
+      // incident still missing one kind never advances, which is the rule
+      // tested above and would mask what this test is about.
+      const corr = await addAction(tx, inc.id, {
+        type: CapaActionType.CORRECTIVE,
+        description: 'Call the three patients',
+        responsibleEmployeeId: env.manager.employeeId,
+        dueAt: new Date('2026-08-05T10:00:00Z'),
+      });
+      const a = await addAction(tx, inc.id, {
+        type: CapaActionType.PREVENTIVE,
+        description: 'Remind reception in the morning huddle',
+        responsibleEmployeeId: env.reception.employeeId,
+        dueAt: new Date('2026-08-10T10:00:00Z'),
+      });
+
+      await implementAction(tx, clock, corr.id);
+      await implementAction(tx, clock, a.id);
+      const verifying = await tx.incident.findUnique({ where: { id: inc.id } });
+      expect(verifying!.status).toBe(IncidentStatus.VERIFYING);
+      const pending = await tx.capaAction.findUnique({ where: { id: a.id } });
+      // Carried out is not the same as "it worked", and the check falls due
+      // later on purpose — asking the same afternoon answers nothing.
+      expect(pending!.status).toBe(CapaActionStatus.EFFECTIVENESS_PENDING);
+      expect(pending!.effectivenessDueAt).not.toBeNull();
+
+      // FRS §6: "ineffective loops back."
+      const back = await checkEffectiveness(
+        tx, clock, a.id, env.manager.employeeId, false, 'Happened twice more since',
+      );
+      expect(back.status).toBe(CapaActionStatus.ACTION_IN_PROGRESS);
+      expect(back.ineffectiveCount).toBe(1);
+      expect(back.implementedAt).toBeNull();
+
+      // And the incident cannot sit in VERIFYING while an action is back at work.
+      const reopened = await tx.incident.findUnique({ where: { id: inc.id } });
+      expect(reopened!.status).toBe(IncidentStatus.ACTIONS_PLANNED);
+    });
+  });
+
+  it('will not close on a fix that was merely carried out', async () => {
+    await inClinic(async (tx) => {
+      const inc = await newIncident(tx, 'Autoclave log line missed');
+      await containIncident(tx, clock, inc.id, 'Re-ran the cycle');
+      await investigateIncident(tx, clock, inc.id, 'Closing list runs before the cycle ends');
+      const c = await addAction(tx, inc.id, {
+        type: CapaActionType.CORRECTIVE, description: 'Re-verify the batch',
+        responsibleEmployeeId: env.reception.employeeId, dueAt: new Date('2026-08-05T10:00:00Z'),
+      });
+      const p = await addAction(tx, inc.id, {
+        type: CapaActionType.PREVENTIVE, description: 'Move the closing list after the cycle',
+        responsibleEmployeeId: env.manager.employeeId, dueAt: new Date('2026-08-10T10:00:00Z'),
+      });
+      await implementAction(tx, clock, c.id);
+      await implementAction(tx, clock, p.id);
+
+      // FRS §7: effectiveness is verified BEFORE closure. Implemented is not
+      // enough — the question is whether the failure stopped.
+      await expect(closeIncident(tx, clock, inc.id)).rejects.toThrow(/not yet proven effective/i);
+
+      await checkEffectiveness(tx, clock, c.id, env.manager.employeeId, true);
+      await checkEffectiveness(tx, clock, p.id, env.reception.employeeId, true);
+      const closed = await closeIncident(tx, clock, inc.id);
+      expect(closed.status).toBe(IncidentStatus.CLOSED);
     });
   });
 

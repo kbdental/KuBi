@@ -1,0 +1,97 @@
+KuBi Developer Build Pack v1.0
+1. Architecture
+Recommended baseline: modular monolith with strong domain boundaries, API-driven frontend, relational database, background-job processor, object storage and reusable platform engines.
+UI → API/BFF → Domain Services → Platform Engines → Database
+Platform Engines: Trigger, Workflow, Dependency/Gate, Notification, Exception, Escalation, KPI, Audit
+2. ERD / Database Schema
+ORGANIZATION → CLINIC → LOCATION
+CLINIC → EMPLOYEE ↔ ROLE/PERMISSION
+PATIENT → APPOINTMENT → VISIT → PATIENT_PROCEDURE → CONSENT / CLINICAL_DOCUMENT / FOLLOWUP / IMPLANT_USAGE
+VISIT → LAB_CASE
+CLINIC → ASSET → MAINTENANCE_PLAN / BREAKDOWN
+CLINIC → STOCK_LOCATION → STOCK_BATCH → STOCK_TRANSACTION
+INCIDENT → CAPA
+ACTIVITY_DEFINITION → ACTIVITY_INSTANCE → EVIDENCE / EXCEPTION → ESCALATION_EVENT
+AUTOMATION_RULE → AUTOMATION_EXECUTION
+KPI_DEFINITION → KPI_RESULT
+Principal tables: organizations, clinics, locations, users, employees, roles, permissions, employee_roles, role_permissions, patients, appointments, visits, procedures, patient_procedures, consents, clinical_documents, activity_definitions, activity_instances, checklist_definitions/items/responses, followups, communications, lab_cases, lab_qc, items, stock_batches, stock_transactions, purchase_requests/orders/goods_receipts, implant systems/SKUs/stock/usage, assets/maintenance/breakdowns, sterilization batches/cycles, attendance/leave/competencies/training/conduct, complaints/incidents/CAPAs/audits, automation_rules, exceptions, escalation policies/events, KPI definitions/results, audit_logs.
+3. API Endpoint Catalogue
+/api/v1/auth/login|logout|refresh|me
+/employees, /roles, /permissions
+/patients, /patients/{id}/timeline|readiness|followups|lab-cases
+/appointments + confirm|arrive|seat|complete|cancel|no-show
+/activities, /activities/my-day + start|complete|verify|fail-verification|not-applicable
+/patient-procedures/{id}/readiness|evaluate-readiness|start|complete|override-readiness
+/consents
+/followups + complete|no-response|escalate
+/lab-cases + dispatch|receive|qc|deliver
+/inventory/items|stock|transactions|alerts
+/purchase-requests + approve|reject
+/implants/stock|readiness|usage|traceability
+/assets + functional-check; /maintenance/tasks; /breakdowns
+/sterilization/batches + ultrasonic|pack|autoclave|verify|release
+/complaints, /incidents, /capas + effectiveness-check
+/exceptions + acknowledge|resolve|verify
+/dashboard/my-day|manager|owner|clinical|reception
+4. Exact Enums & State Tables
+ActivityStatus = NOT_DUE|DUE|IN_PROGRESS|COMPLETED|VERIFIED|FAILED_VERIFICATION|OVERDUE|EXCEPTION|NOT_APPLICABLE|CANCELLED
+Priority = ROUTINE|IMPORTANT|CRITICAL|PATIENT_SAFETY
+TriggerType = TIME|EVENT|STATUS_CHANGE|THRESHOLD|DEADLINE|DEPENDENCY|MANUAL
+AssetStatus = OPERATIONAL|RESTRICTED|OUT_OF_SERVICE|UNDER_REPAIR|RETIRED
+ExceptionStatus = OPEN|ACKNOWLEDGED|ACTION_IN_PROGRESS|RESOLVED|VERIFIED|CLOSED
+CompetencyLevel = NOT_TRAINED|TRAINED|SUPERVISED|INDEPENDENT|TRAINER
+5. JSON Rule Format
+{
+  "rule_code": "SURGERY_FOLLOWUP_001",
+  "version": 1,
+  "enabled": true,
+  "trigger": {"type":"STATUS_CHANGE","entity":"patient_procedure","event":"updated"},
+  "conditions":{"all":[
+    {"field":"procedure.category","operator":"IN","value":["SURGERY","IMPLANT_SURGERY"]},
+    {"field":"status","operator":"EQ","value":"COMPLETED"}
+  ]},
+  "actions":[{"type":"CREATE_ACTIVITY","activity_code":"SURG_FOLLOWUP_DAY1",
+    "due_offset":{"value":1,"unit":"DAY"},
+    "assign_to":{"type":"ROLE","role":"RECEPTION_EXECUTIVE"}}]
+}
+6. Notification & Escalation
+7. Wireframe Specifications
+Today: summary cards (Due Now/Overdue/Alerts), prioritized task cards, Patients Today, Later, verification queue.
+Patient 360: medical alert banner; today's doctor/procedure/chair; readiness checklist with exact missing requirement; tabs for clinical, consent, lab, follow-up, communication.
+Manager Command Centre: patients, staff, chair readiness, opening/clinical/sterile/lab/inventory scores, critical exceptions, attention queue, patient flow.
+Exception Centre: severity tabs, filters, cards showing failure, context, owner, age, SLA and next action.
+Owner MIS: clinic health score, eight domains, trends, critical exceptions, repeat failures, root causes, CAPA status.
+8. Jira-Ready Backlog
+9. Definition of Done
+Business rule, authorization, validation, state transitions, audit logging, error handling, automated tests, responsive behavior, acceptance criteria, security checks and documentation must all be complete.
+10. Build Order
+Foundation → Core Activity/Workflow Engines → Patient/Appointment → Clinical Readiness/Consent/Follow-up → Exceptions/Notifications/Escalations → Sterilization/Lab/Inventory/Implant/Equipment → People/Quality → KPI/Dashboards.
+
+[TABLE 1]
+Event | Initial | L1 | L2 | L3
+Routine overdue | Doer | Checker | Functional Owner | —
+Important overdue | Doer | Checker | Manager | Clinic Head
+Critical failure | Doer + Checker | Manager | Clinic Head | Director
+Patient safety | Qualified clinical owner | Clinical Director | Clinic Head | Director
+Lab overdue | Lab Coordinator | Lead | Manager | Clinic Head
+Implant shortage | Coordinator | Treating Doctor | Clinical Head | Clinic Head
+Equipment breakdown | Equipment Owner | Manager | Clinic Head | Director if critical
+Complaint SLA | Complaint Owner | Manager | Clinic Head | Director
+CAPA overdue | CAPA Owner | Quality/Manager | Clinic Head | Director
+
+[TABLE 2]
+Epic | Feature | Representative User Story | Acceptance Criteria
+E01 Identity & Access | RBAC | As Admin, assign multiple clinic-specific roles. | Multiple roles; effective dates; permission enforcement; audit log.
+E02 Activity Engine | My Day | As staff, see automatically generated required work. | Due/priority visible; role/location respected; overdue automatic; timestamped completion.
+E03 Patient & Appointment | Confirmation | As Reception, see unresolved confirmations. | Filterable; contact log; retry; manager visibility.
+E04 Clinical Readiness | Safety Gates | As Doctor, see readiness before treatment. | Requirements visible; server calculation; block configured; audited override.
+E05 Follow-up | Protocol generation | As Reception, receive automatic post-op follow-ups. | Correct due date; Today screen; red flags route clinically.
+E06 Lab | QC/readiness | As Reception, know lab readiness before delivery. | Received/QC status; overdue; patient-ready only after pass.
+E07 Sterilization | Batch traceability | As Assistant, record sterilization stages. | Batch/operator/cycle; failed cycle blocked; closing pending visible.
+E08 Inventory | Reorder | As Inventory, receive low-stock action. | Threshold configurable; expired excluded; optional PR.
+E09 Implant | Readiness/traceability | As Clinician, check implant availability. | Requirements compared; shortages shown; usage decrements; lot linked.
+E10 Equipment | Breakdown/PM | As Manager, remove failed assets from availability. | Failure state; ticket; notification; verified return.
+E11 People | Competency Gate | As Manager, restrict independent work by competency. | Minimum level; invalid assignment blocked; supervised option.
+E12 Quality | CAPA | As Clinic Head, convert failures into improvement. | Root cause; owner/due; effectiveness; reopen ineffective.
+E13 Exceptions | Exception Centre | As Manager, see all intervention needs. | Cross-module; filters; age/SLA/escalation/source.
+E14 Dashboards | Owner MIS | As Owner, see clinic health and trends. | Eight domains; target/trend; drill-down; reconciliation.

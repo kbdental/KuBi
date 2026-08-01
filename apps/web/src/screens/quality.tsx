@@ -329,9 +329,11 @@ function closeBlockedBecause(inc: Incident): string {
   if (!inc.actions.some((a) => a.type === 'PREVENTIVE')) {
     return 'Closing needs a preventive action. Correcting this one instance does not stop the next.';
   }
-  const n = inc.actions.filter((a) => a.status !== 'VERIFIED').length;
+  const n = inc.actions.filter((a) => a.status !== 'EFFECTIVE' && a.status !== 'CLOSED').length;
   if (n > 0) {
-    return `Closing needs every action checked by someone else — ${n} still ${n === 1 ? 'is' : 'are'} not.`;
+    // Not "checked" — proven. Carried out and worked are different claims, and
+    // closing on the first one is how a clinic fixes the same thing for ever.
+    return `Closing needs every action proven to have worked — ${n} still ${n === 1 ? 'has' : 'have'} not been.`;
   }
   return '';
 }
@@ -351,23 +353,40 @@ function ActionRow({
         <p>{action.description}</p>
         <p className="row-note">
           {action.responsibleName}
-          {action.status === 'VERIFIED' && action.verifiedBy && ` · checked by ${action.verifiedBy}`}
+          {action.status === 'EFFECTIVE' && action.verifiedBy && ` · checked by ${action.verifiedBy}`}
+          {action.status === 'EFFECTIVENESS_PENDING' && ' · waiting to see if it worked'}
+          {/* A CAPA on its third attempt is a different conversation from one
+              on its first, so the count is said rather than hidden. */}
+          {action.ineffectiveCount > 0
+            && ` · didn’t work ${action.ineffectiveCount === 1 ? 'once' : `${action.ineffectiveCount} times`} before`}
         </p>
       </div>
-      {action.status === 'VERIFIED' ? (
-        <span className="pill pill-routine">Checked</span>
-      ) : action.status === 'COMPLETED' ? (
-        <button
-          type="button"
-          onClick={() => void onAct(() => api.verifyCapaAction(action.id))}
-        >
-          Check it
-        </button>
+      {action.status === 'EFFECTIVE' || action.status === 'CLOSED' ? (
+        <span className="pill pill-routine">Worked</span>
+      ) : action.status === 'EFFECTIVENESS_PENDING' ? (
+        // Two answers, not one. A check that can only be answered yes is a
+        // formality, and the loop never actually turns.
+        <div className="eff">
+          <button
+            type="button"
+            className="btn btn-quiet"
+            onClick={() => void onAct(() => api.checkCapaEffectiveness(action.id, true))}
+          >
+            It worked
+          </button>
+          <button
+            type="button"
+            className="btn btn-quiet"
+            onClick={() => void onAct(() => api.checkCapaEffectiveness(action.id, false))}
+          >
+            It didn’t
+          </button>
+        </div>
       ) : (
         <button
           type="button"
           className="btn btn-quiet"
-          onClick={() => void onAct(() => api.completeCapaAction(action.id))}
+          onClick={() => void onAct(() => api.implementCapaAction(action.id))}
         >
           Done
         </button>

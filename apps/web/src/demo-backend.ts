@@ -103,13 +103,16 @@ interface Attention {
 interface CapaAction {
   id: string;
   type: 'CORRECTIVE' | 'PREVENTIVE';
-  status: 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'VERIFIED';
+  status: 'OPEN' | 'ACTION_IN_PROGRESS' | 'IMPLEMENTED' | 'EFFECTIVENESS_PENDING'
+    | 'EFFECTIVE' | 'CLOSED';
   description: string;
   responsible: string;
   responsibleName: string;
   dueInDays: number;
   verifiedBy: string | null;
   verificationNote: string | null;
+  /** How many times this fix was found ineffective and sent back round. */
+  ineffectiveCount: number;
 }
 
 /**
@@ -408,16 +411,19 @@ function freshState() {
       rootCause: 'The confirmation list is worked from memory; nobody owns it before 9:45.',
       actions: [
         {
-          id: 'act-1', type: 'CORRECTIVE', status: 'VERIFIED',
+          id: 'act-1', type: 'CORRECTIVE', status: 'EFFECTIVE',
           description: 'Call the three patients and confirm',
           responsible: 'e-kavita', responsibleName: 'Kavita', dueInDays: -2,
-          verifiedBy: 'Rahul', verificationNote: null,
+          verifiedBy: 'Rahul', verificationNote: null, ineffectiveCount: 0,
         },
         {
-          id: 'act-2', type: 'PREVENTIVE', status: 'COMPLETED',
+          // Deliberately on its second attempt: the first fix was a reminder
+          // in the huddle, it did not work, and the loop sent it back. A demo
+          // where every fix works first time teaches the wrong thing.
+          id: 'act-2', type: 'PREVENTIVE', status: 'EFFECTIVENESS_PENDING',
           description: 'Confirmation becomes a named 09:30 task owned by reception, with its own deadline',
           responsible: 'e-rahul', responsibleName: 'Rahul', dueInDays: 1,
-          verifiedBy: null, verificationNote: null,
+          verifiedBy: null, verificationNote: null, ineffectiveCount: 1,
         },
       ],
     },
@@ -667,12 +673,14 @@ function nextStepFor(inc: Incident): string | null {
         ? 'Add a corrective action'
         : 'Add a preventive action — what stops the next one';
     case 'ACTIONS_PLANNED': {
-      const n = inc.actions.filter((a) => a.status === 'OPEN' || a.status === 'IN_PROGRESS').length;
+      const n = inc.actions.filter((a) => a.status === 'OPEN' || a.status === 'ACTION_IN_PROGRESS').length;
       return n > 0 ? `${n} action${n === 1 ? '' : 's'} still to do` : null;
     }
     case 'VERIFYING': {
-      const n = inc.actions.filter((a) => a.status === 'COMPLETED').length;
-      return n > 0 ? `${n} action${n === 1 ? '' : 's'} waiting to be checked` : null;
+      const n = inc.actions.filter((a) => a.status === 'EFFECTIVENESS_PENDING').length;
+      return n > 0
+        ? `${n} action${n === 1 ? '' : 's'} waiting on an effectiveness check — did it actually work?`
+        : null;
     }
     default: return null;
   }
@@ -684,11 +692,11 @@ function incidentView(inc: Incident) {
     stage: STAGES.indexOf(inc.status),
     stageCount: STAGES.length,
     blockedBy: nextStepFor(inc),
-    openActions: inc.actions.filter((a) => a.status !== 'VERIFIED').length,
+    openActions: inc.actions.filter((a) => a.status !== 'EFFECTIVE' && a.status !== 'CLOSED').length,
     totalActions: inc.actions.length,
     canClose: inc.actions.length > 0
       && inc.actions.some((a) => a.type === 'PREVENTIVE')
-      && inc.actions.every((a) => a.status === 'VERIFIED'),
+      && inc.actions.every((a) => a.status === 'EFFECTIVE' || a.status === 'CLOSED'),
   };
 }
 
@@ -1171,7 +1179,7 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         responsible,
         responsibleName: PEOPLE.find((p) => p.employeeId === responsible)?.displayLabel ?? 'Rahul',
         dueInDays: Number(body.dueInDays ?? 7),
-        verifiedBy: null, verificationNote: null,
+        verifiedBy: null, verificationNote: null, ineffectiveCount: 0,
       });
       const hasC = inc.actions.some((a) => a.type === 'CORRECTIVE');
       const hasP = inc.actions.some((a) => a.type === 'PREVENTIVE');
@@ -1188,9 +1196,11 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
       if (!inc.actions.some((a) => a.type === 'PREVENTIVE')) {
         return json({ error: 'No preventive action. Correcting this one instance does not stop the next.' }, 409);
       }
-      const unverified = inc.actions.filter((a) => a.status !== 'VERIFIED').length;
-      if (unverified > 0) {
-        return json({ error: `${unverified} action${unverified === 1 ? '' : 's'} still unverified.` }, 409);
+      const unproven = inc.actions.filter((a) => a.status !== 'EFFECTIVE' && a.status !== 'CLOSED').length;
+      if (unproven > 0) {
+        return json({
+          error: `${unproven} action${unproven === 1 ? '' : 's'} not yet proven effective.`,
+        }, 409);
       }
       inc.status = 'CLOSED';
       return json(incidentView(inc));
@@ -1203,23 +1213,34 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     const action = inc?.actions.find((a) => a.id === actMatch[1]);
     if (!inc || !action) return json({ error: 'Not found' }, 404);
 
-    if (actMatch[2] === 'complete') {
-      action.status = 'COMPLETED';
-    } else if (actMatch[2] === 'verify') {
-      if (action.status !== 'COMPLETED') {
-        return json({ error: 'An action must be completed before it can be verified.' }, 409);
+    if (actMatch[2] === 'implement') {
+      // Carried out is not the same as "it worked".
+      action.status = 'EFFECTIVENESS_PENDING';
+    } else if (actMatch[2] === 'effectiveness') {
+      if (action.status !== 'EFFECTIVENESS_PENDING') {
+        return json({ error: 'An action must be implemented before its effectiveness can be checked.' }, 409);
       }
       // Same reason a doer cannot confirm their own activity.
       if (action.responsible === me.employeeId) {
         return json({
-          error: 'A CAPA action must be verified by someone other than the person responsible for it.',
+          error: 'A CAPA action must be checked by someone other than the person responsible for it.',
         }, 409);
       }
-      action.status = 'VERIFIED';
+      if (body.effective === false) {
+        // FRS §6: "ineffective loops back."
+        action.status = 'ACTION_IN_PROGRESS';
+        action.ineffectiveCount += 1;
+        action.verificationNote = (body.note as string) || null;
+        if (inc.status === 'VERIFYING') inc.status = 'ACTIONS_PLANNED';
+        return json(incidentView(inc));
+      }
+      action.status = 'EFFECTIVE';
       action.verifiedBy = me.displayLabel;
       action.verificationNote = (body.note as string) || null;
     }
-    const allDone = inc.actions.every((a) => a.status === 'COMPLETED' || a.status === 'VERIFIED');
+    const allDone = inc.actions.every(
+      (a) => a.status === 'EFFECTIVENESS_PENDING' || a.status === 'EFFECTIVE' || a.status === 'CLOSED',
+    );
     if (allDone && inc.status === 'ACTIONS_PLANNED') inc.status = 'VERIFYING';
     return json(incidentView(inc));
   }

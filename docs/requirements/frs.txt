@@ -1,0 +1,104 @@
+KuBi Functional Requirement Specification (FRS) v1.0
+1. Purpose & Product Scope
+KuBi is a Clinic Operating System designed to reduce dependence on staff memory by converting clinic standards into triggered, assigned, evidenced, verified and escalated workflows.
+Operating loop: STANDARD → TRIGGER → ASSIGN → EXECUTE → EVIDENCE → VERIFY → PASS/FAIL → EXCEPTION → ESCALATION → CORRECTION → CAPA → KPI → IMPROVEMENT.
+Scope includes appointments, daily operations, clinical readiness, consent, follow-up, sterilization, lab, inventory, implant traceability, equipment, emergency readiness, attendance/leave, competency, conduct, complaints, incidents/CAPA, audits, exceptions, dashboards and audit trails.
+2. Design Principles
+Exception-based management; role-based experience; configuration before hard-coding; server-side safety and authorization; complete auditability; clinic/location scoping; patient-safety controls cannot disappear silently.
+3. Roles & Permissions
+4. Core Data Dictionary
+5. Core Enums
+ActivityStatus: NOT_DUE, DUE, IN_PROGRESS, COMPLETED, VERIFIED, FAILED_VERIFICATION, OVERDUE, EXCEPTION, NOT_APPLICABLE, CANCELLED
+Priority: ROUTINE, IMPORTANT, CRITICAL, PATIENT_SAFETY
+ReadinessStatus: PENDING, READY, PARTIAL, NOT_READY, OVERRIDDEN
+EvidenceType: SYSTEM, CONFIRMATION, VALUE, ATTACHMENT, VERIFICATION, SIGNATURE
+NotificationPriority: P1, P2, P3, P4
+TriggerType: TIME, EVENT, STATUS_CHANGE, THRESHOLD, DEADLINE, DEPENDENCY, MANUAL
+6. Workflow & State Machines
+Activity: NOT_DUE → DUE → IN_PROGRESS → COMPLETED → VERIFIED
+Failure branches: DUE/IN_PROGRESS → OVERDUE → EXCEPTION; COMPLETED → FAILED_VERIFICATION → EXCEPTION
+Appointment: SCHEDULED → CONFIRMED → ARRIVED → WAITING → SEATED → IN_TREATMENT → COMPLETED; alternatives CANCELLED/RESCHEDULED/NO_SHOW
+Exception: OPEN → ACKNOWLEDGED → ACTION_IN_PROGRESS → RESOLVED → VERIFIED → CLOSED
+CAPA: OPEN → ACTION_IN_PROGRESS → IMPLEMENTED → EFFECTIVENESS_PENDING → EFFECTIVE → CLOSED; ineffective loops back.
+7. Business Rules
+Critical evidence requirements are enforced server-side. Independent verification cannot normally be performed by the doer. Patient-safety gates require authorized override with reason and audit trail. Failed sterilization cycles cannot release packs. Out-of-service assets cannot be scheduled as available. Expired stock is excluded from usable stock. Implant usage retains patient-to-lot traceability. Restricted activities enforce competency level. CAPA effectiveness is verified before closure where configured.
+8. Automation Rules
+9. Screen Requirements
+Global navigation: Home, Today, Patients, Operations, Quality, Team, Exceptions, Dashboards, Admin.
+Today: Due Now, Patients Today, Upcoming, Overdue, Alerts, Verification Required.
+Patient 360: Overview, appointments, medical alerts, readiness, procedures, consents, documents, lab, follow-up, communication, complaints, implant traceability.
+Operations: Opening, Closing, Housekeeping, Sterilization, Lab, Inventory, Implants, Equipment, Emergency Readiness.
+Exception Centre: cross-module exceptions filtered by severity/module/owner/age/status/escalation.
+Manager Command Centre: patient flow, staff, chairs, opening, sterilization, lab, inventory, equipment, follow-ups and exceptions.
+Owner MIS: Patient Experience, Clinical Compliance, Infection Control, Lab, Inventory, Equipment, Team, Quality with targets, trends, critical exceptions and root causes.
+10. Acceptance Criteria
+Opening tasks auto-generate at configured time. Failed critical equipment restricts resource and creates breakdown/exception. Overdue work changes state automatically. Missing mandatory consent makes procedure NOT_READY. Surgery completion creates follow-up. Red-flag follow-up alerts qualified clinical role. Lab overdue creates exception; received cases generate QC. Reorder threshold creates alert/PR. Expired stock excluded. Implant usage records patient/site/SKU/lot. Failed autoclave cycle cannot release packs. PM due generates task. Competency gate blocks invalid independent assignment. Complaint SLA escalates. CAPA closure follows effectiveness verification. Dashboard KPIs drill down and reconcile.
+11. MVP & Release Sequence
+Phase 1: identity/RBAC, clinic/location, patient/appointment, activity engine, Today, opening/closing, readiness, consent, follow-up, exceptions, notifications/escalations, basic manager dashboard, audit log.
+Phase 2: sterilization, lab, inventory, implant inventory, equipment/PM, emergency readiness.
+Phase 3: training/competency, complaints, incidents/CAPA, audits, advanced MIS.
+12. Definition of Success
+Routine work is system-generated; critical work has a single accountable owner; staff work primarily from role-specific Today screens; safety controls cannot disappear unnoticed; exceptions surface before disrupting care; follow-ups are system-generated; recurring failures become root-cause/CAPA learning; owner MIS shows clinic health rather than task clutter.
+
+[TABLE 1]
+Role | Primary scope
+Owner/Director | Strategic MIS, governance, critical escalation
+Clinic Head | Clinic-wide operational accountability
+Clinical Director | Clinical governance and safety
+Treating/Associate Doctor | Clinical records, procedures, consent, clinical follow-up
+Clinic Manager | Operations, staff, exceptions, approvals
+Reception | Appointments, confirmations, communication, follow-up coordination
+Senior/Dental Assistant | Chair readiness, sterilization, clinical support
+Inventory Coordinator | Stock, procurement, implant inventory
+Lab Coordinator | Lab case tracking and coordination
+Quality/Compliance | Complaints, incidents, CAPA, audits
+Housekeeping | Assigned cleanliness and facility controls
+System Administrator | Configuration and technical administration; no automatic clinical-edit privilege
+
+[TABLE 2]
+Entity | Key fields / purpose
+Organization | organization_id, name, status
+Clinic | clinic_id, organization_id, name, timezone, opening/closing time
+Location | location_id, parent_location_id, type, clinic_id
+Employee | employee_id, code, name, clinic, manager, shift, status
+Role/Permission | role_id, permission_id, resource/action scope
+ActivityDefinition | code, process, standard, trigger, due rule, doer/checker/owner, priority, evidence, dependency, failure, escalation, KPI, CAPA policy
+ActivityInstance | definition, context links, assignee, due/start/complete/verify timestamps, status, evidence, exception
+Patient | patient_id, UHID, demographics, alerts
+Appointment | patient, doctor, chair, time, confirmation/status
+Visit | appointment, patient, doctor, chair, timestamps
+Procedure/PatientProcedure | procedure protocol and patient-specific execution/readiness
+Consent | patient, visit, procedure, template/version, signatures, timestamp
+Followup | protocol/source procedure, due, assignee, outcome, escalation
+LabCase | patient, work type, vendor, dispatch/due/receipt, QC, readiness, delivery
+Item/StockBatch/Transaction | stock master, batch/expiry/location, controlled movements
+ImplantSKU/Stock/Usage | system/platform/dimensions/components, batch/expiry, patient traceability
+Asset/Maintenance/Breakdown | asset status, PM/calibration, service/breakdown history
+SterilizationBatch | operator, stages, autoclave cycle, result, verification/release
+Complaint/Incident/CAPA | quality workflow, root cause, actions, effectiveness
+Competency/EmployeeCompetency | required skill, level, assessment, validity
+Exception/Escalation | cross-module failure, owner, SLA, escalation level
+KPIDefinition/KPIResult | formula, target/thresholds, frequency, result
+AuditLog | actor, action, entity, old/new value, reason, timestamp
+
+[TABLE 3]
+Rule | Trigger | Action
+A01 Attendance | Time/deadline | Late/absence detection and alert
+A02 Opening | Time | Generate opening controls
+A03 Appointment confirmation | Appointment/day | Generate confirmation workflow
+A06 Surgery scheduled | Event | Generate pre-op readiness
+A07 Surgery completed | Status change | Generate protocol follow-ups
+A08 Consent missing | Dependency | Mark NOT_READY/block configured procedure
+A10 Lab overdue | Deadline | Create LAB_DELAY exception
+A11 Lab received | Status change | Generate QC
+A13 Stock threshold | Threshold | Alert/create PR
+A15 Implant surgery upcoming | Event/time | Run implant readiness
+A16 PM due | Time | Generate maintenance task
+A18 Equipment failed | Event | Restrict asset/create breakdown
+A19 Autoclave failed | Event | Prevent release/create exception
+A22 Follow-up red flag | Event | Clinical alert
+A23 Complaint SLA | Deadline | Escalate
+A25 CAPA overdue | Deadline | Escalate
+A27 Competency below minimum | Dependency | Block independent assignment
+A29 Task overdue | Deadline | Change status/escalate
+A30 Repeat failure | Threshold | Create/recommend incident/CAPA

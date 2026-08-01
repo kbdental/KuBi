@@ -1018,3 +1018,8 @@ label.field-label {
   font-size: 0.85rem;
   padding: 6px 0;
 }
+
+/* "Did it work?" needs two answers, side by side. A check that can only be
+   answered yes is a formality, and the loop never actually turns. */
+.eff { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
+.eff .btn { white-space: nowrap; }

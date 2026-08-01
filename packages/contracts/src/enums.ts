@@ -779,14 +779,30 @@ export const CapaActionType = {
 } as const;
 export type CapaActionType = (typeof CapaActionType)[keyof typeof CapaActionType];
 
-/** Mirrors the activity lifecycle: doing it and proving it are separate. */
+/**
+ * FRS §6, verbatim: OPEN → ACTION_IN_PROGRESS → IMPLEMENTED →
+ * EFFECTIVENESS_PENDING → EFFECTIVE → CLOSED, "ineffective loops back".
+ *
+ * That last clause is the one that matters, and it is why this is six states
+ * rather than the four an ordinary task needs. A CAPA that was carried out is
+ * only IMPLEMENTED — whether it actually worked is a different question, asked
+ * later, on a configured date (Matrix v2.0 INC-006). If the answer is no, the
+ * CAPA returns to ACTION_IN_PROGRESS rather than closing.
+ *
+ * Without the loop back, "we fixed it" and "it stopped happening" are the same
+ * record, and a clinic can close the same failure for ever while believing it
+ * has learned something.
+ */
 export const CapaActionStatus = {
   OPEN: 'OPEN',
-  IN_PROGRESS: 'IN_PROGRESS',
-  /** The owner says it is done. This is not the same as verified. */
-  COMPLETED: 'COMPLETED',
-  /** Someone other than the owner confirmed it. */
-  VERIFIED: 'VERIFIED',
+  ACTION_IN_PROGRESS: 'ACTION_IN_PROGRESS',
+  /** Carried out. Emphatically not the same as "it worked". */
+  IMPLEMENTED: 'IMPLEMENTED',
+  /** Awaiting the effectiveness check, which falls due on its own date. */
+  EFFECTIVENESS_PENDING: 'EFFECTIVENESS_PENDING',
+  /** Checked, and the failure has not recurred. Only now may the incident close. */
+  EFFECTIVE: 'EFFECTIVE',
+  CLOSED: 'CLOSED',
 } as const;
 export type CapaActionStatus = (typeof CapaActionStatus)[keyof typeof CapaActionStatus];
 

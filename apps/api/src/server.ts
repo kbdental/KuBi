@@ -35,7 +35,7 @@ import { buildHandover } from './platform/workflow/handover.service.js';
 import { buildOverview } from './platform/insight/overview.service.js';
 import {
   raiseIncident, containIncident, investigateIncident, addAction,
-  completeAction, verifyAction, closeIncident, listIncidents, CapaRuleError,
+  implementAction, checkEffectiveness, closeIncident, listIncidents, CapaRuleError,
 } from './platform/quality/capa.service.js';
 import { ActivityStatus, ExceptionStatus } from '@kubi/contracts';
 
@@ -837,22 +837,27 @@ export async function buildServer(): Promise<FastifyInstance> {
     return out;
   });
 
-  app.post('/api/v1/capa-actions/:id/complete', async (req) => {
+  app.post('/api/v1/capa-actions/:id/implement', async (req) => {
     const s = await requireSession(req);
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const out = await capaStep(() => withTenantContext(prisma, s.tenancy, (tx) =>
-      completeAction(tx, clock, id)));
-    await track(s, 'capa_complete_action');
+      implementAction(tx, clock, id)));
+    await track(s, 'capa_implement_action');
     return out;
   });
 
-  app.post('/api/v1/capa-actions/:id/verify', async (req) => {
+  // FRS §6: the effectiveness check can send an action BACK, and that return
+  // path is the point. `effective: false` is not an error condition.
+  app.post('/api/v1/capa-actions/:id/effectiveness', async (req) => {
     const s = await requireSession(req);
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    const body = z.object({ note: z.string().max(500).optional() }).parse(req.body ?? {});
+    const body = z.object({
+      effective: z.boolean(),
+      note: z.string().max(500).optional(),
+    }).parse(req.body);
     const out = await capaStep(() => withTenantContext(prisma, s.tenancy, (tx) =>
-      verifyAction(tx, clock, id, s.employeeId!, body.note)));
-    await track(s, 'capa_verify_action');
+      checkEffectiveness(tx, clock, id, s.employeeId!, body.effective, body.note)));
+    await track(s, 'capa_effectiveness_check');
     return out;
   });
 
