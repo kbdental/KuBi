@@ -137,6 +137,56 @@ interface Incident {
   actions: CapaAction[];
 }
 
+
+/** One requirement on a procedure protocol, as the readiness engine reports it. */
+interface Requirement {
+  kind: string;
+  label: string;
+  enforcement: 'ADVISORY' | 'BLOCK_OVERRIDABLE' | 'BLOCK_HARD';
+  result: 'PASS' | 'FAIL' | 'UNKNOWN' | 'NOT_CONFIGURED' | 'NOT_APPLICABLE';
+  detail: string;
+}
+
+/**
+ * A procedure booked for a patient, with its readiness.
+ *
+ * The point of this screen in the requirement is that the DOCTOR sees the
+ * exact missing requirement before the patient reaches the chair, rather than
+ * discovering it when they ask for the component. So each requirement carries
+ * its own result and its own reason, and the screen never summarises them
+ * into a single word.
+ */
+interface PatientProcedure {
+  id: string;
+  patientLabel: string;
+  patientUhid: string;
+  procedureName: string;
+  category: string;
+  whenLabel: string;
+  status: 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED';
+  requirements: Requirement[];
+  overriddenBy: string | null;
+  overrideReason: string | null;
+  /** Medical alerts ride at the top of the record, never inside a tab. */
+  alerts: string[];
+}
+
+/** A post-operative follow-up call, with the structured response. */
+interface DemoFollowup {
+  id: string;
+  patientLabel: string;
+  patientUhid: string;
+  procedureName: string;
+  dueLabel: string;
+  overdue: boolean;
+  outcome: 'PENDING' | 'CONTACTED_WELL' | 'RED_FLAG' | 'NO_RESPONSE';
+  pain: string | null;
+  swelling: string | null;
+  bleeding: string | null;
+  medication: string | null;
+  redFlagReason: string | null;
+}
+
 interface Visit {
   id: string;
   patientLabel: string;
@@ -429,8 +479,99 @@ function freshState() {
     },
   ];
 
+
+  /**
+   * Three procedures at three different readiness states, because a screen
+   * that only ever shows READY teaches nothing about what it is for.
+   *
+   * The implant case is the requirement's own worked example: the component is
+   * unavailable, and KuBi says so before the patient reaches the chair rather
+   * than when the doctor asks for it.
+   */
+  const patientProcedures: PatientProcedure[] = [
+    {
+      id: 'pp-1', patientLabel: 'SYNTHETIC Arjun P.', patientUhid: 'SYN-1002',
+      procedureName: 'Root canal treatment', category: 'ENDODONTIC',
+      whenLabel: 'Today, 10:30', status: 'PLANNED',
+      alerts: ['Penicillin allergy'],
+      overriddenBy: null, overrideReason: null,
+      requirements: [
+        { kind: 'MEDICAL_HISTORY', label: 'Medical history current', enforcement: 'BLOCK_HARD',
+          result: 'PASS', detail: 'Updated 12 days ago.' },
+        { kind: 'RADIOGRAPH', label: 'Relevant radiograph', enforcement: 'BLOCK_HARD',
+          result: 'PASS', detail: 'Periapical taken at consultation.' },
+        { kind: 'CONSENT', label: 'Signed consent', enforcement: 'BLOCK_HARD',
+          result: 'FAIL', detail: 'No signed consent for this procedure.' },
+        { kind: 'TREATMENT_PLAN', label: 'Treatment plan documented', enforcement: 'BLOCK_OVERRIDABLE',
+          result: 'PASS', detail: 'Plan accepted 12 days ago.' },
+      ],
+    },
+    {
+      id: 'pp-2', patientLabel: 'SYNTHETIC Priyanka N.', patientUhid: 'SYN-1005',
+      procedureName: 'Implant surgery', category: 'IMPLANT_SURGERY',
+      whenLabel: 'Today, 12:30', status: 'PLANNED',
+      alerts: ['Type 2 diabetes', 'On anticoagulant'],
+      overriddenBy: null, overrideReason: null,
+      requirements: [
+        { kind: 'CONSENT', label: 'Signed consent', enforcement: 'BLOCK_HARD',
+          result: 'PASS', detail: 'Signed IMPL-SURG v4.' },
+        { kind: 'MEDICAL_HISTORY', label: 'Medical history current', enforcement: 'BLOCK_HARD',
+          result: 'PASS', detail: 'Updated this morning.' },
+        { kind: 'PRE_OP_RECORDS', label: 'Pre-op scan', enforcement: 'BLOCK_HARD',
+          result: 'PASS', detail: 'CBCT on file.' },
+        { kind: 'IMPLANT_AVAILABLE', label: 'Implant components in stock', enforcement: 'BLOCK_HARD',
+          result: 'FAIL', detail: 'Healing abutment 4.5×5 not in stock.' },
+        { kind: 'STERILE_KIT', label: 'Surgical kit sterile', enforcement: 'BLOCK_HARD',
+          result: 'PASS', detail: 'Batch STER-0912 released 08:40.' },
+        { kind: 'EMERGENCY_READY', label: 'Emergency readiness', enforcement: 'BLOCK_HARD',
+          result: 'NOT_CONFIGURED', detail: 'Emergency readiness cannot be confirmed yet — no evaluator.' },
+      ],
+    },
+    {
+      id: 'pp-3', patientLabel: 'SYNTHETIC Fatima S.', patientUhid: 'SYN-1003',
+      procedureName: 'Scaling and polishing', category: 'PREVENTIVE',
+      whenLabel: 'Today, 10:30', status: 'PLANNED',
+      alerts: [],
+      overriddenBy: null, overrideReason: null,
+      requirements: [
+        { kind: 'MEDICAL_HISTORY', label: 'Medical history current', enforcement: 'BLOCK_HARD',
+          result: 'PASS', detail: 'Updated 3 months ago.' },
+        { kind: 'CONSENT', label: 'Signed consent', enforcement: 'ADVISORY',
+          result: 'PASS', detail: 'Signed GEN-TX v2.' },
+      ],
+    },
+  ];
+
+  /**
+   * Follow-ups, including one red flag already raised.
+   *
+   * The red flag was decided by the rule, not by whoever made the call — which
+   * is the whole design point, so the demo shows the symptoms alongside it.
+   */
+  const followups: DemoFollowup[] = [
+    {
+      id: 'fu-1', patientLabel: 'SYNTHETIC Rakesh T.', patientUhid: 'SYN-0994',
+      procedureName: 'Implant surgery', dueLabel: 'Yesterday', overdue: true,
+      outcome: 'RED_FLAG', pain: 'SEVERE', swelling: 'EXCESSIVE',
+      bleeding: 'NO', medication: 'TAKING',
+      redFlagReason: 'Severe pain with excessive swelling',
+    },
+    {
+      id: 'fu-2', patientLabel: 'SYNTHETIC Sunita M.', patientUhid: 'SYN-0987',
+      procedureName: 'Surgical extraction', dueLabel: 'Today', overdue: false,
+      outcome: 'PENDING', pain: null, swelling: null, bleeding: null,
+      medication: null, redFlagReason: null,
+    },
+    {
+      id: 'fu-3', patientLabel: 'SYNTHETIC Vikram D.', patientUhid: 'SYN-0981',
+      procedureName: 'Implant surgery', dueLabel: 'Today', overdue: false,
+      outcome: 'CONTACTED_WELL', pain: 'MILD', swelling: 'EXPECTED',
+      bleeding: 'NO', medication: 'TAKING', redFlagReason: null,
+    },
+  ];
+
   return {
-    tasks, visits, attention, incidents,
+    tasks, visits, attention, incidents, patientProcedures, followups,
     nextIncidentNumber: 8,
     signedIn: null as Person | null,
     /**
@@ -697,6 +838,58 @@ function incidentView(inc: Incident) {
     canClose: inc.actions.length > 0
       && inc.actions.some((a) => a.type === 'PREVENTIVE')
       && inc.actions.every((a) => a.status === 'EFFECTIVE' || a.status === 'CLOSED'),
+  };
+}
+
+/** The same red-flag rule the server holds. A demo that disagreed would lie. */
+function redFlagReason(r: { pain: string | null; swelling: string | null;
+  bleeding: string | null; medication: string | null }): string | null {
+  if (r.pain === 'SEVERE' && r.swelling === 'EXCESSIVE') return 'Severe pain with excessive swelling';
+  if (r.bleeding === 'YES') return 'Bleeding reported';
+  if (r.swelling === 'EXCESSIVE') return 'Excessive swelling';
+  if (r.pain === 'SEVERE') return 'Severe pain';
+  if (r.medication === 'PROBLEM') return 'Problem with medication';
+  return null;
+}
+
+/**
+ * The enforcement matrix, in the demo, matching packages/contracts exactly.
+ *
+ * In EVERY mode, UNKNOWN and NOT_CONFIGURED behave at least as strictly as
+ * FAIL. That is AP-1, and a demo that quietly let an unevaluable requirement
+ * pass would teach precisely the wrong thing about the product.
+ */
+const MATRIX: Record<string, Record<string, string>> = {
+  ADVISORY: { PASS: 'PROCEED', NOT_APPLICABLE: 'PROCEED', FAIL: 'WARN', UNKNOWN: 'WARN', NOT_CONFIGURED: 'WARN' },
+  BLOCK_OVERRIDABLE: { PASS: 'PROCEED', NOT_APPLICABLE: 'PROCEED', FAIL: 'BLOCK_OVERRIDABLE', UNKNOWN: 'BLOCK_OVERRIDABLE', NOT_CONFIGURED: 'BLOCK_OVERRIDABLE' },
+  BLOCK_HARD: { PASS: 'PROCEED', NOT_APPLICABLE: 'PROCEED', FAIL: 'BLOCK_HARD', UNKNOWN: 'BLOCK_HARD', NOT_CONFIGURED: 'BLOCK_HARD' },
+};
+const DECISION_RANK: Record<string, number> = {
+  BLOCK_HARD: 0, BLOCK_OVERRIDABLE: 1, WARN: 2, PROCEED: 3,
+};
+
+function readinessView(pp: PatientProcedure) {
+  const requirements = pp.requirements.map((r) => ({
+    ...r, decision: MATRIX[r.enforcement]![r.result]!,
+  }));
+  const decision = requirements.reduce(
+    (worst, r) => (DECISION_RANK[r.decision]! < DECISION_RANK[worst]! ? r.decision : worst),
+    'PROCEED',
+  );
+  const blocking = requirements
+    .filter((r) => r.decision !== 'PROCEED')
+    .sort((a, b) => DECISION_RANK[a.decision]! - DECISION_RANK[b.decision]!);
+
+  const status = pp.overriddenBy ? 'OVERRIDDEN'
+    : decision === 'PROCEED' ? 'READY'
+    // "Could not be determined" is its own answer, never NOT_READY.
+    : requirements.some((r) => r.result === 'UNKNOWN' || r.result === 'NOT_CONFIGURED') ? 'PENDING'
+    : requirements.some((r) => r.result === 'PASS') ? 'PARTIAL' : 'NOT_READY';
+
+  return {
+    ...pp, requirements, decision, blocking, status,
+    overridable: decision === 'BLOCK_OVERRIDABLE',
+    metCount: requirements.filter((r) => r.result === 'PASS').length,
   };
 }
 
@@ -1243,6 +1436,85 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     );
     if (allDone && inc.status === 'ACTIONS_PLANNED') inc.status = 'VERIFYING';
     return json(incidentView(inc));
+  }
+
+  // ---- PATIENTS: readiness before the chair, and follow-ups after it ----
+
+  if (path === '/api/v1/patient-procedures' && method === 'GET') {
+    return json(db.patientProcedures.map(readinessView));
+  }
+
+  const ppMatch = /^\/api\/v1\/patient-procedures\/([^/]+)\/(\w+)$/.exec(path);
+  if (ppMatch) {
+    const pp = db.patientProcedures.find((p) => p.id === ppMatch[1]);
+    if (!pp) return json({ error: 'Not found' }, 404);
+    const view = readinessView(pp);
+
+    if (ppMatch[2] === 'start') {
+      if (view.decision === 'BLOCK_HARD') {
+        return json({
+          error: `${pp.procedureName} cannot start: ${view.blocking[0]?.detail ?? 'a mandatory requirement is not met'}`,
+        }, 409);
+      }
+      if (view.decision === 'BLOCK_OVERRIDABLE' && !pp.overriddenBy) {
+        return json({
+          error: `${pp.procedureName} is not ready: ${view.blocking[0]?.detail ?? 'a requirement is not met'}`,
+        }, 409);
+      }
+      pp.status = 'IN_PROGRESS';
+      return json(readinessView(pp));
+    }
+
+    if (ppMatch[2] === 'override') {
+      const reason = String(body.reason ?? '').trim();
+      // ADR-004: BLOCK_HARD has no override path. No permission exists to grant.
+      if (view.decision === 'BLOCK_HARD') {
+        return json({ error: 'This requirement cannot be overridden by anyone.' }, 409);
+      }
+      if (view.decision === 'PROCEED') {
+        return json({ error: 'Nothing to override — the procedure is ready.' }, 409);
+      }
+      if (!reason) return json({ error: 'An override must record why it was safe.' }, 409);
+      pp.overriddenBy = me.displayLabel;
+      pp.overrideReason = reason;
+      return json(readinessView(pp));
+    }
+  }
+
+  if (path === '/api/v1/followups' && method === 'GET') {
+    return json(db.followups);
+  }
+
+  const fuMatch = /^\/api\/v1\/followups\/([^/]+)\/respond$/.exec(path);
+  if (fuMatch) {
+    const fu = db.followups.find((f) => f.id === fuMatch[1]);
+    if (!fu) return json({ error: 'Not found' }, 404);
+    if (fu.outcome !== 'PENDING') {
+      return json({ error: 'That follow-up has already been recorded.' }, 409);
+    }
+    fu.pain = String(body.pain ?? 'NONE');
+    fu.swelling = String(body.swelling ?? 'EXPECTED');
+    fu.bleeding = String(body.bleeding ?? 'NO');
+    fu.medication = String(body.medication ?? 'TAKING');
+    // The ENGINE decides, not the person who made the call. Recording symptoms
+    // is within anyone's competence; judging them clinically is not.
+    const reason = redFlagReason(fu);
+    fu.redFlagReason = reason;
+    fu.outcome = reason ? 'RED_FLAG' : 'CONTACTED_WELL';
+    if (reason) {
+      raise({
+        code: 'FUP.CLINICAL_RISK.RED_FLAG',
+        severity: 'PATIENT_SAFETY',
+        headline: `Clinical review needed after surgery — ${reason.toLowerCase()}`,
+        detail: `${fu.patientLabel} · ${fu.procedureName}`,
+        owner: 'e-rahul',
+        // FUP-003's due rule is not an interval, it is "now".
+        dueAt: Date.now(),
+        instanceId: null,
+        needsAuthorisation: false,
+      });
+    }
+    return json(fu);
   }
 
   return json({ error: 'Not found' }, 404);

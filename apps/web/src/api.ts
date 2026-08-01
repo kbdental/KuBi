@@ -293,6 +293,49 @@ export interface Incident {
   actions: CapaAction[];
 }
 
+export interface Requirement {
+  kind: string;
+  label: string;
+  enforcement: 'ADVISORY' | 'BLOCK_OVERRIDABLE' | 'BLOCK_HARD';
+  result: 'PASS' | 'FAIL' | 'UNKNOWN' | 'NOT_CONFIGURED' | 'NOT_APPLICABLE';
+  decision: 'PROCEED' | 'WARN' | 'BLOCK_OVERRIDABLE' | 'BLOCK_HARD';
+  detail: string;
+}
+
+export interface PatientProcedure {
+  id: string;
+  patientLabel: string;
+  patientUhid: string;
+  procedureName: string;
+  category: string;
+  whenLabel: string;
+  status: 'READY' | 'PARTIAL' | 'NOT_READY' | 'PENDING' | 'OVERRIDDEN';
+  decision: 'PROCEED' | 'WARN' | 'BLOCK_OVERRIDABLE' | 'BLOCK_HARD';
+  requirements: Requirement[];
+  /** Not-PASS requirements, worst first. What the doctor actually reads. */
+  blocking: Requirement[];
+  overridable: boolean;
+  overriddenBy: string | null;
+  overrideReason: string | null;
+  alerts: string[];
+  metCount: number;
+}
+
+export interface Followup {
+  id: string;
+  patientLabel: string;
+  patientUhid: string;
+  procedureName: string;
+  dueLabel: string;
+  overdue: boolean;
+  outcome: 'PENDING' | 'CONTACTED_WELL' | 'RED_FLAG' | 'NO_RESPONSE';
+  pain: string | null;
+  swelling: string | null;
+  bleeding: string | null;
+  medication: string | null;
+  redFlagReason: string | null;
+}
+
 export const api = {
   login: (email: string, password: string) =>
     post<{ displayLabel: string; roleCodes: string[] }>('/api/v1/auth/login', { email, password }),
@@ -345,4 +388,16 @@ export const api = {
     post<Incident>(`/api/v1/capa-actions/${id}/effectiveness`,
       { effective, ...(note ? { note } : {}) }),
   closeIncident: (id: string) => post<Incident>(`/api/v1/incidents/${id}/close`, {}),
+
+  patientProcedures: () => call<PatientProcedure[]>('/api/v1/patient-procedures'),
+  startPatientProcedure: (id: string) =>
+    post<PatientProcedure>(`/api/v1/patient-procedures/${id}/start`, {}),
+  overridePatientProcedure: (id: string, reason: string) =>
+    post<PatientProcedure>(`/api/v1/patient-procedures/${id}/override`, { reason }),
+
+  followups: () => call<Followup[]>('/api/v1/followups'),
+  respondToFollowup: (
+    id: string,
+    r: { pain: string; swelling: string; bleeding: string; medication: string },
+  ) => post<Followup>(`/api/v1/followups/${id}/respond`, r),
 };

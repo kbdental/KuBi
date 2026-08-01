@@ -1023,3 +1023,151 @@ label.field-label {
    answered yes is a formality, and the loop never actually turns. */
 .eff { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
 .eff .btn { white-space: nowrap; }
+
+/* ---- Patients: readiness before the chair ------------------------------ */
+
+.group-head {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--ink-soft);
+  margin: 26px 0 10px;
+}
+.group-head:first-of-type { margin-top: 6px; }
+
+/* A red flag is somebody in trouble at home, not a task on a list. It sits
+   above everything and does not look like the rows below it. */
+.flagged { margin-bottom: 20px; }
+.flag-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid #f0c2c4;
+  background: #fdf4f4;
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+.flag-main { flex: 1; min-width: 0; }
+
+.pt-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.pt-when { font-size: 12.5px; color: var(--ink-soft); }
+
+/* Readiness word. Never derived from the enum string. */
+.rd {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.rd-ready { background: #dcefe9; color: #0b5648; }
+.rd-partial, .rd-notready { background: #f7e4e5; color: var(--safety); }
+/* "Cannot confirm" is deliberately its own colour: it is not a failure, it is
+   an unanswered question, and the two need different responses. */
+.rd-pending { background: #eceff3; color: var(--ink-soft); }
+.rd-overridden { background: var(--warn-tint); color: var(--warn); }
+
+.alerts { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 2px; }
+.alert-chip {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: #f7e4e5;
+  color: var(--safety);
+}
+
+/* The exact missing requirement, in place, before the chair. */
+.blocking { margin: 10px 0 4px; }
+.blocking-line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13.5px;
+  padding: 3px 0;
+}
+
+.req-dot {
+  flex: 0 0 auto;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--line);
+  transform: translateY(-1px);
+}
+.req-pass { background: var(--ok); }
+.req-fail { background: var(--safety); }
+.req-unknown { background: var(--ink-soft); }
+.req-na { background: var(--line); }
+
+.pt-actions { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+
+/* Stated, not offered-then-refused. Nobody may override a hard block, so there
+   is no button to disable and no route to try. */
+.cannot { font-size: 13px; color: var(--safety); font-weight: 600; }
+
+.override { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.override input {
+  flex: 1 1 12rem;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.reqs { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line); }
+.req {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 4px 8px;
+  align-items: baseline;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.req-label { font-weight: 600; }
+.req-state { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.req-state.req-pass { color: var(--ok); }
+.req-state.req-fail { color: var(--safety); }
+.req-state.req-unknown { color: var(--ink-soft); }
+.req-state.req-na { color: var(--ink-soft); }
+.req-mand {
+  grid-column: 3;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--safety);
+}
+.req-detail { grid-column: 2 / -1; color: var(--ink-soft); font-size: 12.5px; }
+
+.overdue { color: var(--safety); font-weight: 600; }
+
+/* Four questions, not a tick. */
+.fu-form { margin-top: 10px; }
+.choice { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.choice-label {
+  flex: 0 0 5.5rem;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--ink-soft);
+}
+.choice-opts { display: flex; gap: 4px; flex-wrap: wrap; }
+.choice-opts button {
+  min-height: 36px;
+  padding: 5px 11px;
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.choice-opts button.on {
+  border-color: var(--ok);
+  background: rgba(13, 110, 94, .08);
+  font-weight: 600;
+}

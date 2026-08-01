@@ -152,3 +152,20 @@ export function IconQuality({ size = 22, filled = false }: Props) {
     </svg>
   );
 }
+
+/**
+ * PATIENTS — a person with a check beside them.
+ *
+ * Not a clipboard: this tab is about whether a person is ready, not about a
+ * list of forms. The check sits to the side rather than over the figure, so it
+ * reads as "about this person" rather than "this person is done".
+ */
+export function IconPatients({ size = 22, filled = false }: Props) {
+  return (
+    <svg {...base(size)}>
+      <circle cx="9.5" cy="7.5" r="3.2" {...(filled ? { fill: 'currentColor' } : {})} />
+      <path d="M3.5 19.5a6 6 0 0 1 12 0" />
+      <path d="M16.5 12.8l1.6 1.6 3-3.2" />
+    </svg>
+  );
+}
