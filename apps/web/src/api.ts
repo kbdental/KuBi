@@ -358,6 +358,41 @@ export interface OwnerMis {
   capa: { open: number; awaitingEffectiveness: number; closed: number };
 }
 
+export interface DemoAsset {
+  id: string; code: string; name: string; category: string;
+  status: 'OPERATIONAL' | 'RESTRICTED' | 'OUT_OF_SERVICE' | 'UNDER_REPAIR' | 'RETIRED';
+  location: string;
+  checkedToday: 'PASS' | 'FAIL' | null;
+  nextServiceInDays: number | null;
+  serviceKind: string | null;
+}
+
+export interface DemoStock {
+  id: string; code: string; name: string; unit: string;
+  /** Excludes expired batches. Never shown without this. */
+  available: number;
+  onHand: number; minimumQty: number; reorderLevel: number;
+  state: 'OK' | 'REORDER' | 'SHORTAGE';
+  expiringSoon: number; expired: number;
+}
+
+export interface Operations {
+  assets: DemoAsset[];
+  stock: DemoStock[];
+  implants: Array<{
+    id: string; brand: string; line: string; platform: string;
+    componentType: string; size: string; quantity: number; expiringSoon: boolean;
+  }>;
+  batches: Array<{
+    id: string; batchRef: string; stage: string; packCount: number;
+    operator: string; cycleResult: 'PASS' | 'FAIL' | 'INCONCLUSIVE' | null;
+  }>;
+  counts: {
+    assetsDown: number; serviceDue: number; shortages: number;
+    reorders: number; implantGaps: number; batchesPending: number;
+  };
+}
+
 export const api = {
   login: (email: string, password: string) =>
     post<{ displayLabel: string; roleCodes: string[] }>('/api/v1/auth/login', { email, password }),
@@ -424,4 +459,10 @@ export const api = {
   ) => post<Followup>(`/api/v1/followups/${id}/respond`, r),
 
   ownerMis: () => call<OwnerMis>('/api/v1/owner-mis'),
+
+  operations: () => call<Operations>('/api/v1/operations'),
+  checkAsset: (id: string, result: 'PASS' | 'FAIL') =>
+    post<DemoAsset>(`/api/v1/assets/${id}/check`, { result }),
+  advanceBatch: (id: string) =>
+    post<{ stage: string }>(`/api/v1/sterilization/${id}/advance`, {}),
 };

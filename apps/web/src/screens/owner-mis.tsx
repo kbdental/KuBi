@@ -91,7 +91,11 @@ export function OwnerMIS({ onGoToQuality }: { onGoToQuality?: () => void }) {
         </section>
       )}
 
-      <h2 className="group-head">The eight domains</h2>
+      {/* Counted, not written. §7 says "approximately eight"; hardcoding the
+          word left the heading claiming eight while nine were on screen. */}
+      <h2 className="group-head">
+        {mis.domains.length} management {mis.domains.length === 1 ? 'domain' : 'domains'}
+      </h2>
       <div className="domains">
         {mis.domains.map((d) => <DomainCard key={d.name} d={d} />)}
       </div>

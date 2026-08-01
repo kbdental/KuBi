@@ -10,6 +10,7 @@ import { Today } from './screens/today.js';
 import { TaskSheetScreen } from './screens/task-sheet.js';
 import { Attention } from './screens/attention.js';
 import { OwnerMIS } from './screens/owner-mis.js';
+import { Operations } from './screens/operations.js';
 import { Patients } from './screens/patients.js';
 import { Quality } from './screens/quality.js';
 import { Checks } from './screens/checks.js';
@@ -17,7 +18,7 @@ import { Clinic } from './screens/clinic.js';
 import { Overview } from './screens/overview.js';
 import {
   IconToday, IconClinic, IconAttention, IconChecks,
-  IconQuality, IconPatients, IconMe, IconOverview,
+  IconQuality, IconPatients, IconOperations, IconMe, IconOverview,
 } from './icons.js';
 
 /**
@@ -41,7 +42,7 @@ const CAN_MOVE_VISITS = [
   'TREATING_DOCTOR', 'CLINICAL_DIRECTOR',
 ];
 
-type Place = 'MIS' | 'OVERVIEW' | 'TODAY' | 'CLINIC' | 'PATIENTS' | 'ATTENTION' | 'QUALITY' | 'CHECKS' | 'ME';
+type Place = 'MIS' | 'OPERATIONS' | 'OVERVIEW' | 'TODAY' | 'CLINIC' | 'PATIENTS' | 'ATTENTION' | 'QUALITY' | 'CHECKS' | 'ME';
 
 interface Loaded {
   me: Me;
@@ -173,6 +174,9 @@ export function App() {
           {/* Readiness before the chair, follow-up after it. Clinical work, so
               it follows the same permission as the clinic-wide views. */}
           {!isOwner && data.overview && <Tab id="PATIENTS" label="Patients" now={here} go={setPlace} />}
+          {/* Equipment, stock and sterilisation. Clinic-wide, so it follows the
+              same permission as the other whole-clinic views. */}
+          {!isOwner && data.overview && <Tab id="OPERATIONS" label="Operations" now={here} go={setPlace} />}
           {!isOwner && (
             <Tab
               id="ATTENTION"
@@ -229,6 +233,7 @@ export function App() {
       )}
       {here === 'MIS' && <OwnerMIS onGoToQuality={() => setPlace('QUALITY')} />}
       {here === 'PATIENTS' && <Patients onChanged={reload} />}
+      {here === 'OPERATIONS' && <Operations onChanged={reload} />}
       {here === 'QUALITY' && <Quality onChanged={reload} />}
       {here === 'CHECKS' && <Checks items={data.checks} onDone={reload} />}
       {here === 'ME' && (
@@ -246,6 +251,7 @@ const TAB_ICON: Record<Place, (p: { filled: boolean }) => ReactElement> = {
   ATTENTION: ({ filled }) => <IconAttention filled={filled} />,
   MIS: ({ filled }) => <IconOverview filled={filled} />,
   PATIENTS: ({ filled }) => <IconPatients filled={filled} />,
+  OPERATIONS: ({ filled }) => <IconOperations filled={filled} />,
   QUALITY: ({ filled }) => <IconQuality filled={filled} />,
   CHECKS: ({ filled }) => <IconChecks filled={filled} />,
   ME: ({ filled }) => <IconMe filled={filled} />,

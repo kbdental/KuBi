@@ -1386,3 +1386,60 @@ label.field-label {
 .capa-stat:hover { border-color: var(--ok); }
 .capa-stat b { display: block; font-size: 23px; font-weight: 700; letter-spacing: -.02em; }
 .capa-stat span { font-size: 12.5px; color: var(--ink-soft); }
+
+/* ---- Operations -------------------------------------------------------- */
+
+.ops-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.ops-tile {
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fff;
+  padding: 12px 14px;
+}
+/* Only a count that means something wrong gets colour. A tile that is red at
+   zero teaches people to ignore red. */
+.ops-tile-bad { border-color: #f0c2c4; background: #fdf4f4; }
+.ops-tile b { display: block; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.ops-tile-bad b { color: var(--safety); }
+.ops-tile span { font-size: 12px; color: var(--ink-soft); }
+
+.ops-list { display: grid; gap: 8px; }
+.ops-note { margin: -4px 0 10px; }
+.ops-foot { margin-top: 8px; }
+
+.ops-state {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.ops-ok { background: #dcefe9; color: #0b5648; }
+.ops-warn { background: var(--warn-tint); color: var(--warn); }
+.ops-bad { background: #f7e4e5; color: var(--safety); }
+.ops-quiet { background: #eef2f6; color: var(--ink-soft); }
+
+.ops-table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 480px; }
+.ops-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.ops-table td { padding: 9px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+.ops-table tr:last-child td { border-bottom: 0; }
+.ops-table .row-gap { background: #fdf6f6; }
+.ops-table .zero { color: var(--safety); }
+.ops-table .tag { margin-left: 6px; }

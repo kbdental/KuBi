@@ -192,6 +192,57 @@ interface DemoFollowup {
   redFlagReason: string | null;
 }
 
+
+/** One asset, as the Equipment engine reports it. */
+interface DemoAsset {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  status: 'OPERATIONAL' | 'RESTRICTED' | 'OUT_OF_SERVICE' | 'UNDER_REPAIR' | 'RETIRED';
+  location: string;
+  checkedToday: 'PASS' | 'FAIL' | null;
+  nextServiceInDays: number | null;
+  serviceKind: string | null;
+}
+
+/** A stock line. `available` excludes expired batches — that is the point. */
+interface DemoStock {
+  id: string;
+  code: string;
+  name: string;
+  unit: string;
+  available: number;
+  onHand: number;
+  minimumQty: number;
+  reorderLevel: number;
+  state: 'OK' | 'REORDER' | 'SHORTAGE';
+  expiringSoon: number;
+  expired: number;
+}
+
+/** Implant stock, to the component. Quantity alone is insufficient. */
+interface DemoImplant {
+  id: string;
+  brand: string;
+  line: string;
+  platform: string;
+  componentType: string;
+  size: string;
+  quantity: number;
+  expiringSoon: boolean;
+}
+
+/** A sterilisation batch mid-journey. Not a closing tick. */
+interface DemoBatch {
+  id: string;
+  batchRef: string;
+  stage: string;
+  packCount: number;
+  operator: string;
+  cycleResult: 'PASS' | 'FAIL' | 'INCONCLUSIVE' | null;
+}
+
 interface Visit {
   id: string;
   patientLabel: string;
@@ -575,8 +626,51 @@ function freshState() {
     },
   ];
 
+
+  /**
+   * Assets, stock and sterilisation, deliberately not all healthy.
+   *
+   * A screen that only ever shows green teaches nothing about what it is for,
+   * and each of these is one of the requirement's own named exceptions:
+   * equipment service overdue, stock below minimum, instrument sterilisation
+   * pending.
+   */
+  const assets: DemoAsset[] = [
+    { id: 'a1', code: 'CHAIR-01', name: 'Dental chair 1', category: 'DENTAL_CHAIR', status: 'OPERATIONAL', location: 'Room 1', checkedToday: 'PASS', nextServiceInDays: 96, serviceKind: 'SERVICE' },
+    { id: 'a2', code: 'CHAIR-02', name: 'Dental chair 2', category: 'DENTAL_CHAIR', status: 'OUT_OF_SERVICE', location: 'Room 2', checkedToday: 'FAIL', nextServiceInDays: 40, serviceKind: 'SERVICE' },
+    { id: 'a3', code: 'AUTOCLAVE-01', name: 'Autoclave 1', category: 'AUTOCLAVE', status: 'OPERATIONAL', location: 'Sterile bay', checkedToday: 'PASS', nextServiceInDays: 4, serviceKind: 'CALIBRATION' },
+    { id: 'a4', code: 'COMPRESSOR-01', name: 'Compressor', category: 'UTILITY', status: 'OPERATIONAL', location: 'Plant room', checkedToday: null, nextServiceInDays: 210, serviceKind: 'SERVICE' },
+    { id: 'a5', code: 'OPG-01', name: 'OPG unit', category: 'IMAGING', status: 'OPERATIONAL', location: 'Imaging', checkedToday: 'PASS', nextServiceInDays: 61, serviceKind: 'CALIBRATION' },
+  ];
+
+  const stock: DemoStock[] = [
+    { id: 's1', code: 'GLV-NIT-M', name: 'Nitrile gloves (M)', unit: 'BOX', available: 4, onHand: 10, minimumQty: 2, reorderLevel: 5, state: 'REORDER', expiringSoon: 0, expired: 1 },
+    { id: 's2', code: 'MSK-SUR', name: 'Surgical masks', unit: 'BOX', available: 2, onHand: 2, minimumQty: 5, reorderLevel: 10, state: 'SHORTAGE', expiringSoon: 0, expired: 0 },
+    { id: 's3', code: 'GZE-STR', name: 'Sterile gauze', unit: 'PACK', available: 18, onHand: 18, minimumQty: 6, reorderLevel: 12, state: 'OK', expiringSoon: 2, expired: 0 },
+    { id: 's4', code: 'RVG-SLV', name: 'RVG sleeves', unit: 'BOX', available: 9, onHand: 9, minimumQty: 3, reorderLevel: 6, state: 'OK', expiringSoon: 0, expired: 0 },
+    { id: 's5', code: 'ANS-LID', name: 'Local anaesthetic', unit: 'BOX', available: 7, onHand: 11, minimumQty: 4, reorderLevel: 8, state: 'REORDER', expiringSoon: 1, expired: 1 },
+  ];
+
+  const implants: DemoImplant[] = [
+    { id: 'i1', brand: 'Nobel', line: 'Active', platform: 'NP', componentType: 'IMPLANT', size: '3.5×10', quantity: 3, expiringSoon: false },
+    { id: 'i2', brand: 'Nobel', line: 'Active', platform: 'NP', componentType: 'IMPLANT', size: '4.3×11.5', quantity: 2, expiringSoon: false },
+    // The case booked for 12:30 needs this one. It is the reason that surgery
+    // cannot start, and the Compliance engine reads it from here.
+    { id: 'i3', brand: 'Nobel', line: 'Active', platform: 'NP', componentType: 'HEALING_ABUTMENT', size: '4.5×5', quantity: 0, expiringSoon: false },
+    { id: 'i4', brand: 'Nobel', line: 'Active', platform: 'NP', componentType: 'IMPRESSION_COMPONENT', size: '—', quantity: 4, expiringSoon: false },
+    { id: 'i5', brand: 'Straumann', line: 'BLT', platform: 'RC', componentType: 'IMPLANT', size: '4.1×8', quantity: 1, expiringSoon: true },
+  ];
+
+  const batches: DemoBatch[] = [
+    { id: 'b1', batchRef: 'STER-0912', stage: 'RELEASED', packCount: 12, operator: 'Priya', cycleResult: 'PASS' },
+    { id: 'b2', batchRef: 'STER-0913', stage: 'AUTOCLAVED', packCount: 9, operator: 'Priya', cycleResult: 'PASS' },
+    { id: 'b3', batchRef: 'STER-0914', stage: 'ULTRASONIC', packCount: 7, operator: 'Anita', cycleResult: null },
+    { id: 'b4', batchRef: 'STER-0911', stage: 'QUARANTINED', packCount: 6, operator: 'Priya', cycleResult: 'INCONCLUSIVE' },
+  ];
+
   return {
     tasks, visits, attention, incidents, patientProcedures, followups,
+    assets, stock, implants, batches,
     nextIncidentNumber: 8,
     signedIn: null as Person | null,
     /**
@@ -921,6 +1015,13 @@ function ownerDomains() {
   const expected = db.visits.filter((v) => v.status !== 'CANCELLED').length;
   const patientCare = seen === 0 ? null : Math.round((seen / expected) * 100);
 
+  // Share of stock lines that are not short, and of assets that are in
+  // service. Both are counts of things the clinic can act on today.
+  const inventoryScore = db.stock.length === 0 ? null
+    : Math.round((db.stock.filter((s) => s.state === 'OK').length / db.stock.length) * 100);
+  const equipmentScore = db.assets.length === 0 ? null
+    : Math.round((db.assets.filter((a) => a.status === 'OPERATIONAL').length / db.assets.length) * 100);
+
   const rag = (score: number | null, target: number) => {
     if (score === null) return 'GREY';
     if (score >= target) return 'GREEN';
@@ -953,7 +1054,17 @@ function ownerDomains() {
     d('Appointments', 83, 95, [88, 91, 86, 84, 82, 85, 83],
       'Confirmation, cancellation, no-show, utilisation'),
     d('Lab', null, 90, [], 'Lab case module not built yet', false),
-    d('Inventory', null, 95, [], 'Inventory module not built yet', false),
+    // Inventory and Equipment are measurable now that those engines exist.
+    // Derived from the same rows the Operations screen shows, so the owner's
+    // number and the manager's list can never disagree.
+    d('Inventory', inventoryScore, 95,
+      inventoryScore === null ? [] : [97, 96, 94, 95, 93, 94, inventoryScore],
+      'No stock items are set up yet',
+      inventoryScore !== null),
+    d('Equipment', equipmentScore, 95,
+      equipmentScore === null ? [] : [100, 100, 91, 100, 100, 91, equipmentScore],
+      'No assets are registered yet',
+      equipmentScore !== null),
     d('Team', 94, 95, [96, 95, 92, 94, 95, 93, 94],
       'Attendance, task completion, SOP adherence, training'),
   ];
@@ -1551,6 +1662,68 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         closed: db.incidents.filter((i) => i.status === 'CLOSED').length,
       },
     });
+  }
+
+  // ---- OPERATIONS: equipment, stock, implants, sterilisation ----
+
+  if (path === '/api/v1/operations' && method === 'GET') {
+    if (!MAY_SEE_CLINIC.some((r) => me.roles.includes(r))) return json({ error: 'Forbidden' }, 403);
+    return json({
+      assets: db.assets,
+      stock: db.stock,
+      implants: db.implants,
+      batches: db.batches,
+      // Counted here rather than in the screen, so the badge and the list can
+      // never disagree about how many things are wrong.
+      counts: {
+        assetsDown: db.assets.filter((a) => a.status !== 'OPERATIONAL').length,
+        serviceDue: db.assets.filter((a) => a.nextServiceInDays !== null && a.nextServiceInDays <= 7).length,
+        shortages: db.stock.filter((s) => s.state === 'SHORTAGE').length,
+        reorders: db.stock.filter((s) => s.state === 'REORDER').length,
+        implantGaps: db.implants.filter((i) => i.quantity === 0).length,
+        batchesPending: db.batches.filter((b) => b.stage !== 'RELEASED').length,
+      },
+    });
+  }
+
+  const assetMatch = /^\/api\/v1\/assets\/([^/]+)\/check$/.exec(path);
+  if (assetMatch) {
+    const asset = db.assets.find((a) => a.id === assetMatch[1]);
+    if (!asset) return json({ error: 'Not found' }, 404);
+    const result = body.result === 'FAIL' ? 'FAIL' : 'PASS';
+    asset.checkedToday = result;
+    if (result === 'FAIL') {
+      // Not a note. The asset leaves service and the exception is raised in
+      // the same step, exactly as the server does it.
+      asset.status = 'OUT_OF_SERVICE';
+      raise({
+        code: 'EQP.PHYSICAL_FAILURE.CHECK_FAILED',
+        severity: 'PATIENT_SAFETY',
+        headline: `${asset.name} is out of service`,
+        detail: `${asset.code} failed its daily check and cannot be used until repaired and verified.`,
+        owner: 'e-rahul', dueAt: Date.now(), instanceId: null, needsAuthorisation: false,
+      });
+    }
+    // A pass does NOT return a failed asset to service; that needs a repair
+    // and a second person's signature.
+    return json(asset);
+  }
+
+  const batchMatch = /^\/api\/v1\/sterilization\/([^/]+)\/advance$/.exec(path);
+  if (batchMatch) {
+    const batch = db.batches.find((b) => b.id === batchMatch[1]);
+    if (!batch) return json({ error: 'Not found' }, 404);
+    const ORDER = ['COLLECTED', 'ULTRASONIC', 'INSPECTED', 'PACKED', 'AUTOCLAVED', 'VERIFIED', 'RELEASED'];
+    if (batch.stage === 'QUARANTINED') {
+      return json({ error: 'A quarantined batch cannot be advanced until its cycle is resolved.' }, 409);
+    }
+    if (batch.cycleResult === 'FAIL') {
+      return json({ error: 'A failed cycle cannot release packs.' }, 409);
+    }
+    const i = ORDER.indexOf(batch.stage);
+    if (i < 0 || i === ORDER.length - 1) return json(batch);
+    batch.stage = ORDER[i + 1]!;
+    return json(batch);
   }
 
   // ---- PATIENTS: readiness before the chair, and follow-ups after it ----

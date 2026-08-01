@@ -169,3 +169,20 @@ export function IconPatients({ size = 22, filled = false }: Props) {
     </svg>
   );
 }
+
+/**
+ * OPERATIONS — a gauge.
+ *
+ * Not a wrench: this tab is about whether the clinic's plant, stock and
+ * sterilisation are in a fit state, not about repairing things. A gauge reads
+ * as "how is it doing", which is the question the screen answers.
+ */
+export function IconOperations({ size = 22, filled = false }: Props) {
+  return (
+    <svg {...base(size)}>
+      <path d="M3.6 17.5a9 9 0 1 1 16.8 0" />
+      <path d="M12 13.5l3.8-3.6" />
+      {filled && <circle cx="12" cy="13.8" r="1.9" fill="currentColor" stroke="none" />}
+    </svg>
+  );
+}
