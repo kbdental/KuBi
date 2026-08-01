@@ -15,7 +15,9 @@ import type { Clock } from '../../shared/clock.js';
 import { resolveActor, type ActorRef } from './assignment-resolver.js';
 import { raiseAttentionItem } from '../signals/attention.service.js';
 import { checkReadinessAgainstFirstPatient } from '../schedule/appointment.service.js';
-import { ActivityStatus, Priority } from '@kubi/contracts';
+import {
+  ActivityStatus, Priority, Recurrence, InstanceScope, DueRuleKind,
+} from '@kubi/contracts';
 
 /** Clinic-local calendar date, e.g. "2026-07-28". */
 export function clinicLocalDate(instant: Date, timezone: string): string {
@@ -243,6 +245,171 @@ export const generateClosingTasks = (
   generateDailySet(CLOSING_SET, prisma, clock, organizationId, clinicId);
 
 /**
+ * Everything else the clinic owes today.
+ *
+ * The opening and closing generators above are anchored to one configured time
+ * each and filter on one named process each. That was correct while KuBi had
+ * nine activities in two processes. Loading the real Master Activity Matrix
+ * exposed what it costs: of 28 enabled definitions, the two named sets could
+ * reach 9. Nineteen — attendance, sterilisation, follow-up calls, equipment
+ * checks, emergency checks, audits — existed in the database, were enabled,
+ * and generated nothing at all. Silently: no error, no warning, just a clinic
+ * that never saw the work.
+ *
+ * That is the failure mode a hardcoded list always has. It does not break, it
+ * just stops covering things, and nothing tells you.
+ *
+ * So this generates every remaining DAILY, clinic-scoped definition, each due
+ * at ITS OWN time rather than at a shared anchor:
+ *
+ *   CLOCK        — a clinic-local time the matrix states outright (ATT-001 at
+ *                  09:45). Needs no interpretation.
+ *   CLINIC_EVENT — anchored to opening or closing plus an offset, read from
+ *                  the clinic's own configuration.
+ *
+ * Anything else is skipped rather than guessed, and counted so the skip is
+ * visible. A definition whose due rule KuBi cannot resolve must not acquire a
+ * plausible-looking deadline on the way through a scheduler.
+ */
+const NAMED_SETS = [OPENING_SET.process, CLOSING_SET.process];
+
+export async function generateStandingTasks(
+  prisma: TenantPrisma,
+  clock: Clock,
+  organizationId: string,
+  clinicId: string,
+): Promise<GenerationResult & { unscheduled: number }> {
+  const now = clock.now();
+  // withTenantContext, not $transaction: the RLS context is transaction-scoped
+  // and a bare $transaction establishes none, so every query inside it is
+  // refused. TD-4 caught this the first time it ran against real data.
+  return withTenantContext(
+    prisma,
+    { organizationId, clinicIds: [clinicId], crossClinic: false },
+    async (tx) => {
+    const clinic = await tx.clinic.findUnique({ where: { id: clinicId } });
+    if (!clinic) {
+      return {
+        clinicId, periodKey: '', created: 0, skippedExisting: 0,
+        unassigned: 0, notAWorkingDay: false, unscheduled: 0,
+      };
+    }
+    const periodKey = clinicLocalDate(now, clinic.timezone);
+
+    const cfg = await tx.configValue.findMany({
+      where: {
+        organizationId, clinicId,
+        key: { in: ['clinic.opening_time', 'clinic.closing_time'] },
+      },
+    });
+    const anchorTime = (key: string) =>
+      (cfg.find((c) => c.key === key)?.valueJson as { value?: string } | null)?.value ?? null;
+
+    const definitions = await tx.activityDefinition.findMany({
+      where: {
+        organizationId,
+        enabled: true,
+        // WEEKLY and MONTHLY are here too, not in a separate pass. A weekly
+        // audit is the same generation with a different period key, and a
+        // second copy of this loop is how the two drift apart.
+        recurrence: { in: [Recurrence.DAILY, Recurrence.WEEKLY, Recurrence.MONTHLY] },
+        instanceScope: InstanceScope.CLINIC_DAY,
+        process: { notIn: NAMED_SETS },
+      },
+      orderBy: { code: 'asc' },
+    });
+
+    // Whether today closes a week or a month, in the CLINIC's timezone.
+    // Sunday closes the week: the matrix says "week end", and the clinic's own
+    // working-days configuration decides which days it is open, not which day
+    // the week ends on.
+    // 7 is Sunday. clinicLocalWeekday is 1=Mon…7=Sun, NOT JavaScript's
+    // 0=Sun — comparing against 0 here made isWeekEnd permanently false, so
+    // every weekly activity generated nothing, for ever, without an error.
+    const isWeekEnd = clinicLocalWeekday(now, clinic.timezone) === 7;
+    const tomorrow = clinicLocalDate(new Date(now.getTime() + 86_400_000), clinic.timezone);
+    const isMonthEnd = tomorrow.slice(0, 7) !== periodKey.slice(0, 7);
+
+    let created = 0, skippedExisting = 0, unassigned = 0, unscheduled = 0;
+
+    for (const def of definitions) {
+      const rule = def.dueRule as {
+        kind?: string; time?: string; anchor?: string; offsetMinutes?: number;
+      };
+
+      // A weekly activity is not due six days out of seven, and generating it
+      // daily would put an audit on the list every morning until somebody
+      // stopped reading the list.
+      if (def.recurrence === Recurrence.WEEKLY && !isWeekEnd) continue;
+      if (def.recurrence === Recurrence.MONTHLY && !isMonthEnd) continue;
+
+      // Its own period, so a weekly audit is one row per week rather than one
+      // per day — the idempotency key is what makes that true.
+      const instancePeriodKey = def.recurrence === Recurrence.WEEKLY
+        ? `${periodKey.slice(0, 4)}-W${isoWeek(now, clinic.timezone)}`
+        : def.recurrence === Recurrence.MONTHLY
+          ? periodKey.slice(0, 7)
+          : periodKey;
+
+      let dueAt: Date | null = null;
+      if (rule.kind === DueRuleKind.CLOCK && rule.time) {
+        dueAt = clinicLocalTimeToUtc(periodKey, rule.time, clinic.timezone);
+      } else if (rule.kind === DueRuleKind.PERIOD_END) {
+        // Due at the clinic's closing time on the day the period ends. Without
+        // a closing time there is no honest moment to place it.
+        const t = anchorTime('clinic.closing_time');
+        if (t) dueAt = clinicLocalTimeToUtc(periodKey, t, clinic.timezone);
+      } else if (rule.kind === DueRuleKind.CLINIC_EVENT) {
+        const key = rule.anchor === 'CLOSING' ? 'clinic.closing_time' : 'clinic.opening_time';
+        const t = anchorTime(key);
+        if (t) {
+          dueAt = new Date(
+            clinicLocalTimeToUtc(periodKey, t, clinic.timezone).getTime()
+            + (rule.offsetMinutes ?? 0) * 60_000,
+          );
+        }
+      }
+
+      // No resolvable time is not a reason to invent one.
+      if (!dueAt) { unscheduled++; continue; }
+
+      const existing = await tx.activityInstance.findUnique({
+        where: {
+          definitionId_scopeKey_periodKey: {
+            definitionId: def.id, scopeKey: clinicId, periodKey: instancePeriodKey,
+          },
+        },
+      });
+      if (existing) { skippedExisting++; continue; }
+
+      const assignment = def.assignmentRule as unknown as { doer: ActorRef };
+      const doer = await resolveActor(tx, clock, organizationId, clinicId, assignment.doer);
+
+      await tx.activityInstance.create({
+        data: {
+          organizationId, clinicId,
+          definitionId: def.id,
+          definitionVersion: def.version,
+          scopeKey: clinicId,
+          periodKey: instancePeriodKey,
+          status: ActivityStatus.DUE,
+          assigneeEmployeeId: doer.employeeIds[0] ?? null,
+          dueAt,
+        },
+      });
+      created++;
+      if (doer.unresolved) unassigned++;
+    }
+
+    return {
+      clinicId, periodKey, created, skippedExisting, unassigned,
+      notAWorkingDay: false, unscheduled,
+    };
+    },
+  );
+}
+
+/**
  * Move past-due, incomplete tasks to OVERDUE and raise a PROBLEM.
  * Implements A29 (task overdue) for every daily set — each instance is judged
  * against its own dueAt, so a closing check is late at its own deadline and not
@@ -303,4 +470,26 @@ export async function sweepOverdue(
       return stale.length;
     },
   );
+}
+
+/**
+ * ISO week number in the clinic's timezone, zero-padded.
+ *
+ * Its own function because "which week is it" is a question with a wrong
+ * answer that looks right for fifty weeks a year: a naive day-of-year/7 puts
+ * the days either side of New Year in the same bucket, so a January audit
+ * silently satisfies December's.
+ */
+export function isoWeek(instant: Date, timezone: string): string {
+  const local = clinicLocalDate(instant, timezone);
+  const [y, m, d] = local.split('-').map(Number) as [number, number, number];
+  const date = new Date(Date.UTC(y, m - 1, d));
+  // Shift to the Thursday of this week; ISO weeks are numbered by the Thursday.
+  const day = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - day + 3);
+  const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const firstDay = (firstThursday.getUTCDay() + 6) % 7;
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDay + 3);
+  const week = 1 + Math.round((date.getTime() - firstThursday.getTime()) / (7 * 86_400_000));
+  return String(week).padStart(2, '0');
 }

@@ -27,7 +27,9 @@
 import { prisma, type TenantPrisma } from '../tenancy/rls-context.js';
 import type { Clock } from '../../shared/clock.js';
 import { logger } from '../../shared/logging/logger.js';
-import { generateOpeningTasks, generateClosingTasks, sweepOverdue } from './scheduler.service.js';
+import {
+  generateOpeningTasks, generateClosingTasks, generateStandingTasks, sweepOverdue,
+} from './scheduler.service.js';
 
 export interface ClinicRef {
   organizationId: string;
@@ -39,6 +41,13 @@ export interface DailyRunResult {
   clinics: number;
   created: number;
   swept: number;
+  /**
+   * Definitions that are enabled but whose due rule KuBi could not resolve, so
+   * nothing was generated for them. Reported rather than swallowed: a clinic
+   * with unscheduled requirements should know the number, and a zero here is
+   * the only honest way to claim full coverage.
+   */
+  unscheduled: number;
   /** Clinics whose run threw. The run continues past them, by design. */
   failed: Array<{ clinicId: string; error: string }>;
 }
@@ -72,7 +81,9 @@ export async function runDailyGeneration(
   client: TenantPrisma = prisma,
 ): Promise<DailyRunResult> {
   const clinics = await listActiveClinics(client);
-  const result: DailyRunResult = { clinics: clinics.length, created: 0, swept: 0, failed: [] };
+  const result: DailyRunResult = {
+    clinics: clinics.length, created: 0, swept: 0, unscheduled: 0, failed: [],
+  };
 
   for (const c of clinics) {
     // One clinic's bad configuration must not stop every other clinic getting
@@ -80,9 +91,14 @@ export async function runDailyGeneration(
     try {
       const opening = await generateOpeningTasks(client, clock, c.organizationId, c.clinicId);
       const closing = await generateClosingTasks(client, clock, c.organizationId, c.clinicId);
+      // Everything that is neither opening nor closing — attendance,
+      // sterilisation, equipment checks, audits. Without this the two named
+      // sets were the only work a clinic ever saw, however much was enabled.
+      const standing = await generateStandingTasks(client, clock, c.organizationId, c.clinicId);
       const swept = await sweepOverdue(client, clock, c.organizationId, c.clinicId);
 
-      result.created += opening.created + closing.created;
+      result.created += opening.created + closing.created + standing.created;
+      result.unscheduled += standing.unscheduled;
       result.swept += swept;
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
@@ -123,9 +139,12 @@ export function startDailyRuns(
     running = true;
     try {
       const r = await runDailyGeneration(clock);
-      if (r.created > 0 || r.swept > 0 || r.failed.length > 0) {
+      if (r.created > 0 || r.swept > 0 || r.failed.length > 0 || r.unscheduled > 0) {
         logger.info(
-          { clinics: r.clinics, created: r.created, swept: r.swept, failed: r.failed.length },
+          {
+            clinics: r.clinics, created: r.created, swept: r.swept,
+            unscheduled: r.unscheduled, failed: r.failed.length,
+          },
           'daily run',
         );
       }
