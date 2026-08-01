@@ -1,0 +1,1806 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KuBi — the 16 control parameters</title>
+<style>
+:root{--ink:#12181f;--soft:#5a6875;--line:#e4e9ee;--bg:#f6f8fa;--card:#fff;
+--ps:#a4262c;--crit:#c4543a;--imp:#8a6d1f;--rout:#5a6875;--ok:#0d6e5e;--accent:#0d6e5e}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:var(--ink);background:var(--bg)}
+.wrap{max-width:1180px;margin:0 auto;padding:32px 20px 80px}
+h1{font-size:30px;margin:0 0 6px;letter-spacing:-.02em}
+.sub{color:var(--soft);margin:0 0 28px;font-size:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:28px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.stat b{display:block;font-size:26px;letter-spacing:-.02em}
+.stat span{color:var(--soft);font-size:12.5px}
+.note{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);
+border-radius:0 12px 12px 0;padding:16px 18px;margin:0 0 26px}
+.note h2{font-size:15px;margin:0 0 8px}
+.note p{margin:0 0 8px}.note p:last-child{margin:0}
+.loop{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;background:var(--bg);
+padding:10px 12px;border-radius:8px;overflow-x:auto;white-space:nowrap;margin:8px 0}
+.loop b{color:var(--accent)}
+h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--soft);
+margin:36px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.param{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:16px}
+.param-gap{border-color:#e6c9c9;background:#fffafa}
+.ph{display:flex;gap:14px;align-items:flex-start}
+.pn{flex:0 0 32px;height:32px;border-radius:9px;background:var(--accent);color:#fff;
+display:grid;place-items:center;font-weight:700;font-size:14px}
+.param-gap .pn{background:var(--ps)}
+.pt{flex:1;min-width:0}
+.pt h3{margin:2px 0 4px;font-size:17px;letter-spacing:-.01em}
+.ctrl{margin:0;color:var(--soft);font-size:13.5px}
+.pc{flex:0 0 auto;text-align:right}
+.cnt{display:block;font-size:22px;font-weight:700;letter-spacing:-.02em}
+.cnt-zero{color:var(--ps)}
+.cntl{font-size:11.5px;color:var(--soft)}
+.meta{margin:12px 0 0;font-size:13px;color:var(--soft);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mk{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--soft)}
+.sep{color:var(--line)}
+.kpis{margin:8px 0 0;font-size:13px}
+.kpis code{background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12px;margin-right:4px;display:inline-block}
+.gapnote{margin:12px 0 0;padding:11px 13px;background:#fdf0f0;border-radius:9px;font-size:13.5px;color:#7d2a2a}
+.tw{overflow-x:auto;margin-top:14px;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:900px}
+th{background:var(--bg);text-align:left;padding:9px 10px;font-size:10.5px;text-transform:uppercase;
+letter-spacing:.05em;color:var(--soft);border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid #f0f3f6;vertical-align:top}
+tr:last-child td{border-bottom:0}
+.id{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;font-weight:600;white-space:nowrap}
+.act{font-weight:600;min-width:150px}
+.std{color:var(--soft);min-width:170px}
+.trig{font-size:10.5px;font-weight:600;letter-spacing:.03em}
+.freq{font-size:10.5px;color:var(--soft)}
+.due,.ev,.gate,.capa,.who{color:var(--soft)}
+.chk{font-size:11px;color:var(--ok)}
+.none{color:#c8d0d8}
+.pri{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.04em;
+padding:2px 6px;border-radius:4px;white-space:nowrap;text-transform:uppercase}
+.pri-patient-safety{background:#f7e4e5;color:var(--ps)}
+.pri-critical{background:#fae9e3;color:var(--crit)}
+.pri-important{background:#f7f0da;color:var(--imp)}
+.pri-routine{background:#eef2f6;color:var(--rout)}
+.scores{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.score{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:13px 15px}
+.score b{display:block;font-size:14px;margin-bottom:3px}
+.score span{color:var(--soft);font-size:12.5px}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--soft);font-size:12.5px}
+@media (max-width:640px){.wrap{padding:20px 14px 60px}h1{font-size:24px}.ph{flex-wrap:wrap}.pc{text-align:left}}
+@media (prefers-color-scheme:dark){
+:root{--ink:#e6ebf0;--soft:#93a1b0;--line:#242c35;--bg:#0e1319;--card:#141a21;--accent:#3fbfa4}
+.param-gap{border-color:#4a2a2a;background:#1a1113}
+.gapnote{background:#241417;color:#e0a8a8}
+.pri-patient-safety{background:#3d1f22;color:#e79aa0}
+.pri-critical{background:#3a231b;color:#e8a68e}
+.pri-important{background:#332d18;color:#dbc478}
+.pri-routine{background:#232b33;color:#9fb0bf}
+td{border-bottom-color:#1c232b}
+.kpis code,.loop{background:#0e1319}
+.none{color:#3a444f}}
+</style></head><body><div class="wrap">
+
+<h1>The 16 control parameters</h1>
+<p class="sub">Generated from <code>master-activity-matrix-v2.xlsx</code> and the §1 control table of
+<code>operations-app.docx</code>. Nothing on this page is hand-typed — if the matrix changes, this changes.</p>
+
+<div class="stats">
+  <div class="stat"><b>16</b><span>control parameters</span></div>
+  <div class="stat"><b>101</b><span>defined activities</span></div>
+  <div class="stat"><b>27</b><span>patient-safety</span></div>
+  <div class="stat"><b>38</b><span>critical</span></div>
+  <div class="stat"><b>2</b><span>parameters with no activities</span></div>
+</div>
+
+<div class="note">
+  <h2>The operating principle (§8)</h2>
+  <p>Every activity below travels one loop. It is the app's reason to exist, not a diagram:</p>
+  <div class="loop">PLAN → TRIGGER → ASSIGN → EXECUTE → PROVE → VERIFY → ESCALATE → MEASURE → <b>IMPROVE</b></div>
+  <p>The last stage is what makes it a loop rather than a line. Every activity carries a
+  <strong>CAPA requirement</strong> — the rightmost column of every table below — which decides whether
+  a failure must produce an incident, and therefore whether the clinic learns from it or merely
+  records it again tomorrow.</p>
+</div>
+
+<h2 class="sec">The 16 parameters</h2>
+<section class="param" id="ATTENDANCE_LEAVE">
+    <header class="ph">
+      <div class="pn">1</div>
+      <div class="pt">
+        <h3>Attendance &amp; Leave</h3>
+        <p class="ctrl">Reporting time, late arrival, absence, leave request, approval, Saturday–Monday sandwich rule, attendance compliance</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">4</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Team Compliance Score</strong>
+      
+      
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>On-Time Attendance %</code> <code>Attendance Record Completeness %</code> <code>Planned Leave Compliance %</code> <code>Leave Approval SLA %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">ATT-001</td>
+    <td class="act">Report for duty</td>
+    <td class="std">All scheduled staff checked in by 09:45</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">09:45</td>
+    <td class="who">All Staff<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">ATT-003</td>
+    <td class="act">Submit planned leave</td>
+    <td class="std">Planned leave submitted in advance per policy</td>
+    <td><span class="trig">MANUAL</span><br><span class="freq">AS_REQUIRED</span></td>
+    <td class="due">Policy-defined</td>
+    <td class="who">Employee<br><span class="chk">✓ Reporting Manager</span></td>
+    <td class="ev">ATTACHMENT</td>
+    <td class="gate">Leave policy</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">ATT-004</td>
+    <td class="act">Approve/reject leave</td>
+    <td class="std">Every submitted leave has disposition and coverage check</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">AS_REQUIRED</span></td>
+    <td class="due">Before leave</td>
+    <td class="who">Reporting Manager<br><span class="chk">✓ Clinic Head</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Leave submitted</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr><tr>
+    <td class="id">ATT-002</td>
+    <td class="act">Record checkout</td>
+    <td class="std">All present staff record end-of-shift checkout</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Shift end</td>
+    <td class="who">All Staff<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-routine">ROUTINE</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr></tbody></table></div>
+  </section>
+<section class="param" id="OPENING_READINESS">
+    <header class="ph">
+      <div class="pn">2</div>
+      <div class="pt">
+        <h3>Opening Readiness</h3>
+        <p class="ctrl">Clinic opened on time, floors ready, AC/diffuser/lights, water, reception, treatment rooms, equipment readiness</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">5</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Clinic Readiness Score</strong>
+      <span class="sep">·</span><span class="pri pri-patient-safety">PATIENT SAFETY</span> 1
+      <span class="sep">·</span><span class="pri pri-critical">CRITICAL</span> 2
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>Opening On-Time %</code> <code>Room Readiness %</code> <code>Reception Readiness %</code> <code>Environment Compliance %</code> <code>Emergency Readiness %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">OPN-005</td>
+    <td class="act">Emergency readiness quick check</td>
+    <td class="std">Emergency equipment/critical items available and accessible</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Opening</td>
+    <td class="who">Assigned Assistant<br><span class="chk">✓ Doctor/Manager</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Emergency inventory</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">OPN-001</td>
+    <td class="act">Open clinic/floors</td>
+    <td class="std">Required clinic areas opened before first patient</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Before first patient</td>
+    <td class="who">Assigned Opening Staff<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">OPN-002</td>
+    <td class="act">Treatment room readiness</td>
+    <td class="std">All scheduled operatories clean, stocked and functional</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Before first patient</td>
+    <td class="who">Dental Assistant<br><span class="chk">✓ Senior Assistant</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate">Chair/equipment status</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">OPN-003</td>
+    <td class="act">Reception readiness</td>
+    <td class="std">Phones, appointment list, payment/reception systems ready</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Before first patient</td>
+    <td class="who">Reception<br><span class="chk">✓ Reception Lead</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">OPN-004</td>
+    <td class="act">Environment readiness</td>
+    <td class="std">AC 24°C where applicable, diffuser/lights as schedule</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Opening</td>
+    <td class="who">Housekeeping/Assistant<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">VALUE</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-routine">ROUTINE</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr></tbody></table></div>
+  </section>
+<section class="param param-gap" id="CLEANLINESS">
+    <header class="ph">
+      <div class="pn">3</div>
+      <div class="pt">
+        <h3>Cleanliness &amp; Housekeeping</h3>
+        <p class="ctrl">Treatment rooms, chairs, slabs, mirrors, washrooms, reception, staff areas, high-touch surfaces, plants</p>
+      </div>
+      <div class="pc">
+        <span class="cnt cnt-zero">0</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Clinic Readiness Score</strong>
+      
+      
+    </div>
+    <p class="gapnote"><strong>No activities defined in Matrix v2.0.</strong>
+      This control head exists in the requirement and has nothing behind it, so it can never
+      score anything but GREY. It is a gap in the dictionary, not in the code.</p>
+    
+    
+  </section>
+<section class="param" id="MAINTENANCE_UTILITIES">
+    <header class="ph">
+      <div class="pn">4</div>
+      <div class="pt">
+        <h3>Maintenance &amp; Utilities</h3>
+        <p class="ctrl">AC, plumbing, electricals, chairs, compressor, suction, switches, doors, faucets, water pump, repair reporting</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">7</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Clinic Readiness Score</strong>
+      <span class="sep">·</span><span class="pri pri-patient-safety">PATIENT SAFETY</span> 4
+      <span class="sep">·</span><span class="pri pri-critical">CRITICAL</span> 2
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>Equipment Availability %</code> <code>PM Compliance %</code> <code>Calibration Compliance %</code> <code>Breakdown Reporting Time</code> <code>Verified Return-to-Service %</code> <code>AMC/Warranty Coverage %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">EQP-001</td>
+    <td class="act">Daily functional check</td>
+    <td class="std">Critical assets checked before clinical use</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Opening</td>
+    <td class="who">Assigned Assistant<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate">Asset active</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">EQP-004</td>
+    <td class="act">Calibration control</td>
+    <td class="std">Calibration completed before expiry where required</td>
+    <td><span class="trig">TIME</span><br><span class="freq">PER_PLAN</span></td>
+    <td class="due">Before due</td>
+    <td class="who">Equipment Owner<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">ATTACHMENT</td>
+    <td class="gate">Calibration plan</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">EQP-005</td>
+    <td class="act">Breakdown reporting</td>
+    <td class="std">Failure creates breakdown ticket and asset restriction</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_FAILURE</span></td>
+    <td class="due">Immediate</td>
+    <td class="who">Any Authorized User<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Functional failure</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">EQP-006</td>
+    <td class="act">Return to service</td>
+    <td class="std">Repaired asset independently verified before availability</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_BREAKDOWN</span></td>
+    <td class="due">After repair</td>
+    <td class="who">Equipment Owner/Vendor<br><span class="chk">✓ Clinic Manager/Qualified Verifier</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Repair complete</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">EQP-002</td>
+    <td class="act">Preventive maintenance scheduling</td>
+    <td class="std">PM task generated before due date</td>
+    <td><span class="trig">TIME</span><br><span class="freq">PER_PLAN</span></td>
+    <td class="due">Lead-time configured</td>
+    <td class="who">System<br><span class="chk">✓ Equipment Owner</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Maintenance plan</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">EQP-003</td>
+    <td class="act">Complete preventive maintenance</td>
+    <td class="std">PM completed with service evidence</td>
+    <td><span class="trig">DEADLINE</span><br><span class="freq">PER_PLAN</span></td>
+    <td class="due">By due date</td>
+    <td class="who">Equipment Owner/Vendor<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">ATTACHMENT</td>
+    <td class="gate">PM due</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">EQP-007</td>
+    <td class="act">AMC/warranty monitoring</td>
+    <td class="std">Upcoming expiry surfaced</td>
+    <td><span class="trig">TIME</span><br><span class="freq">MONTHLY</span></td>
+    <td class="due">Configured lead time</td>
+    <td class="who">System/Manager<br><span class="chk">✓ Clinic Head</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Asset master</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr></tbody></table></div>
+  </section>
+<section class="param" id="INFECTION_CONTROL">
+    <header class="ph">
+      <div class="pn">5</div>
+      <div class="pt">
+        <h3>Infection Control &amp; Sterilization</h3>
+        <p class="ctrl">Dirty-to-clean instrument flow, ultrasonic cycle, packing/sealing, autoclave cycle, storage, same-day completion, biomedical waste</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">7</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Infection Control Score</strong>
+      <span class="sep">·</span><span class="pri pri-patient-safety">PATIENT SAFETY</span> 6
+      <span class="sep">·</span><span class="pri pri-critical">CRITICAL</span> 1
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>Instrument Traceability %</code> <code>Same-Day Processing %</code> <code>Packing Compliance %</code> <code>Autoclave Pass %</code> <code>Sterile Release Compliance %</code> <code>Same-Day Sterilization %</code> <code>BMW Compliance %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">STER-001</td>
+    <td class="act">Collect used instruments</td>
+    <td class="std">Used instruments moved into dirty workflow safely</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_BATCH</span></td>
+    <td class="due">After use</td>
+    <td class="who">Dental Assistant<br><span class="chk">✓ Senior Assistant</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate">Instrument use</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">STER-002</td>
+    <td class="act">Ultrasonic cleaning</td>
+    <td class="std">Required instruments ultrasonically cleaned same day</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_BATCH</span></td>
+    <td class="due">Same day</td>
+    <td class="who">Dental Assistant<br><span class="chk">✓ Senior Assistant</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Batch collected</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">STER-003</td>
+    <td class="act">Inspect/dry/pack</td>
+    <td class="std">Instruments inspected and properly sealed/packed</td>
+    <td><span class="trig">STATUS_CHANGE</span><br><span class="freq">PER_BATCH</span></td>
+    <td class="due">After cleaning</td>
+    <td class="who">Dental Assistant<br><span class="chk">✓ Senior Assistant</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Cleaning complete</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">STER-004</td>
+    <td class="act">Autoclave cycle</td>
+    <td class="std">Cycle parameters/result recorded</td>
+    <td><span class="trig">STATUS_CHANGE</span><br><span class="freq">PER_BATCH</span></td>
+    <td class="due">Same day</td>
+    <td class="who">Dental Assistant<br><span class="chk">✓ Senior Assistant</span></td>
+    <td class="ev">VALUE</td>
+    <td class="gate">Packing complete</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">STER-005</td>
+    <td class="act">Release sterile packs</td>
+    <td class="std">Only passed verified batches released</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_BATCH</span></td>
+    <td class="due">After pass</td>
+    <td class="who">Senior Assistant<br><span class="chk">✓ Doctor/Manager</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Cycle PASS</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">STER-006</td>
+    <td class="act">Closing pending instrument check</td>
+    <td class="std">No used instruments remain unprocessed at closing</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Closing</td>
+    <td class="who">Senior Assistant<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">End of day</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">STER-007</td>
+    <td class="act">Biomedical waste disposal</td>
+    <td class="std">Waste segregated/disposed on schedule</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Configured</td>
+    <td class="who">Assigned Assistant/Housekeeping<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr></tbody></table></div>
+  </section>
+<section class="param param-gap" id="ROOM_CHAIR_READINESS">
+    <header class="ph">
+      <div class="pn">6</div>
+      <div class="pt">
+        <h3>Room &amp; Chair Readiness</h3>
+        <p class="ctrl">Consumables, instruments, PPE, RVG sleeves, materials, chair/equipment functionality before patient seating</p>
+      </div>
+      <div class="pc">
+        <span class="cnt cnt-zero">0</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Clinic Readiness Score</strong>
+      
+      
+    </div>
+    <p class="gapnote"><strong>No activities defined in Matrix v2.0.</strong>
+      This control head exists in the requirement and has nothing behind it, so it can never
+      score anything but GREY. It is a gap in the dictionary, not in the code.</p>
+    
+    
+  </section>
+<section class="param" id="APPOINTMENT_CONTROL">
+    <header class="ph">
+      <div class="pn">7</div>
+      <div class="pt">
+        <h3>Appointment Control</h3>
+        <p class="ctrl">Morning confirmation, reminders, cancellations, rescheduling, unconfirmed patients, next appointment</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">6</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Appointment Efficiency</strong>
+      
+      
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>Confirmation %</code> <code>Confirmation Resolution %</code> <code>Recall Contact %</code> <code>Registration Completeness %</code> <code>Average Waiting Time</code> <code>No-Show Recovery %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">APT-001</td>
+    <td class="act">Confirm today's patients</td>
+    <td class="std">All today's patients contacted/confirmed early morning</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Morning</td>
+    <td class="who">Reception<br><span class="chk">✓ Reception Lead</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Today's appointments</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">APT-002</td>
+    <td class="act">Retry no-response confirmations</td>
+    <td class="std">Configured retry attempts completed</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Before appointment</td>
+    <td class="who">Reception<br><span class="chk">✓ Reception Lead</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">No response</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr><tr>
+    <td class="id">APT-004</td>
+    <td class="act">Patient arrival registration</td>
+    <td class="std">Arrival recorded and record verified</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_PATIENT</span></td>
+    <td class="due">At arrival</td>
+    <td class="who">Reception<br><span class="chk">✓ Reception Lead</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Appointment/patient</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr><tr>
+    <td class="id">APT-005</td>
+    <td class="act">Manage waiting patient</td>
+    <td class="std">Waiting time monitored against threshold</td>
+    <td><span class="trig">THRESHOLD</span><br><span class="freq">CONTINUOUS</span></td>
+    <td class="due">Configured minutes</td>
+    <td class="who">Reception<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Arrival</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">APT-006</td>
+    <td class="act">No-show handling</td>
+    <td class="std">No-show recorded and follow-up workflow initiated</td>
+    <td><span class="trig">DEADLINE</span><br><span class="freq">PER_APPOINTMENT</span></td>
+    <td class="due">After grace period</td>
+    <td class="who">Reception<br><span class="chk">✓ Reception Lead</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Scheduled appointment</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr><tr>
+    <td class="id">APT-003</td>
+    <td class="act">Review reminders and recalls</td>
+    <td class="std">Due reminders/recalls actioned</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Morning</td>
+    <td class="who">Reception<br><span class="chk">✓ Reception Lead</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-routine">ROUTINE</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr></tbody></table></div>
+  </section>
+<section class="param" id="PATIENT_JOURNEY">
+    <header class="ph">
+      <div class="pn">8</div>
+      <div class="pt">
+        <h3>Patient Clinical Journey</h3>
+        <p class="ctrl">Arrival → examination → records → consent → treatment → instructions → billing → next appointment → exit</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">11</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Patient Care Compliance</strong>
+      <span class="sep">·</span><span class="pri pri-patient-safety">PATIENT SAFETY</span> 4
+      <span class="sep">·</span><span class="pri pri-critical">CRITICAL</span> 7
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>Medical History Compliance %</code> <code>Consent Compliance %</code> <code>Pre-Treatment Documentation %</code> <code>Radiograph Compliance %</code> <code>Chairside Readiness %</code> <code>Pre-op Reminder Compliance %</code> <code>Pre-op Instruction Compliance %</code> <code>Procedure Readiness %</code> <code>Post-Treatment Documentation %</code> <code>Post-op Instruction Compliance %</code> <code>Clinical Note Completion %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">CLN-001</td>
+    <td class="act">Update medical history</td>
+    <td class="std">Medical history current before applicable treatment</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_VISIT</span></td>
+    <td class="due">Before treatment</td>
+    <td class="who">Doctor/Assistant<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Patient visit</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">CLN-002</td>
+    <td class="act">Verify procedure consent</td>
+    <td class="std">Valid procedure-specific consent signed</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_PROCEDURE</span></td>
+    <td class="due">Before procedure</td>
+    <td class="who">Doctor/Assistant<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SIGNATURE</td>
+    <td class="gate">Procedure requires consent</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">CLN-004</td>
+    <td class="act">Verify radiograph requirement</td>
+    <td class="std">Required radiograph available/current</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_PROCEDURE</span></td>
+    <td class="due">Before procedure</td>
+    <td class="who">Doctor<br><span class="chk">✓ Clinical Director</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Procedure protocol</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">CLN-008</td>
+    <td class="act">Procedure readiness evaluation</td>
+    <td class="std">All mandatory configured requirements evaluated</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_PROCEDURE</span></td>
+    <td class="due">Before start</td>
+    <td class="who">System<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">All readiness inputs</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">CLN-003</td>
+    <td class="act">Pre-treatment scan/photo</td>
+    <td class="std">Required baseline scan/photo documented</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_PROCEDURE</span></td>
+    <td class="due">Before procedure</td>
+    <td class="who">Assistant/Doctor<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">ATTACHMENT</td>
+    <td class="gate">Procedure protocol</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLN-005</td>
+    <td class="act">Chairside setup</td>
+    <td class="std">Procedure-specific instruments/materials ready</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_PATIENT</span></td>
+    <td class="due">Before seating/procedure</td>
+    <td class="who">Dental Assistant<br><span class="chk">✓ Doctor</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate">Procedure plan</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLN-006</td>
+    <td class="act">Pre-op medication reminder</td>
+    <td class="std">Surgical patient reminded per prescribed plan</td>
+    <td><span class="trig">TIME</span><br><span class="freq">PER_SURGERY</span></td>
+    <td class="due">Protocol-defined</td>
+    <td class="who">Reception/Assistant<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Surgery scheduled</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLN-007</td>
+    <td class="act">Pre-op meal/instruction reminder</td>
+    <td class="std">Surgical patient receives clinic-approved pre-op instructions</td>
+    <td><span class="trig">TIME</span><br><span class="freq">PER_SURGERY</span></td>
+    <td class="due">Protocol-defined</td>
+    <td class="who">Reception/Assistant<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Surgery scheduled</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLN-009</td>
+    <td class="act">Post-treatment scan/photo</td>
+    <td class="std">Required post-treatment record captured</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_PROCEDURE</span></td>
+    <td class="due">Before visit closure</td>
+    <td class="who">Assistant/Doctor<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">ATTACHMENT</td>
+    <td class="gate">Procedure protocol</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLN-010</td>
+    <td class="act">Post-op instructions</td>
+    <td class="std">Applicable patient receives documented instructions</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_PROCEDURE</span></td>
+    <td class="due">Before discharge</td>
+    <td class="who">Doctor/Assistant<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate">Procedure completed</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLN-011</td>
+    <td class="act">Clinical notes completion</td>
+    <td class="std">Required clinical note completed</td>
+    <td><span class="trig">DEADLINE</span><br><span class="freq">PER_VISIT</span></td>
+    <td class="due">Before/within configured SLA</td>
+    <td class="who">Treating Doctor<br><span class="chk">✓ Clinical Director</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Visit</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr></tbody></table></div>
+  </section>
+<section class="param" id="CLINICAL_DOCUMENTATION">
+    <header class="ph">
+      <div class="pn">9</div>
+      <div class="pt">
+        <h3>Clinical Documentation</h3>
+        <p class="ctrl">Pre/post scans, photographs, X-rays, notes, treatment plan, consent, prescriptions, procedure documentation</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">11</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Clinical Documentation Score</strong>
+      <span class="sep">·</span><span class="pri pri-patient-safety">PATIENT SAFETY</span> 4
+      <span class="sep">·</span><span class="pri pri-critical">CRITICAL</span> 7
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>Medical History Compliance %</code> <code>Consent Compliance %</code> <code>Pre-Treatment Documentation %</code> <code>Radiograph Compliance %</code> <code>Chairside Readiness %</code> <code>Pre-op Reminder Compliance %</code> <code>Pre-op Instruction Compliance %</code> <code>Procedure Readiness %</code> <code>Post-Treatment Documentation %</code> <code>Post-op Instruction Compliance %</code> <code>Clinical Note Completion %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">CLN-001</td>
+    <td class="act">Update medical history</td>
+    <td class="std">Medical history current before applicable treatment</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_VISIT</span></td>
+    <td class="due">Before treatment</td>
+    <td class="who">Doctor/Assistant<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Patient visit</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">CLN-002</td>
+    <td class="act">Verify procedure consent</td>
+    <td class="std">Valid procedure-specific consent signed</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_PROCEDURE</span></td>
+    <td class="due">Before procedure</td>
+    <td class="who">Doctor/Assistant<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SIGNATURE</td>
+    <td class="gate">Procedure requires consent</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">CLN-004</td>
+    <td class="act">Verify radiograph requirement</td>
+    <td class="std">Required radiograph available/current</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_PROCEDURE</span></td>
+    <td class="due">Before procedure</td>
+    <td class="who">Doctor<br><span class="chk">✓ Clinical Director</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Procedure protocol</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">CLN-008</td>
+    <td class="act">Procedure readiness evaluation</td>
+    <td class="std">All mandatory configured requirements evaluated</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_PROCEDURE</span></td>
+    <td class="due">Before start</td>
+    <td class="who">System<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">All readiness inputs</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">CLN-003</td>
+    <td class="act">Pre-treatment scan/photo</td>
+    <td class="std">Required baseline scan/photo documented</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_PROCEDURE</span></td>
+    <td class="due">Before procedure</td>
+    <td class="who">Assistant/Doctor<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">ATTACHMENT</td>
+    <td class="gate">Procedure protocol</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLN-005</td>
+    <td class="act">Chairside setup</td>
+    <td class="std">Procedure-specific instruments/materials ready</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_PATIENT</span></td>
+    <td class="due">Before seating/procedure</td>
+    <td class="who">Dental Assistant<br><span class="chk">✓ Doctor</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate">Procedure plan</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLN-006</td>
+    <td class="act">Pre-op medication reminder</td>
+    <td class="std">Surgical patient reminded per prescribed plan</td>
+    <td><span class="trig">TIME</span><br><span class="freq">PER_SURGERY</span></td>
+    <td class="due">Protocol-defined</td>
+    <td class="who">Reception/Assistant<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Surgery scheduled</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLN-007</td>
+    <td class="act">Pre-op meal/instruction reminder</td>
+    <td class="std">Surgical patient receives clinic-approved pre-op instructions</td>
+    <td><span class="trig">TIME</span><br><span class="freq">PER_SURGERY</span></td>
+    <td class="due">Protocol-defined</td>
+    <td class="who">Reception/Assistant<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Surgery scheduled</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLN-009</td>
+    <td class="act">Post-treatment scan/photo</td>
+    <td class="std">Required post-treatment record captured</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_PROCEDURE</span></td>
+    <td class="due">Before visit closure</td>
+    <td class="who">Assistant/Doctor<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">ATTACHMENT</td>
+    <td class="gate">Procedure protocol</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLN-010</td>
+    <td class="act">Post-op instructions</td>
+    <td class="std">Applicable patient receives documented instructions</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_PROCEDURE</span></td>
+    <td class="due">Before discharge</td>
+    <td class="who">Doctor/Assistant<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate">Procedure completed</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLN-011</td>
+    <td class="act">Clinical notes completion</td>
+    <td class="std">Required clinical note completed</td>
+    <td><span class="trig">DEADLINE</span><br><span class="freq">PER_VISIT</span></td>
+    <td class="due">Before/within configured SLA</td>
+    <td class="who">Treating Doctor<br><span class="chk">✓ Clinical Director</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Visit</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr></tbody></table></div>
+  </section>
+<section class="param" id="SURGICAL_HIGH_RISK">
+    <header class="ph">
+      <div class="pn">10</div>
+      <div class="pt">
+        <h3>Surgical &amp; High-Risk Protocols</h3>
+        <p class="ctrl">Pre-op medicine reminder, meal instruction, consent, surgical checklist, post-op instructions, next-day follow-up</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">6</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Patient Care Compliance</strong>
+      <span class="sep">·</span><span class="pri pri-patient-safety">PATIENT SAFETY</span> 4
+      <span class="sep">·</span><span class="pri pri-critical">CRITICAL</span> 2
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>Implant Master Completeness %</code> <code>Implant Planning Completeness %</code> <code>Implant Readiness %</code> <code>Valid Implant Batch %</code> <code>Implant Traceability %</code> <code>Implant Inventory Accuracy %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">IMP-002</td>
+    <td class="act">Upcoming surgery requirements</td>
+    <td class="std">Planned implant/components captured per case</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_SURGERY</span></td>
+    <td class="due">Before surgery</td>
+    <td class="who">Treating Doctor<br><span class="chk">✓ Implant Coordinator</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Surgery scheduled</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">IMP-003</td>
+    <td class="act">Implant stock readiness</td>
+    <td class="std">Required implant/components compared to usable stock</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_SURGERY</span></td>
+    <td class="due">Configured lead time</td>
+    <td class="who">System/Implant Coordinator<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Case requirements</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">IMP-004</td>
+    <td class="act">Implant lot/expiry verification</td>
+    <td class="std">Selected implant batch valid and not expired</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_IMPLANT</span></td>
+    <td class="due">Before use</td>
+    <td class="who">Assistant/Doctor<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Implant selected</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">IMP-005</td>
+    <td class="act">Record implant usage</td>
+    <td class="std">Patient/site/SKU/lot/dimensions/doctor permanently linked</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_IMPLANT</span></td>
+    <td class="due">At placement</td>
+    <td class="who">Treating Doctor/Assistant<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Procedure</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">IMP-001</td>
+    <td class="act">Maintain implant SKU master</td>
+    <td class="std">Manufacturer/system/platform/dimensions/components current</td>
+    <td><span class="trig">MANUAL</span><br><span class="freq">AS_REQUIRED</span></td>
+    <td class="due">Before use</td>
+    <td class="who">Implant Coordinator<br><span class="chk">✓ Clinical Director</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr><tr>
+    <td class="id">IMP-006</td>
+    <td class="act">Implant stock reconciliation</td>
+    <td class="std">Physical vs system implant stock reconciled</td>
+    <td><span class="trig">TIME</span><br><span class="freq">WEEKLY</span></td>
+    <td class="due">Week end</td>
+    <td class="who">Implant Coordinator<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr></tbody></table></div>
+  </section>
+<section class="param" id="FOLLOWUP_EXPERIENCE">
+    <header class="ph">
+      <div class="pn">11</div>
+      <div class="pt">
+        <h3>Patient Follow-up &amp; Experience</h3>
+        <p class="ctrl">Follow-up due/completed, treatment progress, unresolved complaints, satisfaction, Google review request</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">9</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Patient Care Compliance</strong>
+      <span class="sep">·</span><span class="pri pri-patient-safety">PATIENT SAFETY</span> 1
+      <span class="sep">·</span><span class="pri pri-critical">CRITICAL</span> 4
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>Follow-up Generation %</code> <code>Surgery Follow-up Compliance %</code> <code>Clinical Alert Response Time</code> <code>Follow-up Compliance %</code> <code>Review Request %</code> <code>Complaint Capture %</code> <code>Complaint Acknowledgement Time</code> <code>Complaint Resolution Time</code> <code>Complaint Closure %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">FUP-003</td>
+    <td class="act">Escalate red flags</td>
+    <td class="std">Configured symptoms routed to qualified clinician</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_FOLLOWUP</span></td>
+    <td class="due">Immediate</td>
+    <td class="who">System<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Red-flag response</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">CMP-001</td>
+    <td class="act">Register complaint</td>
+    <td class="std">Every complaint captured with channel/category/severity</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_COMPLAINT</span></td>
+    <td class="due">At receipt</td>
+    <td class="who">Reception/Manager<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CMP-003</td>
+    <td class="act">Investigate complaint</td>
+    <td class="std">Facts reviewed and action documented</td>
+    <td><span class="trig">STATUS_CHANGE</span><br><span class="freq">PER_COMPLAINT</span></td>
+    <td class="due">Within SLA</td>
+    <td class="who">Complaint Owner<br><span class="chk">✓ Clinic Head</span></td>
+    <td class="ev">ATTACHMENT</td>
+    <td class="gate">Acknowledged</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">FUP-001</td>
+    <td class="act">Generate surgical follow-up</td>
+    <td class="std">Protocol follow-up auto-created after surgery</td>
+    <td><span class="trig">STATUS_CHANGE</span><br><span class="freq">PER_SURGERY</span></td>
+    <td class="due">At completion</td>
+    <td class="who">System<br><span class="chk">✓ Reception Lead</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Surgery completed</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">FUP-002</td>
+    <td class="act">Day-after surgery call</td>
+    <td class="std">Surgery patient contacted next day</td>
+    <td><span class="trig">TIME</span><br><span class="freq">PER_SURGERY</span></td>
+    <td class="due">+1 day</td>
+    <td class="who">Reception/Assistant<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Follow-up due</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CMP-002</td>
+    <td class="act">Acknowledge complaint</td>
+    <td class="std">Patient acknowledgement within configured SLA</td>
+    <td><span class="trig">DEADLINE</span><br><span class="freq">PER_COMPLAINT</span></td>
+    <td class="due">SLA-defined</td>
+    <td class="who">Complaint Owner<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Complaint received</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CMP-004</td>
+    <td class="act">Close complaint</td>
+    <td class="std">Resolution and patient contact documented</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_COMPLAINT</span></td>
+    <td class="due">Within SLA</td>
+    <td class="who">Complaint Owner<br><span class="chk">✓ Clinic Head</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Action complete</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">FUP-004</td>
+    <td class="act">Treatment progress follow-up</td>
+    <td class="std">Protocol review/follow-up completed</td>
+    <td><span class="trig">TIME</span><br><span class="freq">PER_PROTOCOL</span></td>
+    <td class="due">Protocol-defined</td>
+    <td class="who">Reception/Doctor<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Procedure protocol</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">FUP-005</td>
+    <td class="act">Google review request</td>
+    <td class="std">Eligible completed patient asked for review</td>
+    <td><span class="trig">STATUS_CHANGE</span><br><span class="freq">PER_TREATMENT</span></td>
+    <td class="due">After completion</td>
+    <td class="who">Reception<br><span class="chk">✓ Reception Lead</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Treatment completed/eligibility</td>
+    <td><span class="pri pri-routine">ROUTINE</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr></tbody></table></div>
+  </section>
+<section class="param" id="LABORATORY">
+    <header class="ph">
+      <div class="pn">12</div>
+      <div class="pt">
+        <h3>Laboratory Case Management</h3>
+        <p class="ctrl">Lab dispatch, due date, receipt, QC, crown availability, appointment linkage, remake/delay tracking</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">7</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Lab Efficiency</strong>
+      
+      <span class="sep">·</span><span class="pri pri-critical">CRITICAL</span> 5
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>Lab Record Completeness %</code> <code>Lab Dispatch Compliance %</code> <code>On-Time Lab %</code> <code>Lab Receipt Accuracy %</code> <code>Lab QC Pass %</code> <code>Lab-Ready Scheduling Compliance %</code> <code>Lab Remake %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">LAB-001</td>
+    <td class="act">Create lab case</td>
+    <td class="std">All sent work has complete digital lab record</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_CASE</span></td>
+    <td class="due">Before dispatch</td>
+    <td class="who">Lab Coordinator/Assistant<br><span class="chk">✓ Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Lab work prescribed</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">LAB-004</td>
+    <td class="act">Receive and cross-check case</td>
+    <td class="std">Received work matched to case/patient/specification</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_CASE</span></td>
+    <td class="due">At receipt</td>
+    <td class="who">Lab Coordinator<br><span class="chk">✓ Doctor</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Lab received</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">LAB-005</td>
+    <td class="act">Doctor QC</td>
+    <td class="std">Clinical/lab QC completed before patient-ready</td>
+    <td><span class="trig">STATUS_CHANGE</span><br><span class="freq">PER_CASE</span></td>
+    <td class="due">After receipt</td>
+    <td class="who">Doctor<br><span class="chk">✓ Clinical Lead</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Case received</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">LAB-006</td>
+    <td class="act">Schedule after readiness</td>
+    <td class="std">Patient delivery appointment only after configured lab readiness</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_CASE</span></td>
+    <td class="due">After QC pass</td>
+    <td class="who">Reception<br><span class="chk">✓ Lab Coordinator</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">QC passed</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">LAB-007</td>
+    <td class="act">Manage remake/correction</td>
+    <td class="std">Failed QC creates correction/remake workflow</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_CASE</span></td>
+    <td class="due">Immediate</td>
+    <td class="who">Lab Coordinator<br><span class="chk">✓ Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">QC failed</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">LAB-002</td>
+    <td class="act">Dispatch lab case</td>
+    <td class="std">Dispatch date/materials recorded</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_CASE</span></td>
+    <td class="due">At dispatch</td>
+    <td class="who">Lab Coordinator<br><span class="chk">✓ Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Case created</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr><tr>
+    <td class="id">LAB-003</td>
+    <td class="act">Monitor expected return</td>
+    <td class="std">Cases tracked against due date</td>
+    <td><span class="trig">DEADLINE</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Before due date</td>
+    <td class="who">Lab Coordinator<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Expected return date</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr></tbody></table></div>
+  </section>
+<section class="param" id="INVENTORY_IMPLANTS">
+    <header class="ph">
+      <div class="pn">13</div>
+      <div class="pt">
+        <h3>Inventory &amp; Implant Stock</h3>
+        <p class="ctrl">Minimum stock, current stock, expiry, consumption, reorder, implant brands/components, shortages, wastage</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">14</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Inventory Readiness</strong>
+      <span class="sep">·</span><span class="pri pri-patient-safety">PATIENT SAFETY</span> 4
+      <span class="sep">·</span><span class="pri pri-critical">CRITICAL</span> 4
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>Critical Consumable Availability %</code> <code>Receipt Accuracy %</code> <code>Stock Transaction Accuracy %</code> <code>Stock-Out Rate</code> <code>Expiry/Wastage %</code> <code>PR Approval SLA %</code> <code>GRN Accuracy %</code> <code>Inventory Variance %</code> <code>Implant Master Completeness %</code> <code>Implant Planning Completeness %</code> <code>Implant Readiness %</code> <code>Valid Implant Batch %</code> <code>Implant Traceability %</code> <code>Implant Inventory Accuracy %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">IMP-002</td>
+    <td class="act">Upcoming surgery requirements</td>
+    <td class="std">Planned implant/components captured per case</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_SURGERY</span></td>
+    <td class="due">Before surgery</td>
+    <td class="who">Treating Doctor<br><span class="chk">✓ Implant Coordinator</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Surgery scheduled</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">IMP-003</td>
+    <td class="act">Implant stock readiness</td>
+    <td class="std">Required implant/components compared to usable stock</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_SURGERY</span></td>
+    <td class="due">Configured lead time</td>
+    <td class="who">System/Implant Coordinator<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Case requirements</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">IMP-004</td>
+    <td class="act">Implant lot/expiry verification</td>
+    <td class="std">Selected implant batch valid and not expired</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_IMPLANT</span></td>
+    <td class="due">Before use</td>
+    <td class="who">Assistant/Doctor<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Implant selected</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">IMP-005</td>
+    <td class="act">Record implant usage</td>
+    <td class="std">Patient/site/SKU/lot/dimensions/doctor permanently linked</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_IMPLANT</span></td>
+    <td class="due">At placement</td>
+    <td class="who">Treating Doctor/Assistant<br><span class="chk">✓ Treating Doctor</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Procedure</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">IMP-001</td>
+    <td class="act">Maintain implant SKU master</td>
+    <td class="std">Manufacturer/system/platform/dimensions/components current</td>
+    <td><span class="trig">MANUAL</span><br><span class="freq">AS_REQUIRED</span></td>
+    <td class="due">Before use</td>
+    <td class="who">Implant Coordinator<br><span class="chk">✓ Clinical Director</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr><tr>
+    <td class="id">IMP-006</td>
+    <td class="act">Implant stock reconciliation</td>
+    <td class="std">Physical vs system implant stock reconciled</td>
+    <td><span class="trig">TIME</span><br><span class="freq">WEEKLY</span></td>
+    <td class="due">Week end</td>
+    <td class="who">Implant Coordinator<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">INV-001</td>
+    <td class="act">Daily critical consumable check</td>
+    <td class="std">Critical room consumables available</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Opening</td>
+    <td class="who">Dental Assistant<br><span class="chk">✓ Inventory Coordinator</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate">Room readiness</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">INV-005</td>
+    <td class="act">Expiry monitoring</td>
+    <td class="std">Near-expiry batches surfaced and FEFO applied</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Configured horizon</td>
+    <td class="who">System/Inventory Coordinator<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Batch expiry</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">INV-002</td>
+    <td class="act">Record stock receipt</td>
+    <td class="std">All received stock entered by batch/expiry where applicable</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_RECEIPT</span></td>
+    <td class="due">At receipt</td>
+    <td class="who">Inventory Coordinator<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">PO/receipt</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr><tr>
+    <td class="id">INV-003</td>
+    <td class="act">Record stock issue</td>
+    <td class="std">Material issues recorded through controlled transaction</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">AS_USED</span></td>
+    <td class="due">At issue</td>
+    <td class="who">Authorized Staff<br><span class="chk">✓ Inventory Coordinator</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Available stock</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">INV-004</td>
+    <td class="act">Low-stock reorder</td>
+    <td class="std">Reorder action generated at configured threshold</td>
+    <td><span class="trig">THRESHOLD</span><br><span class="freq">CONTINUOUS</span></td>
+    <td class="due">Immediate</td>
+    <td class="who">System/Inventory Coordinator<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Stock &lt;= reorder</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">INV-006</td>
+    <td class="act">Purchase request approval</td>
+    <td class="std">PR approved/rejected per authority matrix</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_PR</span></td>
+    <td class="due">Within SLA</td>
+    <td class="who">Approver<br><span class="chk">✓ Clinic Head</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">PR submitted</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr><tr>
+    <td class="id">INV-007</td>
+    <td class="act">Goods receipt reconciliation</td>
+    <td class="std">Received quantities matched to PO/PR</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_RECEIPT</span></td>
+    <td class="due">At receipt</td>
+    <td class="who">Inventory Coordinator<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">PO exists</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">INV-008</td>
+    <td class="act">Wastage/adjustment control</td>
+    <td class="std">All wastage/adjustments have reason and authorization</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">AS_REQUIRED</span></td>
+    <td class="due">At event</td>
+    <td class="who">Authorized Staff<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Stock transaction</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr></tbody></table></div>
+  </section>
+<section class="param" id="STAFF_CONDUCT">
+    <header class="ph">
+      <div class="pn">14</div>
+      <div class="pt">
+        <h3>Staff Conduct &amp; Coordination</h3>
+        <p class="ctrl">Role responsibility, lunch coverage, reception support, handovers, communication, conduct incidents, training</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">8</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Team Compliance Score</strong>
+      <span class="sep">·</span><span class="pri pri-patient-safety">PATIENT SAFETY</span> 1
+      <span class="sep">·</span><span class="pri pri-critical">CRITICAL</span> 3
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>Role Competency Coverage %</code> <code>Training Completion %</code> <code>Competency Coverage %</code> <code>Competency Gate Compliance %</code> <code>Current Competency %</code> <code>Conduct Incident Closure %</code> <code>Patient-Facing Conduct Incidents</code> <code>Conduct Action Closure %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">TRN-004</td>
+    <td class="act">Restricted work gate</td>
+    <td class="std">Independent assignment requires minimum competency</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_ASSIGNMENT</span></td>
+    <td class="due">At assignment</td>
+    <td class="who">System<br><span class="chk">✓ Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Role competency</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">CON-002</td>
+    <td class="act">Patient-facing conflict prevention</td>
+    <td class="std">No staff arguments/unprofessional conduct in patient areas</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">CONTINUOUS</span></td>
+    <td class="due">Immediate</td>
+    <td class="who">All Staff<br><span class="chk">✓ Manager</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate">Conduct policy</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">TRN-001</td>
+    <td class="act">Role competency assignment</td>
+    <td class="std">Each role has required competency profile</td>
+    <td><span class="trig">MANUAL</span><br><span class="freq">ON_ROLE_CHANGE</span></td>
+    <td class="due">At assignment</td>
+    <td class="who">Manager<br><span class="chk">✓ Clinical Director</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Role assigned</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr><tr>
+    <td class="id">TRN-003</td>
+    <td class="act">Competency assessment</td>
+    <td class="std">Skill assessed and level recorded with validity</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_ASSESSMENT</span></td>
+    <td class="due">Before independent work</td>
+    <td class="who">Qualified Assessor<br><span class="chk">✓ Clinical Director/Manager</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Training complete</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CON-001</td>
+    <td class="act">Record conduct incident</td>
+    <td class="std">Material conduct issue recorded factually and confidentially</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">AS_REQUIRED</span></td>
+    <td class="due">Promptly</td>
+    <td class="who">Manager<br><span class="chk">✓ Clinic Head</span></td>
+    <td class="ev">ATTACHMENT</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CON-003</td>
+    <td class="act">Conduct follow-up</td>
+    <td class="std">Assigned corrective/coaching action completed</td>
+    <td><span class="trig">DEADLINE</span><br><span class="freq">PER_INCIDENT</span></td>
+    <td class="due">By due date</td>
+    <td class="who">Employee/Manager<br><span class="chk">✓ Clinic Head</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Conduct incident</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">TRN-002</td>
+    <td class="act">Training assignment</td>
+    <td class="std">Competency gap generates training/reassessment</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">AS_REQUIRED</span></td>
+    <td class="due">On gap detection</td>
+    <td class="who">System/Manager<br><span class="chk">✓ Trainer</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Gap detected</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">TRN-005</td>
+    <td class="act">Competency expiry monitoring</td>
+    <td class="std">Expiring credentials generate reassessment alert</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Lead-time configured</td>
+    <td class="who">System<br><span class="chk">✓ Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Validity date</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr></tbody></table></div>
+  </section>
+<section class="param" id="SAFETY_EMERGENCY">
+    <header class="ph">
+      <div class="pn">15</div>
+      <div class="pt">
+        <h3>Safety, Emergency &amp; Compliance</h3>
+        <p class="ctrl">Emergency kit, emergency readiness, OPG competency, biomedical waste, equipment safety, incident reporting</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">4</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Infection Control Score</strong>
+      <span class="sep">·</span><span class="pri pri-patient-safety">PATIENT SAFETY</span> 3
+      <span class="sep">·</span><span class="pri pri-critical">CRITICAL</span> 1
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>Emergency Readiness %</code> <code>Emergency Audit Score</code> <code>Emergency Incident Documentation %</code> <code>Emergency Drill Compliance %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">EMR-001</td>
+    <td class="act">Daily emergency quick check</td>
+    <td class="std">Critical emergency equipment/items ready</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Opening</td>
+    <td class="who">Assigned Assistant<br><span class="chk">✓ Doctor/Manager</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Emergency master</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">EMR-002</td>
+    <td class="act">Monthly full emergency audit</td>
+    <td class="std">Complete emergency inventory/function/expiry audit</td>
+    <td><span class="trig">TIME</span><br><span class="freq">MONTHLY</span></td>
+    <td class="due">Scheduled</td>
+    <td class="who">Clinic Manager<br><span class="chk">✓ Clinical Director</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Emergency master</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">EMR-003</td>
+    <td class="act">Emergency event documentation</td>
+    <td class="std">Every medical emergency creates incident record</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_EVENT</span></td>
+    <td class="due">Immediate/after stabilization</td>
+    <td class="who">Treating Team<br><span class="chk">✓ Clinical Director</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Emergency event</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">EMR-004</td>
+    <td class="act">Emergency drill</td>
+    <td class="std">Team drill completed per schedule</td>
+    <td><span class="trig">TIME</span><br><span class="freq">QUARTERLY</span></td>
+    <td class="due">Scheduled</td>
+    <td class="who">Clinic Manager<br><span class="chk">✓ Clinical Director</span></td>
+    <td class="ev">ATTACHMENT</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr></tbody></table></div>
+  </section>
+<section class="param" id="QUALITY_CAPA">
+    <header class="ph">
+      <div class="pn">16</div>
+      <div class="pt">
+        <h3>Quality, Incident &amp; CAPA</h3>
+        <p class="ctrl">Incident → containment → root cause → corrective action → preventive action → verification → closure; repeat-failure detection and audit findings</p>
+      </div>
+      <div class="pc">
+        <span class="cnt">13</span>
+        <span class="cntl">activities</span>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="mk">Rolls into</span> <strong>Team Compliance Score</strong>
+      <span class="sep">·</span><span class="pri pri-patient-safety">PATIENT SAFETY</span> 3
+      <span class="sep">·</span><span class="pri pri-critical">CRITICAL</span> 8
+    </div>
+    
+    <p class="kpis"><span class="mk">KPIs</span> <code>Incident Reporting Time</code> <code>Containment Time</code> <code>RCA Completion %</code> <code>CAPA Initiation %</code> <code>CAPA On-Time Completion %</code> <code>CAPA Effectiveness %</code> <code>Repeat Failure Rate</code> <code>Weekly Clinic Health Score</code> <code>Monthly Review Compliance %</code> <code>Infection Control Audit Score</code> <code>Equipment Compliance Score</code> <code>Inventory Accuracy %</code> <code>Audit Finding Closure %</code></p>
+    <div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">AUD-003</td>
+    <td class="act">Infection control audit</td>
+    <td class="std">Detailed infection-control audit completed</td>
+    <td><span class="trig">TIME</span><br><span class="freq">MONTHLY</span></td>
+    <td class="due">Scheduled</td>
+    <td class="who">Clinical/Quality Lead<br><span class="chk">✓ Clinical Director</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">INC-001</td>
+    <td class="act">Report incident</td>
+    <td class="std">Safety/quality incident recorded promptly</td>
+    <td><span class="trig">EVENT</span><br><span class="freq">PER_INCIDENT</span></td>
+    <td class="due">Immediate</td>
+    <td class="who">Any Authorized User<br><span class="chk">✓ Manager/Clinical Director</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">INC-002</td>
+    <td class="act">Immediate containment</td>
+    <td class="std">Immediate risk controlled/documented</td>
+    <td><span class="trig">STATUS_CHANGE</span><br><span class="freq">PER_INCIDENT</span></td>
+    <td class="due">Immediate</td>
+    <td class="who">Incident Owner<br><span class="chk">✓ Clinical Director/Manager</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Incident reported</td>
+    <td><span class="pri pri-patient-safety">PATIENT SAFETY</span></td>
+    <td class="capa">required on critical</td>
+  </tr><tr>
+    <td class="id">AUD-004</td>
+    <td class="act">Equipment audit</td>
+    <td class="std">Asset status/PM/calibration reviewed</td>
+    <td><span class="trig">TIME</span><br><span class="freq">MONTHLY</span></td>
+    <td class="due">Scheduled</td>
+    <td class="who">Clinic Manager<br><span class="chk">✓ Clinic Head</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">AUD-005</td>
+    <td class="act">Inventory audit</td>
+    <td class="std">Critical stock/expiry/variance reviewed</td>
+    <td><span class="trig">TIME</span><br><span class="freq">MONTHLY</span></td>
+    <td class="due">Scheduled</td>
+    <td class="who">Inventory Coordinator<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">AUD-006</td>
+    <td class="act">Audit finding closure</td>
+    <td class="std">Findings closed by severity-based SLA</td>
+    <td><span class="trig">DEADLINE</span><br><span class="freq">PER_FINDING</span></td>
+    <td class="due">SLA-defined</td>
+    <td class="who">Finding Owner<br><span class="chk">✓ Auditor/Manager</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Finding open</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">INC-003</td>
+    <td class="act">Root cause analysis</td>
+    <td class="std">Root cause category and analysis completed</td>
+    <td><span class="trig">STATUS_CHANGE</span><br><span class="freq">PER_INCIDENT</span></td>
+    <td class="due">By SLA</td>
+    <td class="who">Incident Owner<br><span class="chk">✓ Quality/Clinic Head</span></td>
+    <td class="ev">ATTACHMENT</td>
+    <td class="gate">Contained</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">INC-004</td>
+    <td class="act">Create CAPA</td>
+    <td class="std">Required corrective/preventive actions assigned</td>
+    <td><span class="trig">DEPENDENCY</span><br><span class="freq">PER_INCIDENT</span></td>
+    <td class="due">After RCA</td>
+    <td class="who">Quality/Manager<br><span class="chk">✓ Clinic Head</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">CAPA required</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">always</td>
+  </tr><tr>
+    <td class="id">INC-005</td>
+    <td class="act">Implement CAPA</td>
+    <td class="std">Actions completed by due date</td>
+    <td><span class="trig">DEADLINE</span><br><span class="freq">PER_CAPA</span></td>
+    <td class="due">Due date</td>
+    <td class="who">CAPA Owner<br><span class="chk">✓ Quality/Manager</span></td>
+    <td class="ev">ATTACHMENT</td>
+    <td class="gate">CAPA open</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">always</td>
+  </tr><tr>
+    <td class="id">INC-006</td>
+    <td class="act">Effectiveness check</td>
+    <td class="std">CAPA effectiveness independently assessed</td>
+    <td><span class="trig">TIME</span><br><span class="freq">PER_CAPA</span></td>
+    <td class="due">Configured date</td>
+    <td class="who">Verifier<br><span class="chk">✓ Clinic Head</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate">Implemented</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">always</td>
+  </tr><tr>
+    <td class="id">INC-007</td>
+    <td class="act">Repeat failure detection</td>
+    <td class="std">Repeated same failure crosses threshold</td>
+    <td><span class="trig">THRESHOLD</span><br><span class="freq">CONTINUOUS</span></td>
+    <td class="due">Configured</td>
+    <td class="who">System<br><span class="chk">✓ Quality/Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate">Failure taxonomy</td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">AUD-001</td>
+    <td class="act">Weekly clinic health audit</td>
+    <td class="std">Weekly cross-domain audit completed</td>
+    <td><span class="trig">TIME</span><br><span class="freq">WEEKLY</span></td>
+    <td class="due">Week end</td>
+    <td class="who">Clinic Manager<br><span class="chk">✓ Clinic Head</span></td>
+    <td class="ev">VERIFICATION</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">AUD-002</td>
+    <td class="act">Monthly operating review</td>
+    <td class="std">Monthly KPI/exception/CAPA review completed</td>
+    <td><span class="trig">TIME</span><br><span class="freq">MONTHLY</span></td>
+    <td class="due">Month end</td>
+    <td class="who">Clinic Head<br><span class="chk">✓ Owner/Director</span></td>
+    <td class="ev">ATTACHMENT</td>
+    <td class="gate">KPI data</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr></tbody></table></div>
+  </section>
+
+<h2 class="sec">The eight management scores</h2>
+<p class="sub">§7: the 16 parameters roll upward into approximately eight management scores.
+This is the layer the owner actually reads — not sixteen numbers, and not one.</p>
+<div class="scores">
+<div class="score"><b>Clinic Readiness Score</b><span>% opening requirements completed before first patient</span></div><div class="score"><b>Patient Care Compliance</b><span>% required patient protocols completed</span></div><div class="score"><b>Clinical Documentation Score</b><span>% cases with complete required records</span></div><div class="score"><b>Infection Control Score</b><span>Sterilization + PPE + biomedical waste compliance</span></div><div class="score"><b>Appointment Efficiency</b><span>Confirmation, cancellation, no-show, utilization</span></div><div class="score"><b>Lab Efficiency</b><span>On-time cases, pending cases, remakes, QC</span></div><div class="score"><b>Inventory Readiness</b><span>Stock-outs, reorder compliance, implant availability</span></div><div class="score"><b>Team Compliance Score</b><span>Attendance + task completion + SOP adherence + training</span></div>
+</div>
+
+<h2 class="sec">Escalation</h2>
+<div class="scores">
+  <div class="score"><b>L1 — Reminder</b><span>Approaching deadline → notify the responsible person</span></div>
+  <div class="score"><b>L2 — Overdue</b><span>Deadline crossed → notify responsible <em>and</em> checker</span></div>
+  <div class="score"><b>L3 — Critical</b><span>Still unresolved, or patient safety → notify owner/manager</span></div>
+</div>
+<p class="sub" style="margin-top:12px">Escalation depends on clinical risk, not elapsed time alone:
+a plant not watered and a missing implant consent cannot receive the same priority. That is what the
+risk column on every activity is for.</p>
+
+<h2 class="sec">Spans several control heads</h2>
+<div class="param"><header class="ph"><div class="pn" style="background:var(--soft)">—</div>
+<div class="pt"><h3>Closing &amp; Facility</h3>
+<p class="ctrl">These 6 activities each belong to a different control head — the closing
+run is a moment in the day, not a parameter. Filing them together would have put patient-safety
+checks under a facilities heading.</p></div>
+<div class="pc"><span class="cnt">6</span><span class="cntl">activities</span></div></header>
+<div class="tw"><table>
+  <thead><tr><th>ID</th><th>Activity</th><th>Standard</th><th>Trigger</th><th>Due</th><th>Doer / Checker</th><th>Evidence</th><th>Gate</th><th>Risk</th><th>CAPA</th></tr></thead>
+  <tbody><tr>
+    <td class="id">CLS-006</td>
+    <td class="act">Final clinic lock/security</td>
+    <td class="std">Required floors/rooms secured and closure recorded</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Final closing</td>
+    <td class="who">Authorized Closing Staff<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-critical">CRITICAL</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLS-001</td>
+    <td class="act">Patient/appointment closure</td>
+    <td class="std">All visits/appointments reconciled at day end</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Closing</td>
+    <td class="who">Reception<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr><tr>
+    <td class="id">CLS-002</td>
+    <td class="act">Lab day-end review</td>
+    <td class="std">All lab dispatch/receipt/status changes recorded</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Closing</td>
+    <td class="who">Lab Coordinator<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">SYSTEM</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr><tr>
+    <td class="id">CLS-003</td>
+    <td class="act">Stock/critical consumables closing check</td>
+    <td class="std">Critical shortages identified before next day</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Closing</td>
+    <td class="who">Inventory/Assistant<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate">Tomorrow schedule</td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLS-005</td>
+    <td class="act">Water pump/tank check</td>
+    <td class="std">Pump safely switched off when tank full/at closing</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Closing</td>
+    <td class="who">Assigned Staff<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-important">IMPORTANT</span></td>
+    <td class="capa">required on repeat</td>
+  </tr><tr>
+    <td class="id">CLS-004</td>
+    <td class="act">Utilities shutdown</td>
+    <td class="std">Unused AC/lights/fans/equipment switched off safely</td>
+    <td><span class="trig">TIME</span><br><span class="freq">DAILY</span></td>
+    <td class="due">Closing</td>
+    <td class="who">Assigned Staff<br><span class="chk">✓ Clinic Manager</span></td>
+    <td class="ev">CONFIRMATION</td>
+    <td class="gate"><span class="none">—</span></td>
+    <td><span class="pri pri-routine">ROUTINE</span></td>
+    <td class="capa"><span class="none">—</span></td>
+  </tr></tbody></table></div></div>
+
+<footer>
+  Synthetic and internal. Generated by <code>scripts/build-parameter-spec.mjs</code> from the
+  frozen Master Activity Matrix v2.0 (101 activities) and the Operations App §1 control table.
+</footer>
+</div></body></html>

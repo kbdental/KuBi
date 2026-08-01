@@ -72,8 +72,8 @@ section: "Everything else stays in the background."
 | §7 KPI rollup | 16 parameters → **~8 management scores** → owner dashboard | 16 → 1 | **the 8-score middle layer is missing** — the owner reads Opening / Clinical / Patient Experience / Infection Control / Lab / Inventory / Equipment / Team, and those eight are not modelled |
 | 6 engines | Time, Patient Event, Equipment, Inventory, Compliance, Exception | Time, Exception | **4 missing**, incl. the Compliance engine the doc calls the point where "KuBi becomes significantly more useful than ordinary clinic software" |
 | Role views | Assistant, Reception, **Doctor**, Manager, Owner | Assistant, Senior Assistant, Reception, Manager | **no Doctor view** — medical alerts, pending treatment plans, consent status, documentation, scans required, Lab QC |
-| Activity IDs | "permanent ID such as ATT-001, OPEN-001, PAT-001 … should never change" | `OPN-001`, `CLS-001` | **wrong prefixes, invented rather than taken from the dictionary.** Since the IDs are permanent by design, this gets more expensive every day it stands |
-| Master Activity Dictionary | ~118 activities, sheets A–N | 9 | **~8% seeded** |
+| Activity IDs | permanent IDs, never changing | `OPN-001`, `CLS-001` | **correct after all** — see the correction below |
+| Master Activity Matrix v2.0 | **101 activities, 23 columns, fully populated** | 9 | **~9% seeded** |
 
 ### Domain objects the documents specify that do not exist
 
@@ -126,5 +126,57 @@ The correction order that follows from §8 rather than from convenience:
 3. **The 8 management scores** — the layer the owner actually reads.
 4. **Lab Case object, then the crown-delivery gate** — the doc's own flagship
    example, and the first real test of the Patient Event and Compliance engines.
-5. **The Master Activity Dictionary, with the document's own IDs** — including
-   renaming `OPN-*`/`CLS-*` to `OPEN-*`/`CLOSE-*` before those IDs spread further.
+5. **The Master Activity Matrix v2.0** — all 101 activities, under the IDs the
+   frozen matrix already assigns.
+
+---
+
+## Correction (2026-08-01): there is a third source, and it is the authoritative one
+
+The uploads contained three documents nobody had opened: `KuBi_FRS_v1.0.docx`,
+`KuBi_Developer_Build_Pack_v1.0.docx`, and — the important one —
+**`KuBi_Master_Activity_Automation_Matrix_v2.0.xlsx`**. CLAUDE.md already
+referred to "Matrix v2.0 is frozen"; this is that matrix. All are now committed
+here.
+
+It contains **101 activities across 23 columns**, every field of the 22-field
+record populated, plus 23 automation rules, the enum register, and a KPI
+dictionary. It is the extensive definition, and this file's earlier claims must
+be corrected against it:
+
+- **The seeded IDs were right.** `OPN-001` and `CLS-001` match Matrix v2.0
+  exactly. The `OPEN-`/`CLOSE-` prefixes I said they should have been come from
+  the earlier `Operation_App.xlsx` brainstorm (sheets B and N), which v2.0
+  supersedes. Nothing needs renaming.
+- **The 16-parameter enum is right.** The §1 control table lives in a Word
+  *table*, which the original paragraph-only extraction skipped entirely — so
+  the list was never actually read. Checked now, all 16 enum values match it
+  one for one.
+- **The eight management scores are specified**, in another skipped table:
+  Clinic Readiness, Patient Care Compliance, Clinical Documentation, Infection
+  Control, Appointment Efficiency, Lab Efficiency, Inventory Readiness, Team
+  Compliance. §7's missing middle layer is not underspecified; it was unread.
+- **The three escalation levels are specified** in a third skipped table: L1
+  reminder on approaching deadline, L2 on deadline crossed (responsible *and*
+  checker), L3 on unresolved or patient-safety (owner/manager).
+
+### The genuine finding
+
+Matrix v2.0 groups its 101 activities into **17 execution groups**, which are
+not the §1 **16 control parameters**. That is not an error in either document —
+v2.0 groups by how work runs (who does it, in which pass), §1 groups by what
+the owner is accountable for. But the mapping between them was never written
+down, so it is written down now in `scripts/build-parameter-spec.mjs` and
+rendered in `docs/kubi-parameters.html`.
+
+Mapping them exposes two real gaps in the frozen matrix:
+
+- **Cleanliness & Housekeeping (parameter 3) has zero activities.** The earlier
+  workbook defines fourteen (`HK-001`–`HK-014`); v2.0 carries none of them. The
+  parameter can therefore never score anything but GREY.
+- **Room & Chair Readiness (parameter 6) has zero activities**, though several
+  v2.0 activities (`CLN-005` chairside setup, `INV-001` consumable check) plainly
+  serve it and are filed elsewhere.
+
+Both are gaps in the dictionary, not in the code, and both need an owner
+decision rather than a guess.
