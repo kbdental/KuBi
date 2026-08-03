@@ -5,3 +5,7 @@ export * from './activity-record.js';
 export * from './work-model.js';
 export * from './management-scores.js';
 export * from './activity-library.js';
+export * from './automation.js';
+export * from './activity-generation.js';
+export * from './audit.js';
+export * from './notifications.js';
