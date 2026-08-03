@@ -21,6 +21,7 @@ import {
 } from '@kubi/contracts';
 import { useEffect, useState } from 'react';
 import { api, type ParameterHealthRow } from '../api.js';
+import { ActivityLibrary } from './activity-library.js';
 
 const CLASS_LABEL: Record<WeightClass, string> = {
   PATIENT_SAFETY: 'Patient safety',
@@ -48,6 +49,9 @@ const ORDER: WeightClass[] = [
 
 export function Standards() {
   const [health, setHealth] = useState<ParameterHealthRow[] | null>(null);
+  // Parameters and Activities are two views of one spine, so they share a
+  // destination rather than adding a tab. Navigation is unchanged.
+  const [view, setView] = useState<'PARAMETERS' | 'ACTIVITIES'>('PARAMETERS');
   useEffect(() => { void api.parameterHealth().then(setHealth).catch(() => setHealth([])); }, []);
 
   const byId = new Map((health ?? []).map((h) => [h.parameter, h]));
@@ -57,6 +61,27 @@ export function Standards() {
   return (
     <div className="screen screen-wide">
       <h1 className="screen-title">Clinic operating standards</h1>
+
+      <div className="std-switch">
+        <button
+          className={`std-tab ${view === 'PARAMETERS' ? 'is-on' : ''}`}
+          type="button"
+          onClick={() => setView('PARAMETERS')}
+        >
+          Parameters
+        </button>
+        <button
+          className={`std-tab ${view === 'ACTIVITIES' ? 'is-on' : ''}`}
+          type="button"
+          onClick={() => setView('ACTIVITIES')}
+        >
+          Activities
+        </button>
+      </div>
+
+      {view === 'ACTIVITIES' && <ActivityLibrary />}
+
+      {view === 'PARAMETERS' && <>
       <p className="screen-sub">
         Sixteen control parameters. What each is worth, who owns it, what it stands on,
         and which way it is moving.
@@ -96,6 +121,7 @@ export function Standards() {
           </section>
         );
       })}
+      </>}
     </div>
   );
 }

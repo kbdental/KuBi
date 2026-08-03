@@ -2033,3 +2033,59 @@ label.field-label {
 .or-gate { background: var(--safety-tint); color: var(--safety); }
 .or-exc { background: var(--safety); color: #fff; }
 @media (prefers-color-scheme: dark) { .or-event { background: #232a4d; color: #a5b4fc; } }
+
+/* ---- Activity library (PSS engine, browsable) ---------------------------- */
+.std-switch { display: flex; gap: 4px; margin: 0 0 18px; }
+.std-tab {
+  min-height: 40px; padding: 8px 16px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--card);
+  font: inherit; font-size: 14.5px; font-weight: 600; color: var(--ink-soft);
+  cursor: pointer;
+}
+.std-tab.is-on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); }
+
+.al-search {
+  width: 100%; min-height: 44px; padding: 10px 14px; margin: 0 0 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--card); font: inherit; font-size: 15px;
+}
+.al-fns { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 16px; }
+.al-fn {
+  padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--card);
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink-soft);
+  cursor: pointer;
+}
+.al-fn.is-on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.al-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.al-row {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  min-height: var(--tap); padding: 11px 14px 11px 0;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font: inherit; text-align: left; cursor: pointer; overflow: hidden;
+}
+.al-rail { flex: 0 0 3px; align-self: stretch; }
+.al-rail.pri-safety { background: var(--safety); }
+.al-rail.pri-critical { background: var(--warn); }
+.al-rail.pri-important { background: var(--accent-line); }
+.al-rail.pri-routine { background: var(--line); }
+.al-main { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.al-act { font-weight: 550; font-size: 15px; }
+.al-where { font-size: 12.5px; color: var(--ink-faint); }
+.al-id {
+  font: 11.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink-faint); white-space: nowrap;
+}
+.al-detail {
+  background: var(--line-soft); border: 1px solid var(--line); border-top: 0;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  padding: 14px 16px; margin: -6px 0 0;
+}
+.al-standard { margin: 0 0 12px; font-size: 14.5px; font-style: italic; color: var(--ink-soft); }
+.al-undecided { color: var(--warn); font-weight: 600; }
+.al-auto {
+  margin: 14px 0 0; padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--card); border: 1px solid var(--line); font-size: 14px;
+}
