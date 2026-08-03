@@ -2,6 +2,20 @@
 
 Step 1 of the two-step refactor. No code is merged until this is agreed.
 
+> **Status: approved in principle, 3 August 2026, with five corrections.**
+> Do not read this document alone — §4 and §5 below are superseded in part.
+>
+> | # | Correction | Supersedes | Now specified in |
+> |---|---|---|---|
+> | 1 | "Rider cannot be built" → **should not be built now**. Stays registered as Phase 4, pending domain definition. | §4 C6 | `kubi-v3-dashboard-strategy.md` §9 |
+> | 2 | Six dashboards is the wrong target. Design a **registry of fourteen**, six live. | §4 C6, §5 | strategy §3–§4 |
+> | 3 | Reports is **three families** — Operational, Compliance, Business — not one menu. | §5, §6 | strategy §7 |
+> | 4 | Parameters are **primary**, not secondary navigation. This reverses requirement 7 of the original brief, on the owner's instruction. | §5, §6 | strategy §6 |
+> | 5 | Patient Experience and the relationship/CRM layer were **missing entirely**. A real omission, not a scoping decision. | whole document | `domains/patient-experience.md`, `domains/business-growth.md` |
+>
+> Also added at the same review: `product-vision.md`, which every later
+> decision cites.
+
 Sources, both copied into `docs/requirements/prototypes/` so they survive the
 container:
 

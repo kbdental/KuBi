@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Domain design — Business Growth</title>
+<style>
+:root{--ink:#101a22;--ink-soft:#5a6875;--ink-faint:#8b97a3;--line:#e4e9ee;--page:#f2f5f7;
+--card:#fff;--accent:#0d6e5e;--accent-soft:#e8f3f0;--safety:#b0202a;--radius:14px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:17px/1.55 system-ui,-apple-system,
+"Segoe UI",Roboto,"Helvetica Neue",sans-serif;letter-spacing:-.006em;
+-webkit-text-size-adjust:100%;font-variant-numeric:tabular-nums}
+main{max-width:860px;margin:0 auto;padding:34px 20px 90px}
+h1{font-size:31px;font-weight:750;letter-spacing:-.024em;margin:0 0 6px}
+h2{font-size:23px;font-weight:700;letter-spacing:-.018em;margin:40px 0 10px;
+padding-top:16px;border-top:1px solid var(--line)}
+h3{font-size:18px;font-weight:700;margin:26px 0 6px}
+h4{font-size:16px;font-weight:650;margin:20px 0 4px;color:var(--ink-soft)}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 15px;padding-left:22px}
+li{margin:0 0 6px}
+hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+a{color:var(--accent)}
+code{background:var(--accent-soft);color:#0a5648;border-radius:5px;padding:1px 5px;
+font:.86em/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+padding:14px 16px;overflow-x:auto;margin:0 0 16px}
+pre code{background:0;color:inherit;padding:0;font-size:13.5px;line-height:1.5}
+.tw{overflow-x:auto;background:var(--card);border:1px solid var(--line);
+border-radius:var(--radius);margin:0 0 18px;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:650;color:var(--ink-soft);font-size:12.5px;text-transform:uppercase;
+letter-spacing:.04em;white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+strong{font-weight:650}
+@media (prefers-color-scheme:dark){
+:root{--ink:#e8edf1;--ink-soft:#a3b0bb;--ink-faint:#7d8a95;--line:#26333c;--page:#0d1418;
+--card:#141e24;--accent:#4fbfa8;--accent-soft:#12302b}
+code{color:#7fd7c4}
+}
+</style></head><body><main>
+<h1>Domain design — Business Growth</h1>
+<p>Design review 2 of 3. <strong>Not for implementation.</strong> The purpose is to establish Business Growth as a first-class domain with a defined shape, so the merged architecture leaves the right space and so nobody later invents its inputs.</p>
+<p>Owner-level operational metrics — deliberately <em>operational</em>, not financial reporting. The distinction is in §2.</p>
+<hr>
+<h2>1. The question this domain answers</h2>
+<p>&gt; <strong>&quot;Where is the money the clinic has already earned the right to?&quot;</strong></p>
+<p>Not &quot;what did we bill&quot;. Growth is about work that has been <em>proposed and not yet closed</em>: a treatment plan the patient has not accepted, a recall that is due, a satisfied patient who was never asked for a review, a referral that was never followed up. Every one of those is revenue the clinic has already paid the acquisition cost for.</p>
+<p>This is what an owner wakes up thinking about, and none of it is in KuBi today.</p>
+<h2>2. Why this is operations, not accounting</h2>
+<p>An accounts dashboard asks &quot;what is billed, collected, outstanding&quot;. A growth dashboard asks &quot;what should have been proposed, followed up or asked for, and was not&quot;. The second one generates <strong>tasks</strong>; the first generates statements.</p>
+<p>That is the test for anything entering this domain: <strong>if it cannot produce work for somebody tomorrow, it belongs in Business Reports, not in Business Growth.</strong> Marketing ROI is a number you read. &quot;Four high-value estimates are 14 days old and nobody has rung&quot; is a job.</p>
+<h2>3. The prerequisite — a relationship layer</h2>
+<p>None of the six metrics below is computable today, and the reason is a single missing substrate rather than six missing features.</p>
+<p>KuBi holds patients as <strong>clinical</strong> records: a person with procedures, consents, follow-ups and lab cases. It does not hold them as <strong>relationships</strong>: how they found the clinic, which segment they belong to, what was proposed to them, what they said, whether they may be contacted and on which channel.</p>
+<p>The relationship layer, at minimum:</p>
+<div class="tw"><table><thead><tr><th>Concept</th><th>Why growth needs it</th></tr></thead><tbody><tr><td><strong>Patient segment</strong></td><td>Premium, family, corporate, referred. Every growth metric is meaningless in aggregate and useful per segment.</td></tr><tr><td><strong>Acquisition source</strong></td><td>Which channel, campaign or referrer brought this person in. Without it, marketing return is unattributable.</td></tr><tr><td><strong>Treatment plan and estimate</strong></td><td>A proposal with line items, a value and a status. This is the single largest gap: <strong>treatment acceptance cannot be defined without it</strong>, because acceptance is a ratio whose numerator and denominator both live here.</td></tr><tr><td><strong>Contact consent and channel</strong></td><td>WhatsApp, phone, email — and permission for each. A recall the patient never agreed to receive is not a recall, it is a complaint.</td></tr><tr><td><strong>Interaction history</strong></td><td>What was said, when, by whom, on which channel. Recall effectiveness is attempts against outcomes.</td></tr><tr><td><strong>Referral</strong></td><td>Who referred whom, in which direction, and what came of it.</td></tr></tbody></table></div>
+<p><strong>Consequence for sequencing:</strong> the relationship layer is a prerequisite domain. Building growth first would mean inventing its inputs, which principle 2 of the vision forbids. It is also the honest answer to why the Owner dashboard currently lists nine metrics as &quot;not yet answerable&quot; — they were never missing screens, they were missing data.</p>
+<h2>4. The six metrics</h2>
+<p>For each: what it means, what produces work, what it needs, and what KuBi has today.</p>
+<h3>4.1 Treatment Acceptance</h3>
+<p><strong>Means:</strong> of the treatment proposed, how much was accepted — by count, by value, by doctor, by segment, and by how long it took.</p>
+<p><strong>Produces work:</strong> a plan presented and not answered after N days becomes a task for reception. A doctor whose acceptance drops on one procedure type becomes a conversation, not a scolding.</p>
+<p><strong>Needs:</strong> treatment plan with line items and value; presented/accepted/declined /deferred status with timestamps; who presented it.</p>
+<p><strong>Today:</strong> nothing. <code>PatientProcedure</code> records work that is happening, not work that was offered. <strong>This is the foundational gap of the whole domain.</strong></p>
+<p><strong>Trap to avoid:</strong> acceptance measured only by count rewards proposing cheap work. Value and count must both be shown, and neither alone.</p>
+<h3>4.2 Pending High-Value Cases</h3>
+<p><strong>Means:</strong> accepted or presented cases above a value threshold that have not progressed — the implant plan agreed in April with nothing booked since.</p>
+<p><strong>Produces work:</strong> the single highest-yield task list an owner can have. Each row is a named patient, a value, an age in days and a next action.</p>
+<p><strong>Needs:</strong> treatment plan value; a case lifecycle beyond the individual procedure; a configurable threshold per clinic.</p>
+<p><strong>Today:</strong> nothing.</p>
+<p><strong>Trap to avoid:</strong> an aging list that nobody is accountable for becomes wallpaper within a fortnight. Every row needs an owner and a next action date, or it does not belong on a dashboard.</p>
+<h3>4.3 Reviews</h3>
+<p><strong>Means:</strong> eligible patients asked, asked-to-left conversion, rating distribution, and response to negative reviews.</p>
+<p><strong>Produces work:</strong> &quot;eleven patients finished treatment this week and were never asked&quot; is a reception task. A one-star review is an incident, and should raise one.</p>
+<p><strong>Needs:</strong> review-request tracking, contact consent, and eventually a platform integration for outcomes.</p>
+<p><strong>Today:</strong> <code>FUP-005</code> exists in the frozen matrix as a &quot;Google review request&quot; activity, and prototype #1 surfaces it on the reception briefing. So the <em>task</em> exists; the <em>outcome</em> does not — KuBi can record that we asked, never that they left one.</p>
+<p><strong>Shared with Patient Experience.</strong> Reviews are the visible surface of satisfaction. Owned by Patient Experience, consumed here — see §6.</p>
+<h3>4.4 Referrals</h3>
+<p><strong>Means:</strong> patients arriving on the recommendation of another patient or a referring dentist; and referrals the clinic sends out. Both directions.</p>
+<p><strong>Produces work:</strong> a thank-you that never went out; a referring dentist who has sent nobody in six months; an outbound referral whose outcome was never chased.</p>
+<p><strong>Needs:</strong> a referral record linking two parties with a direction, a source and an outcome; referrer as a first-class party, since a referring dentist is not a patient.</p>
+<p><strong>Today:</strong> nothing.</p>
+<p><strong>Trap to avoid:</strong> modelling referrals as a free-text field on the patient. It has to be a relationship between two parties or none of the questions above can be asked.</p>
+<h3>4.5 Recall Effectiveness</h3>
+<p><strong>Means:</strong> of recalls due, how many were attempted, contacted, booked and attended — the funnel, not the count. Broken down by channel and segment.</p>
+<p><strong>Produces work:</strong> the due list itself, plus &quot;the WhatsApp channel converts at half the phone rate&quot; as a decision rather than a hunch.</p>
+<p><strong>Needs:</strong> recall schedule per patient and procedure type; attempt log with channel and outcome; conversion to a booked appointment.</p>
+<p><strong>Today:</strong> partial and adjacent. <code>followup.service.ts</code> generates clinical follow-ups after procedures and records responses. That is post-operative care, <strong>not</strong> recall — a different clock, a different purpose, a different owner. They should not be conflated, and the existing service should not be stretched to cover both.</p>
+<h3>4.6 Marketing Performance</h3>
+<p><strong>Means:</strong> by channel and campaign — enquiries, conversions to first visit, cost per acquired patient, and value of treatment accepted by those patients.</p>
+<p><strong>Produces work:</strong> stopping a campaign; noticing a channel that produces enquiries nobody answered.</p>
+<p><strong>Needs:</strong> acquisition source on every patient; campaign spend; enquiry records for people who never became patients.</p>
+<p><strong>Today:</strong> nothing, and note the second-order requirement — measuring marketing means recording <strong>non-patients</strong>, which is a new class of record.</p>
+<p><strong>Trap to avoid:</strong> cost per acquisition without acceptance value ranks the cheapest channel first, which is usually the worst one.</p>
+<h2>5. Shape as a domain</h2>
+<p>Per the domain contract in the dashboard strategy:</p>
+<pre><code>domains/business-growth/
+  parameters:  none in the frozen matrix today — new control heads required,
+               which means Matrix v3.0, not a v2.0 amendment
+  kpis:        acceptance % (count), acceptance % (value), high-value pipeline
+               age, review request %, review conversion %, referral in/out,
+               recall funnel conversion, cost per acquisition, acquired value
+  sectionsFor: OWNER_DIRECTOR   → &quot;Needs a decision&quot;, &quot;Pipeline ageing&quot;
+               CLINIC_HEAD      → &quot;Acceptance by doctor&quot;
+               RECEPTION        → &quot;Calls to make&quot; (recalls, reviews, estimates)
+               TREATING_DOCTOR  → &quot;Plans presented, not answered&quot;
+  attention:   high-value case ageing past threshold; negative review received;
+               recall funnel collapse on a channel
+  phase:       3</code></pre>
+<p>Note the last one carefully: this domain contributes sections to <strong>four</strong> existing dashboards, not only the owner's. A recall to chase is a reception job. That is exactly why domains contribute sections rather than owning screens.</p>
+<h2>6. Boundary with Patient Experience</h2>
+<p>The two domains overlap on reviews, recalls and referral requests, and the boundary needs to be explicit before either is built.</p>
+<div class="tw"><table><thead><tr><th>Concept</th><th>Owned by</th><th>Consumed by</th><th>Rule</th></tr></thead><tbody><tr><td>Review request task</td><td>Patient Experience</td><td>Growth</td><td>Asking is care; conversion is growth</td></tr><tr><td>Review outcome and rating</td><td>Patient Experience</td><td>Growth</td><td>Rating is a satisfaction signal first</td></tr><tr><td>Complaint</td><td>Patient Experience</td><td>Growth (as a leak)</td><td>Never owned by growth</td></tr><tr><td>Waiting time</td><td>Patient Experience</td><td>—</td><td>Experience only</td></tr><tr><td>Referral request to a patient</td><td>Patient Experience</td><td>Growth</td><td>Asking is care</td></tr><tr><td>Referral record and outcome</td><td>Growth</td><td>Patient Experience</td><td>The relationship is commercial</td></tr><tr><td>Recall due</td><td>Growth</td><td>—</td><td>Commercial clock</td></tr><tr><td>Clinical follow-up</td><td>Clinical (exists today)</td><td>Patient Experience</td><td><strong>Not</strong> a recall</td></tr></tbody></table></div>
+<p><strong>The governing rule:</strong> <em>asking</em> a patient for something is Patient Experience; <em>what the clinic gets</em> from it is Business Growth. It keeps the incentive honest — a clinic optimising the second without the first is one that pesters people.</p>
+<h2>7. What this domain must never become</h2>
+<p>Three failure modes, recorded now because they are easy to slide into and hard to reverse.</p>
+<ol><li><strong>A revenue dashboard.</strong> Revenue belongs to Accounts. The moment this screen leads with a rupee total it stops generating work and starts generating anxiety.</li><li><strong>A staff league table.</strong> Acceptance by doctor is a coaching input. Ranked publicly it produces over-selling, which is a clinical risk and a complaint pipeline.</li><li><strong>A reason to contact people who did not agree to be contacted.</strong> Contact consent is a hard gate, not a preference. Per vision principle 4.4, a hard gate has no override.</li></ol>
+<h2>8. Open decisions</h2>
+<div class="tw"><table><thead><tr><th>#</th><th>Decision</th></tr></thead><tbody><tr><td>G1</td><td>Is the relationship layer its own domain, or part of an existing patient domain? Proposed: its own, since marketing and experience both depend on it and neither should own it.</td></tr><tr><td>G2</td><td>High-value threshold — fixed per clinic, or a percentile of that clinic's own plans?</td></tr><tr><td>G3</td><td>Is a referring dentist a party, an organisation, or both?</td></tr><tr><td>G4</td><td>Does treatment acceptance count deferred plans as declined, or hold them open? This changes every acceptance figure the clinic will ever quote.</td></tr><tr><td>G5</td><td>Do non-patient enquiries live in KuBi at all, or in a marketing tool that hands over on conversion?</td></tr></tbody></table></div>
+</main></body></html>

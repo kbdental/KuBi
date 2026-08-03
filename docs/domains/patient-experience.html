@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Domain design — Patient Experience</title>
+<style>
+:root{--ink:#101a22;--ink-soft:#5a6875;--ink-faint:#8b97a3;--line:#e4e9ee;--page:#f2f5f7;
+--card:#fff;--accent:#0d6e5e;--accent-soft:#e8f3f0;--safety:#b0202a;--radius:14px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:17px/1.55 system-ui,-apple-system,
+"Segoe UI",Roboto,"Helvetica Neue",sans-serif;letter-spacing:-.006em;
+-webkit-text-size-adjust:100%;font-variant-numeric:tabular-nums}
+main{max-width:860px;margin:0 auto;padding:34px 20px 90px}
+h1{font-size:31px;font-weight:750;letter-spacing:-.024em;margin:0 0 6px}
+h2{font-size:23px;font-weight:700;letter-spacing:-.018em;margin:40px 0 10px;
+padding-top:16px;border-top:1px solid var(--line)}
+h3{font-size:18px;font-weight:700;margin:26px 0 6px}
+h4{font-size:16px;font-weight:650;margin:20px 0 4px;color:var(--ink-soft)}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 15px;padding-left:22px}
+li{margin:0 0 6px}
+hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+a{color:var(--accent)}
+code{background:var(--accent-soft);color:#0a5648;border-radius:5px;padding:1px 5px;
+font:.86em/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+padding:14px 16px;overflow-x:auto;margin:0 0 16px}
+pre code{background:0;color:inherit;padding:0;font-size:13.5px;line-height:1.5}
+.tw{overflow-x:auto;background:var(--card);border:1px solid var(--line);
+border-radius:var(--radius);margin:0 0 18px;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:650;color:var(--ink-soft);font-size:12.5px;text-transform:uppercase;
+letter-spacing:.04em;white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+strong{font-weight:650}
+@media (prefers-color-scheme:dark){
+:root{--ink:#e8edf1;--ink-soft:#a3b0bb;--ink-faint:#7d8a95;--line:#26333c;--page:#0d1418;
+--card:#141e24;--accent:#4fbfa8;--accent-soft:#12302b}
+code{color:#7fd7c4}
+}
+</style></head><body><main>
+<h1>Domain design — Patient Experience</h1>
+<p>Design review 3 of 3. <strong>Not for implementation.</strong> The purpose is to make patient experience a first-class domain rather than a set of fields scattered across other screens, and to leave the architecture the right space for it.</p>
+<hr>
+<h2>1. The question this domain answers</h2>
+<p>&gt; <strong>&quot;What was it actually like to be a patient here today?&quot;</strong></p>
+<p>Everything KuBi measures today is about whether the <em>clinic</em> performed. Nothing measures whether the <em>patient</em> had a decent time. Those diverge more often than is comfortable: a day where every task was ticked, every cycle passed and every note was written can still be a day where four people waited forty minutes and one of them will never come back.</p>
+<p>The omission was real. It was not scoped out; it was not noticed.</p>
+<h2>2. Why first-class, and not a report</h2>
+<p>Three reasons, and the third is the one that matters.</p>
+<ol><li><strong>It generates work.</strong> A patient waiting past their slot is an intervention available for the next eleven minutes, not a statistic available next month.</li><li><strong>It is a leading indicator.</strong> Waiting time and complaint resolution move before reviews, referrals and revenue do. A domain that only shows up in a monthly report is a domain that reports the damage.</li><li><strong>It is the counterweight.</strong> Every other parameter in KuBi pushes towards throughput and compliance. Without a domain whose job is the patient's experience, &quot;efficient&quot; and &quot;good&quot; quietly become the same word — and they are not. A clinic can hit every operational target by rushing people.</li></ol>
+<h2>3. The six concepts</h2>
+<h3>3.1 Waiting Time</h3>
+<p><strong>Means:</strong> appointment time → arrival → seated → treatment start → departure. Four intervals, not one number. The useful one is <em>seated later than promised</em>, because that is the one the patient experiences as being ignored.</p>
+<p><strong>Produces work:</strong> live — &quot;Mr Shah has been waiting 31 minutes&quot; on the reception and manager boards, with an expected wait so somebody can go and say so. That sentence, said at minute twelve, prevents most complaints.</p>
+<p><strong>Needs:</strong> the four timestamps and a promised time.</p>
+<p><strong>Today:</strong> <strong>the closest to buildable of all six.</strong> <code>clinic.tsx</code> and the schedule already move appointments through ARRIVED → IN_CHAIR → COMPLETED, and prototype #1's reception briefing already displays &quot;waited 31m&quot;. What is missing is that the transitions are not durably timestamped for measurement, and there is no promised-versus-actual comparison. That is a small migration, not a module.</p>
+<p><strong>Trap:</strong> measuring average wait. The average is fine on a day when one person waited an hour. Distribution and worst case, or it tells you nothing.</p>
+<h3>3.2 Complaints</h3>
+<p><strong>Means:</strong> a patient says something is wrong — at the desk, on the phone, in a review, or to the assistant while the doctor is out of the room. Captured, acknowledged, resolved, closed, with time limits on each.</p>
+<p><strong>Produces work:</strong> acknowledgement is a timed task. Unresolved complaints escalate. A complaint about a clinical matter must reach a clinician, not a receptionist.</p>
+<p><strong>Needs:</strong> a complaint record with source, category, severity, acknowledgement, resolution and closure; escalation rules; and a link to CAPA.</p>
+<p><strong>Today:</strong> nothing — and this is the sharpest gap in the domain, because the frozen matrix already carries the KPIs for it. <code>QUALITY_CAPA</code> lists Complaint Capture %, Complaint Acknowledgement Time, Complaint Resolution Time and Complaint Closure %. <strong>The standard exists; the object it measures does not.</strong> Prototype #1 shows complaints on the reception and manager briefings, from fixtures.</p>
+<p><strong>The important design decision:</strong> a complaint is not a lesser incident. It should raise an <strong>Incident</strong> and run the existing CAPA loop — containment, root cause, corrective and preventive action, effectiveness check, closure. KuBi already has that loop built and tested. A complaint that gets a sympathetic phone call and no root cause is how the same complaint arrives again in March.</p>
+<h3>3.3 Satisfaction</h3>
+<p><strong>Means:</strong> asked directly — a short post-visit question, and a periodic NPS. Segmented by doctor, procedure type, visit type and wait experienced.</p>
+<p><strong>Produces work:</strong> a low score is a callback task within a defined window. A detractor is a complaint that has not been made yet.</p>
+<p><strong>Needs:</strong> a survey mechanism, a delivery channel, contact consent, and response storage. Depends on the relationship layer for the channel and the consent.</p>
+<p><strong>Today:</strong> nothing.</p>
+<p><strong>Trap:</strong> surveying everybody after every visit trains people to ignore it. Sample deliberately, and always survey after the visits most likely to have gone badly — long waits, first implant appointments, remakes.</p>
+<h3>3.4 Reviews</h3>
+<p><strong>Means:</strong> public reviews — requested, left, rated, and responded to.</p>
+<p><strong>Produces work:</strong> the request itself; and a response to every negative review inside a defined window.</p>
+<p><strong>Needs:</strong> request tracking (partly exists as activity <code>FUP-005</code>), and a platform integration for outcomes.</p>
+<p><strong>Today:</strong> the <em>task</em> exists in the frozen matrix and on prototype #1's reception briefing. The <em>outcome</em> does not — KuBi can record that we asked, never what came back.</p>
+<p><strong>Owned here, consumed by Business Growth.</strong> A review is a satisfaction signal before it is a marketing asset. Owning it in Growth would make the incentive to ask stronger than the incentive to deserve it.</p>
+<h3>3.5 Follow-up Completion</h3>
+<p><strong>Means:</strong> post-operative follow-ups generated, attempted, completed, and the clinical response to red flags — with time-to-response measured, not just completion.</p>
+<p><strong>Produces work:</strong> overdue follow-ups; and any red-flag response that has not reached a clinician.</p>
+<p><strong>Today:</strong> <strong>built.</strong> <code>followup.service.ts</code> generates follow-ups after procedures, records pain / swelling / bleeding / medication responses and detects red flags; the frozen matrix carries Follow-up Generation %, Surgery Follow-up Compliance %, Clinical Alert Response Time and Follow-up Compliance %. This is the one concept in the domain that is complete.</p>
+<p><strong>Note:</strong> clinical follow-up is <strong>not</strong> recall. Different clock, different purpose, different owner. Recall belongs to Business Growth. Conflating them would put a commercial trigger inside a clinical safety net, which is the wrong place for it in both directions.</p>
+<h3>3.6 Referral Requests</h3>
+<p><strong>Means:</strong> asking a satisfied patient to recommend the clinic — who was asked, when, and whether asking was appropriate.</p>
+<p><strong>Produces work:</strong> the request, on eligible patients only.</p>
+<p><strong>Needs:</strong> eligibility rules, request tracking, and contact consent.</p>
+<p><strong>Today:</strong> nothing.</p>
+<p><strong>Owned here, outcome owned by Growth</strong>, per the rule below.</p>
+<h2>4. The boundary rule with Business Growth</h2>
+<p>&gt; <strong>Asking a patient for something is Patient Experience. What the clinic gets &gt; from it is Business Growth.</strong></p>
+<p>Requesting a review, requesting a referral, and asking for satisfaction all sit here. Conversion, referral outcomes and attributable value sit in Growth. This keeps the incentive honest: a clinic that optimises the second without the first is one that pesters people, and the architecture should make that harder rather than easier.</p>
+<h2>5. Relationship to existing parameters</h2>
+<p>Unlike Business Growth, this domain is <strong>already partly in the frozen matrix</strong> — which is the strongest argument that it was an oversight in the merge plan rather than a new idea.</p>
+<div class="tw"><table><thead><tr><th>Existing parameter</th><th>Contributes</th></tr></thead><tbody><tr><td><code>APPOINTMENT_CONTROL</code></td><td>Average Waiting Time; No-Show Recovery %</td></tr><tr><td><code>FOLLOWUP_EXPERIENCE</code></td><td>Follow-up Compliance %, Review Request %, Complaint Capture / Acknowledgement / Resolution / Closure, Satisfaction</td></tr><tr><td><code>QUALITY_CAPA</code></td><td>The complaint → incident → CAPA path</td></tr><tr><td><code>PATIENT_JOURNEY</code></td><td>Arrival → exit, the spine the timestamps hang on</td></tr></tbody></table></div>
+<p>So Patient Experience is largely a <strong>regrouping and completion</strong> of control heads that already exist, plus two new objects: <strong>Complaint</strong> and <strong>Satisfaction response</strong>. That is a materially smaller build than Business Growth, and it is why it should come first.</p>
+<h2>6. Shape as a domain</h2>
+<pre><code>domains/patient-experience/
+  parameters:  APPOINTMENT_CONTROL (shared), FOLLOWUP_EXPERIENCE,
+               PATIENT_JOURNEY (shared), QUALITY_CAPA (complaint path)
+  kpis:        seated-late %, wait distribution p50/p90/worst, complaint
+               capture / acknowledgement / resolution / closure, satisfaction,
+               NPS, review request %, follow-up completion %, clinical alert
+               response time
+  sectionsFor: RECEPTION       → &quot;Kept waiting&quot;, &quot;Calls to make&quot;, &quot;Complaints open&quot;
+               CLINIC_MANAGER  → &quot;Patients waiting&quot;, &quot;Complaints&quot;, &quot;Experience today&quot;
+               TREATING_DOCTOR → &quot;Follow-ups needing me&quot;, &quot;Complaints about my care&quot;
+               OWNER_DIRECTOR  → &quot;Experience this week&quot;
+               QUALITY         → &quot;Repeat complaints&quot;, &quot;CAPA from complaints&quot;
+  attention:   patient waiting past threshold; complaint unacknowledged past SLA;
+               red-flag follow-up response overdue; negative review received
+  phase:       2   (before Business Growth — see §7)</code></pre>
+<h2>7. Why this comes before Business Growth</h2>
+<p>Four reasons, in order of weight:</p>
+<ol><li><strong>The data is closer.</strong> Waiting time is a timestamp migration; follow-up completion is done; complaints reuse the CAPA loop that already exists. Business Growth needs an entire relationship layer first.</li><li><strong>The parameters already exist</strong> in the frozen matrix, with KPIs defined. Growth needs new control heads, which means Matrix v3.0.</li><li><strong>It is the leading indicator</strong> for most of what Growth wants to measure. Reviews and referrals are downstream of experience; building the downstream metric first measures an effect whose cause is not instrumented.</li><li><strong>It is the counterweight</strong> from §2. If Growth ships first, KuBi spends a release optimising for acceptance and recall with nothing in the product arguing for the patient.</li></ol>
+<h2>8. Open decisions</h2>
+<div class="tw"><table><thead><tr><th>#</th><th>Decision</th></tr></thead><tbody><tr><td>P1</td><td>Does every complaint raise an Incident and run full CAPA, or only those above a severity? Proposed: all of them raise one; severity sets the escalation level, not whether it is recorded.</td></tr><tr><td>P2</td><td>Waiting-time target — a single clinic-wide threshold, or per visit type? A crown delivery and an implant review are not the same promise.</td></tr><tr><td>P3</td><td>Satisfaction: post-visit micro-survey, periodic NPS, or both?</td></tr><tr><td>P4</td><td>Which channel carries surveys and review requests — and does that force the relationship layer earlier than Phase 3?</td></tr><tr><td>P5</td><td>Are complaints visible to the staff member complained about, and when? A real decision with real consequences either way.</td></tr></tbody></table></div>
+</main></body></html>
