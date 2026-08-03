@@ -575,6 +575,31 @@ export interface ExceptionRow {
   activityCode: string | null;
 }
 
+/** The six engines, the cascade, and one activity fully modelled. */
+export interface EnginesView {
+  engines: Array<{ id: string; name: string; count: number | null; what: string }>;
+  cascade: {
+    fired: boolean;
+    event: string;
+    spawn: Array<{ when: string; role: string; title: string; due: string; parameter: string }>;
+  };
+  anatomy: {
+    requirement: string; notStoredAs: string;
+    parameter: string; process: string; trigger: string; owner: string; due: string;
+    sop: string[]; evidence: string; verification: string;
+    kpi: string; formula: string;
+    numerator: number; denominator: number; target: number;
+  };
+}
+
+/** Engine D. The verdict is derived — nobody declares a procedure ready. */
+export interface GateView {
+  procedure: string;
+  checks: Array<{ id: string; label: string; met: boolean }>;
+  ready: boolean;
+  missingCount: number;
+}
+
 export interface OwnerBusiness {
   clinicName: string;
   known: Array<{ name: string; value: string | null; available: boolean; module: string | null }>;
@@ -682,6 +707,11 @@ export const api = {
   scoreboard: () => call<Scoreboard>('/api/v1/scoreboard'),
   confirmations: () => call<Confirmations>('/api/v1/confirmations'),
   exceptions: () => call<ExceptionRow[]>('/api/v1/exceptions'),
+
+  engines: () => call<EnginesView>('/api/v1/engines'),
+  fireCascade: (fired: boolean) => post<{ fired: boolean }>('/api/v1/engines/cascade', { fired }),
+  gate: () => call<GateView>('/api/v1/gate'),
+  toggleGateCheck: (id: string) => post<{ ok: boolean }>(`/api/v1/gate/${id}`, {}),
 
   commandCentre: () => call<CommandCentre>('/api/v1/command-centre'),
   ownerBusiness: () => call<OwnerBusiness>('/api/v1/owner-business'),

@@ -1929,3 +1929,93 @@ label.field-label {
 .ex-ladder { margin-top: 7px; font-size: 13.5px; color: var(--ink-soft); }
 .ex-ladder b { color: var(--ink); }
 .ex-owner { margin-top: 3px; font-size: 12.5px; color: var(--ink-faint); text-transform: capitalize; }
+
+/* ---- Engines, cascade, anatomy ------------------------------------------ */
+.eng-list { list-style: none; margin: 0 0 30px; padding: 0; display: grid; gap: 8px; }
+.eng {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 14px 16px;
+}
+.eng-top { display: flex; align-items: center; gap: 10px; }
+.eng-name { flex: 1; font-weight: 600; font-size: 15.5px; }
+.eng-count {
+  background: var(--accent-soft); color: var(--accent);
+  border-radius: 999px; padding: 2px 10px; font-size: 13px; font-weight: 700;
+}
+.eng-live {
+  background: var(--safety-tint); color: var(--safety);
+  border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700;
+}
+.eng-what { margin: 5px 0 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+
+.casc {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px 18px; margin-bottom: 30px;
+}
+.casc-lead { margin: 0 0 12px; font-size: 15px; line-height: 1.55; color: var(--ink-soft); }
+.casc-lead b { color: var(--ink); }
+.casc-when { margin-bottom: 14px; }
+.casc-when-head {
+  font-size: 11.5px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ink-faint); margin-bottom: 5px;
+}
+.casc-row {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 7px 0; border-bottom: 1px solid var(--line-soft);
+}
+.casc-title { font-weight: 550; font-size: 14.5px; }
+.casc-role {
+  background: var(--line-soft); color: var(--ink-soft);
+  border-radius: 999px; padding: 1px 9px; font-size: 11.5px; font-weight: 600;
+}
+
+.anat {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px 18px;
+}
+.anat-req { margin: 0 0 10px; font-size: 15.5px; font-style: italic; color: var(--ink-soft); }
+.anat-not {
+  margin: 0 0 16px; padding: 9px 12px; border-radius: var(--radius-sm);
+  background: var(--safety-tint); color: var(--safety);
+  font-size: 14px; font-weight: 600;
+}
+.anat-chain { display: grid; gap: 4px; margin: 0 0 14px; }
+.anat-chain div { display: flex; gap: 12px; font-size: 14.5px; }
+.anat-chain dt { flex: 0 0 104px; color: var(--ink-soft); }
+.anat-chain dd { margin: 0; font-weight: 550; }
+.anat-sop {
+  background: var(--line-soft); border-radius: var(--radius-sm);
+  padding: 11px 13px; margin: 0 0 14px;
+  font-size: 13.5px; line-height: 1.9; font-weight: 550;
+}
+.anat-kpi { border-top: 1px solid var(--line); padding-top: 13px; }
+.anat-kpi-row { display: flex; align-items: baseline; gap: 12px; margin-top: 6px; }
+.anat-pct { font-size: 30px; font-weight: 650; letter-spacing: -.025em; }
+.anat-ok { color: var(--ok); }
+.anat-warn { color: var(--warn); }
+.anat-bad { color: var(--safety); }
+
+/* ---- The gate. The verdict is the screen. ------------------------------- */
+.gt-list { list-style: none; margin: 0 0 18px; padding: 0; }
+.gt-check {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  min-height: var(--tap); padding: 12px 4px;
+  border: 0; border-bottom: 1px solid var(--line);
+  background: 0; font: inherit; text-align: left; cursor: pointer;
+}
+.gt-box {
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 6px;
+  display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 13px;
+}
+.gt-box.is-met { background: var(--ok); }
+.gt-box.is-missing { background: var(--safety); }
+.gt-label { flex: 1; font-size: 15.5px; font-weight: 550; }
+.gt-state { font-size: 12.5px; font-weight: 650; }
+.gt-state.is-met { color: var(--ok); }
+.gt-state.is-missing { color: var(--safety); }
+
+.gt-verdict { border-radius: var(--radius); padding: 20px; text-align: center; }
+.gt-verdict b { font-size: 19px; letter-spacing: .03em; }
+.gt-verdict p { margin: 8px 0 0; font-size: 14.5px; line-height: 1.5; }
+.gt-verdict.is-ready { background: var(--accent-soft); color: var(--accent); }
+.gt-verdict.is-not { background: var(--safety-tint); color: var(--safety); }

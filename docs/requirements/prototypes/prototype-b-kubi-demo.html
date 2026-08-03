@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KuBi — Clinic Operating System</title>
+<style>
+:root{
+  --blue:#0078B4; --blue-2:#0090CC; --wash:#F0F6FB; --wash-2:#DCF4FB;
+  --green:#059669; --red:#C0392B; --amber:#D97706;
+  --ink:#12232B; --ink-2:#3C5560; --ink-3:#6B8290; --ink-4:#9DB0BA;
+  --line:#DCE7EE; --card:#fff; --radius:8px;
+  --shadow:0 2px 8px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif;
+  background:var(--wash);color:var(--ink)}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit;text-align:left}
+
+/* Role bar wraps rather than scrolls: a horizontally scrolling bar pushes
+   the last role off a narrow screen where it cannot be tapped. */
+.rolebar{background:var(--ink);color:#fff;padding:8px 12px;display:flex;gap:6px;
+  align-items:center;flex-wrap:wrap}
+.rolebar .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  color:#8FA8B4;margin-right:4px}
+.rolebar button{padding:5px 11px;border-radius:20px;font-size:12.5px;
+  background:rgba(255,255,255,.10);color:#CFE0E9}
+.rolebar button.on{background:var(--blue-2);color:#fff;font-weight:600}
+
+header{background:var(--blue);color:#fff;padding:14px 16px}
+header h1{margin:0;font-size:17px;font-weight:600}
+header .sub{font-size:12.5px;opacity:.85;margin-top:2px}
+
+nav{background:#fff;border-bottom:1px solid var(--line);display:flex;
+  overflow-x:auto;position:sticky;top:0;z-index:5}
+nav button{padding:11px 15px;font-size:13px;color:var(--ink-3);white-space:nowrap;
+  border-bottom:2.5px solid transparent}
+nav button.on{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
+
+main{max-width:920px;margin:0 auto;padding:14px 12px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+.card > h2{margin:0;padding:11px 14px;font-size:12px;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--ink-3);border-bottom:1px solid var(--line);
+  background:#FAFCFD;font-weight:600}
+.pad{padding:14px}
+.muted{color:var(--ink-3)}
+.small{font-size:12.5px}
+.tiny{font-size:11.5px}
+.row{display:flex;align-items:center;gap:10px}
+.grow{flex:1;min-width:0}
+.chip{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;
+  font-weight:600;white-space:nowrap}
+.c-green{background:#E6F5EF;color:var(--green)}
+.c-red{background:#FBEAE7;color:var(--red)}
+.c-amber{background:#FDF1E1;color:var(--amber)}
+.c-blue{background:var(--wash-2);color:var(--blue)}
+.c-grey{background:#EDF2F5;color:var(--ink-3)}
+
+/* ---- operational health ---- */
+.health{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.health .num{font-size:38px;font-weight:700;line-height:1}
+.scoreline{display:block;width:100%;padding:10px 14px;border-top:1px solid var(--line)}
+.scoreline:hover{background:var(--wash)}
+.bar{height:6px;background:#EDF2F5;border-radius:4px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;border-radius:4px}
+.drill{background:var(--wash);border-top:1px solid var(--line);padding:12px 14px}
+.drill ul{margin:6px 0 0;padding-left:18px}
+.drill li{margin:4px 0}
+
+/* ---- work items, grouped by WHY they exist ---- */
+.grp{border-top:1px solid var(--line)}
+.grp .ghead{padding:9px 14px;background:#FAFCFD;display:flex;gap:8px;align-items:baseline}
+.grp .gname{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.grp .gwhy{font-size:11.5px;color:var(--ink-3)}
+.item{display:flex;gap:10px;padding:11px 14px;border-top:1px solid var(--line);
+  width:100%;align-items:flex-start}
+.item:hover{background:var(--wash)}
+.dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink-4);
+  flex:0 0 auto;margin-top:2px}
+.dot.done{background:var(--green);border-color:var(--green)}
+.dot.late{border-color:var(--red)}
+.dot.lock{border-color:var(--ink-4);background:#EDF2F5}
+.item .nm{font-weight:600}
+.item.isdone .nm{color:var(--ink-3);text-decoration:line-through}
+
+.detail{background:var(--wash);border-top:1px solid var(--line);padding:12px 14px}
+.kv{display:flex;gap:8px;padding:3px 0;font-size:12.5px}
+.kv b{flex:0 0 108px;color:var(--ink-3);font-weight:600}
+.sop{background:#fff;border:1px solid var(--line);border-radius:6px;padding:9px 11px;
+  margin-top:8px;font-size:12.5px;line-height:1.7}
+.btn{display:inline-block;padding:8px 14px;border-radius:6px;background:var(--blue);
+  color:#fff;font-weight:600;font-size:13px;margin-top:10px;margin-right:8px}
+.btn.ghost{background:#fff;color:var(--blue);border:1px solid var(--blue)}
+.btn.warn{background:var(--red)}
+
+/* ---- gate ---- */
+.gate{padding:14px}
+.gcheck{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);
+  width:100%;align-items:center}
+.gbox{width:18px;height:18px;border-radius:4px;border:2px solid var(--ink-4);
+  flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:#fff;font-weight:700}
+.gbox.ok{background:var(--green);border-color:var(--green)}
+.gbox.no{background:var(--red);border-color:var(--red)}
+.verdict{margin-top:14px;padding:13px;border-radius:6px;text-align:center;
+  font-weight:700;font-size:15px}
+.verdict.ok{background:#E6F5EF;color:var(--green)}
+.verdict.no{background:#FBEAE7;color:var(--red)}
+
+/* ---- escalation ladder ---- */
+.ladder{margin-top:10px;border-left:2px solid var(--line);padding-left:14px}
+.step{position:relative;padding:6px 0}
+.step:before{content:"";position:absolute;left:-19px;top:11px;width:8px;height:8px;
+  border-radius:50%;background:var(--ink-4)}
+.step.hit:before{background:var(--red)}
+.step.now:before{background:var(--red);box-shadow:0 0 0 4px #FBEAE7}
+.step.hit .who,.step.now .who{color:var(--red);font-weight:700}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);
+  vertical-align:top}
+th{background:#FAFCFD;color:var(--ink-3);font-size:11px;text-transform:uppercase;
+  letter-spacing:.05em}
+.scroller{overflow-x:auto}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:99;
+  background:var(--ink);color:#fff;padding:10px 16px;border-radius:20px;
+  font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:90vw}
+</style>
+</head>
+<body>
+<div class="rolebar" id="rolebar"></div>
+<header><h1 id="hTitle"></h1><div class="sub" id="hSub"></div></header>
+<nav id="nav"></nav>
+<main id="main"></main>
+
+<script>
+/* ============================================================
+   KuBi — demo with dummy data.
+   Structured around the five system objects, not a checklist:
+     A RECURRING   fired by time
+     B EVENT       fired by something happening to a patient
+     C CONDITION   appears only while a condition holds
+     D GATE        blocks the procedure until satisfied
+     E EXCEPTION   what should have happened and did not
+   ============================================================ */
+
+/* ---- the eight management scores ------------------------- */
+var SCORES=[
+ {id:"ready", name:"Clinic Readiness",       v:100,exc:[]},
+ {id:"care",  name:"Patient Care Compliance",v:96,
+   exc:["1 post-op instruction sheet not issued — Patient #4772",
+        "1 surgery follow-up call overdue — Patient #4693"]},
+ {id:"doc",   name:"Clinical Documentation", v:88,
+   exc:["3 clinical notes incomplete beyond 24h",
+        "1 pre-op record set missing — Patient #4821"]},
+ {id:"infect",name:"Infection Control",      v:98,
+   exc:["Autoclave cycle verification overdue — batch B-114"]},
+ {id:"appt",  name:"Appointment Efficiency", v:93,
+   exc:["2 patients unconfirmed past morning cutoff",
+        "1 no-show pending follow-up"]},
+ {id:"lab",   name:"Lab Efficiency",         v:76,
+   exc:["3 lab cases overdue",
+        "1 crown received but QC pending — Patient #4755",
+        "2 patients awaiting appointment after lab-ready",
+        "1 remake raised — shade mismatch"]},
+ {id:"inv",   name:"Inventory Readiness",    v:97,
+   exc:["1 item below minimum — Composite A2 (2 left, min 5)"]},
+ {id:"team",  name:"Team Compliance",        v:94,
+   exc:["1 employee late — biometric 09:58 against 09:45"]}
+];
+
+/* ---- exception queue (engine E) -------------------------- */
+var EXC=[
+ {id:"e1",sev:"red",  what:"Implant consent missing",
+  ref:"Patient #4821 — implant surgery 16:30", param:"Patient Journey",
+  doer:"Doctor/Assistant", owner:"Treating Doctor",
+  ladder:[{t:"14:30",who:"Due — consent to be signed",s:"due"},
+          {t:"15:00",who:"Treating Doctor alerted",s:"hit"},
+          {t:"15:30",who:"Clinical Operations Head",s:"now"},
+          {t:"16:00",who:"Clinic Head",s:""}]},
+ {id:"e2",sev:"red",  what:"Autoclave cycle verification overdue",
+  ref:"Batch B-114 — cycle result not recorded", param:"Infection Control",
+  doer:"Dental Assistant", owner:"Clinical Operations Head",
+  ladder:[{t:"19:00",who:"Due — cycle reading",s:"due"},
+          {t:"19:15",who:"Assistant alerted",s:"hit"},
+          {t:"19:30",who:"Senior Assistant alerted",s:"now"},
+          {t:"20:00",who:"Clinic Head",s:""}]},
+ {id:"e3",sev:"amber",what:"2 lab cases delayed",
+  ref:"Crown #L-2210, Bridge #L-2214", param:"Laboratory",
+  doer:"Reception", owner:"Clinic Manager",
+  ladder:[{t:"Due date",who:"Case due from lab",s:"due"},
+          {t:"+1 day",  who:"Reception chases lab",s:"hit"},
+          {t:"+2 days", who:"Clinic Manager",s:"now"},
+          {t:"+3 days", who:"Clinic Head",s:""}]},
+ {id:"e4",sev:"amber",what:"1 employee late",
+  ref:"Biometric 09:58 against 09:45", param:"Attendance & Leave",
+  doer:"Staff", owner:"Clinic Manager", ladder:[]},
+ {id:"e5",sev:"amber",what:"1 stock item below minimum",
+  ref:"Composite A2 — 2 left, minimum 5", param:"Inventory",
+  doer:"Assistant", owner:"Clinic Manager", ladder:[]},
+ {id:"e6",sev:"amber",what:"1 patient complaint open",
+  ref:"Patient #4708 — waiting time", param:"Follow-up & Experience",
+  doer:"Reception", owner:"Clinic Manager", ladder:[]}
+];
+
+/* ---- work items, each carrying WHY it exists ------------- */
+var CLASSES={
+  A:{name:"Recurring",      why:"generated by time"},
+  B:{name:"Patient event",  why:"generated by something that happened to a patient"},
+  C:{name:"Condition",      why:"exists only while a condition holds"},
+  D:{name:"Gate",           why:"blocks the procedure until satisfied"}
+};
+
+var WORK={
+assistant:[
+ {id:"w1",cls:"A",nm:"Treatment-room readiness",due:"09:45",st:"done",
+  param:"Opening Readiness",doer:"Dental Assistant",checker:"Senior Assistant",
+  ev:"Photo of both rooms",trig:"Daily — opening"},
+ {id:"w2",cls:"A",nm:"Instruments collected for processing",due:"20:00",st:"open",
+  param:"Infection Control",doer:"Dental Assistant",checker:"Senior Assistant",
+  ev:"Confirmation",trig:"Daily — closing"},
+ {id:"w3",cls:"B",nm:"Prepare room for implant surgery — Patient #4821",due:"16:00",
+  st:"open",param:"Surgical & High-Risk",doer:"Dental Assistant",
+  checker:"Senior Assistant",ev:"Surgical kit photo",
+  trig:"Implant surgery booked for today"},
+ {id:"w4",cls:"C",nm:"Autoclave cycle B-114 — reading needed",due:"19:00",st:"late",
+  param:"Infection Control",doer:"Dental Assistant",checker:"Senior Assistant",
+  ev:"Cycle parameters / batch record",trig:"Cycle finished, result not recorded"},
+ {id:"w5",cls:"D",nm:"Release sterile packs",due:"After pass",st:"open",
+  blocked:"STER-004 — cycle PASS",param:"Infection Control",
+  doer:"Senior Assistant",checker:"Doctor/Manager",ev:"Verification",
+  trig:"Depends on autoclave cycle result"},
+ {id:"w6",cls:"C",nm:"Raise reorder — Composite A2",due:"Today",st:"open",
+  param:"Inventory",doer:"Assistant",checker:"Clinic Manager",ev:"Value",
+  trig:"Stock 2 fell to or below minimum 5"}
+],
+reception:[
+ {id:"r1",cls:"A",nm:"Confirm today's patients",due:"Morning cutoff",st:"part",
+  param:"Appointment Control",doer:"Reception",checker:"Reception Lead",
+  ev:"System — 15 of 18 confirmed",trig:"Daily — morning"},
+ {id:"r2",cls:"C",nm:"Retry 2 no-response confirmations",due:"Before appointment",
+  st:"open",param:"Appointment Control",doer:"Reception",checker:"Reception Lead",
+  ev:"System",trig:"No response to first attempt"},
+ {id:"r3",cls:"B",nm:"Book next appointment — Patient #4755",due:"Today",st:"open",
+  param:"Laboratory",doer:"Reception",checker:"Reception Lead",ev:"System",
+  trig:"Crown received from lab and QC passed"},
+ {id:"r4",cls:"C",nm:"No-show follow-up — Patient #4790",due:"After grace period",
+  st:"open",param:"Appointment Control",doer:"Reception",checker:"Reception Lead",
+  ev:"System",trig:"Patient did not arrive within grace period"},
+ {id:"r5",cls:"A",nm:"Review reminders and recalls",due:"Morning",st:"done",
+  param:"Appointment Control",doer:"Reception",checker:"Reception Lead",
+  ev:"System",trig:"Daily — morning"}
+],
+doctor:[
+ {id:"d1",cls:"D",nm:"Consent missing — Patient #4821 implant",due:"Before procedure",
+  st:"late",param:"Patient Journey",doer:"Doctor/Assistant",checker:"Treating Doctor",
+  ev:"Signature",trig:"Procedure requires consent"},
+ {id:"d2",cls:"B",nm:"Surgery follow-up call — Patient #4693",due:"Today",st:"late",
+  param:"Follow-up & Experience",doer:"Treating Doctor",checker:"Clinic Manager",
+  ev:"Confirmation",trig:"Surgery completed yesterday"},
+ {id:"d3",cls:"C",nm:"3 clinical notes incomplete beyond 24h",due:"24h after visit",
+  st:"open",param:"Clinical Documentation",doer:"Treating Doctor",
+  checker:"Clinical Ops Head",ev:"Verification",trig:"Note not completed in window"},
+ {id:"d4",cls:"D",nm:"Lab QC — crown Patient #4755",due:"At receipt",st:"open",
+  param:"Laboratory",doer:"Treating Doctor",checker:"Clinical Ops Head",
+  ev:"Verification",trig:"Case received from lab, QC not recorded"}
+],
+housekeeping:[
+ {id:"h1",cls:"A",nm:"Treatment rooms and chairs cleaned",due:"09:30",st:"done",
+  param:"Cleanliness",doer:"Housekeeping",checker:"Senior Assistant",
+  ev:"Photo",trig:"Daily — opening"},
+ {id:"h2",cls:"A",nm:"Washrooms cleaned and stocked",due:"09:30",st:"done",
+  param:"Cleanliness",doer:"Housekeeping",checker:"Senior Assistant",
+  ev:"Photo",trig:"Daily — opening"},
+ {id:"h3",cls:"A",nm:"High-touch surface round",due:"14:00",st:"open",
+  param:"Cleanliness",doer:"Housekeeping",checker:"Senior Assistant",
+  ev:"Confirmation",trig:"Daily — midday"},
+ {id:"h4",cls:"A",nm:"Biomedical waste segregated and handed over",due:"Closing",
+  st:"open",param:"Infection Control",doer:"Housekeeping",checker:"Clinic Manager",
+  ev:"Confirmation",trig:"Daily — closing"},
+ {id:"h5",cls:"B",nm:"Deep clean surgical room after implant",due:"After procedure",
+  st:"open",param:"Cleanliness",doer:"Housekeeping",checker:"Senior Assistant",
+  ev:"Photo",trig:"Surgical procedure completed in Room 2"}
+],
+manager:[
+ {id:"m1",cls:"A",nm:"Attendance review",due:"10:00",st:"done",
+  param:"Attendance & Leave",doer:"Clinic Manager",checker:"Clinic Head",
+  ev:"System",trig:"Daily"},
+ {id:"m2",cls:"A",nm:"Opening readiness verification",due:"10:00",st:"done",
+  param:"Opening Readiness",doer:"Clinic Manager",checker:"Clinic Head",
+  ev:"Verification",trig:"Daily — after opening"},
+ {id:"m3",cls:"C",nm:"Equipment service due — Autoclave #01",due:"Today",st:"open",
+  param:"Maintenance & Utilities",doer:"Clinic Manager",checker:"Clinic Head",
+  ev:"Attachment — service report",trig:"Next service date reached"},
+ {id:"m4",cls:"A",nm:"Closing verification round",due:"Closing",st:"open",
+  param:"Closing & Facility",doer:"Clinic Manager",checker:"Clinic Head",
+  ev:"Verification",trig:"Daily — closing"}
+]};
+
+/* ---- compliance gate (engine D) -------------------------- */
+var GATE={
+ proc:"Implant Surgery — Patient #4821, 16:30",
+ checks:[
+  {id:"g1",nm:"Consent signed",                 ok:false},
+  {id:"g2",nm:"Medical history updated",        ok:true},
+  {id:"g3",nm:"Pre-op instructions given",      ok:true},
+  {id:"g4",nm:"Medication reminder completed",  ok:true},
+  {id:"g5",nm:"Implant and components available",ok:true},
+  {id:"g6",nm:"Surgical kit sterilized",        ok:false},
+  {id:"g7",nm:"Pre-op records available",       ok:true}
+ ]};
+
+/* ---- patient event cascade (engine B) -------------------- */
+var CASCADE={
+ fired:false,
+ event:"Implant surgery completed — Patient #4821",
+ spawn:[
+  {when:"Today",   role:"doctor",   nm:"Post-op instructions issued",cls:"B",
+   due:"Before discharge",param:"Surgical & High-Risk"},
+  {when:"Today",   role:"doctor",   nm:"Prescription verification",cls:"B",
+   due:"Before discharge",param:"Patient Journey"},
+  {when:"Today",   role:"reception",nm:"Next appointment booked",cls:"B",
+   due:"Before discharge",param:"Appointment Control"},
+  {when:"Today",   role:"housekeeping",nm:"Deep clean surgical room",cls:"B",
+   due:"After procedure",param:"Cleanliness"},
+  {when:"Tomorrow",role:"doctor",   nm:"Surgery follow-up call",cls:"B",
+   due:"Tomorrow",param:"Follow-up & Experience"},
+  {when:"Later",   role:"doctor",   nm:"Clinical documentation check",cls:"B",
+   due:"Within 24h",param:"Clinical Documentation"}
+ ]};
+
+/* ---- the sterilization anatomy (your section 5) ---------- */
+var STER={
+ param:"Infection Control",
+ process:"Instrument Sterilization",
+ trigger:"Instrument used",
+ owner:"Dental Assistant",
+ due:"Same working day",
+ sop:["Used","Segregation","Cleaning","Ultrasonic","Drying","Packing","Sealing",
+      "Autoclave","Storage"],
+ evidence:"Autoclave cycle / batch record",
+ verification:"Closing sterilization check",
+ kpi:"Same-Day Sterilization Compliance %",
+ formula:"Instruments sterilized same day ÷ Instruments requiring sterilization × 100",
+ num:47,den:48,target:100
+};
+
+/* ---- equipment engine: every asset has its own record ---- */
+var ASSETS=[
+ {id:"AST-01",nm:"Autoclave #01",loc:"Sterilization bay",resp:"Senior Assistant",
+  daily:"Cycle log + water level",freq:"6 months",last:"03 Feb 2026",next:"03 Aug 2026",
+  amc:"Active — expires 31 Mar 2027",downtime:"0 h this quarter",
+  breakdowns:[{d:"12 Nov 2025",w:"Door seal replaced",dt:"4 h"}],
+  docs:"Invoice, AMC, validation certificate",due:true},
+ {id:"AST-02",nm:"Dental Chair — Room 1",loc:"Room 1",resp:"Dental Assistant",
+  daily:"Suction, water, upholstery",freq:"12 months",last:"20 Sep 2025",
+  next:"20 Sep 2026",amc:"Active — expires 20 Sep 2026",downtime:"2 h this quarter",
+  breakdowns:[{d:"04 Jun 2026",w:"Suction motor serviced",dt:"2 h"}],
+  docs:"Invoice, AMC",due:false},
+ {id:"AST-03",nm:"Air Compressor",loc:"Utility room",resp:"Clinic Manager",
+  daily:"Pressure, drain",freq:"3 months",last:"18 May 2026",next:"18 Aug 2026",
+  amc:"Not covered",downtime:"0 h this quarter",breakdowns:[],
+  docs:"Invoice",due:false},
+ {id:"AST-04",nm:"RVG Sensor",loc:"Room 2",resp:"Doctor",
+  daily:"Sleeve check",freq:"12 months",last:"11 Jan 2026",next:"11 Jan 2027",
+  amc:"Active — expires 11 Jan 2027",downtime:"0 h this quarter",breakdowns:[],
+  docs:"Invoice, calibration",due:false}
+];
+
+/* ---- inventory engine ------------------------------------ */
+var STOCK=[
+ {item:"Composite A2",cat:"Restorative",unit:"syringe",qty:2,min:5,reorder:10,
+  batch:"C-8842",exp:"11/2027",loc:"Cabinet 1",sup:"Dentmart",low:true},
+ {item:"Articaine 4%",cat:"Anaesthetic",unit:"cartridge",qty:38,min:20,reorder:50,
+  batch:"A-2291",exp:"03/2027",loc:"Cabinet 2",sup:"Septodont",low:false},
+ {item:"Nitrile gloves M",cat:"PPE",unit:"box",qty:6,min:6,reorder:20,
+  batch:"G-5510",exp:"08/2028",loc:"Store",sup:"Medline",low:true},
+ {item:"Autoclave pouches",cat:"Sterilization",unit:"pack",qty:14,min:5,reorder:20,
+  batch:"P-1180",exp:"01/2029",loc:"Sterilization bay",sup:"Dentmart",low:false},
+ {item:"Suture 3-0 silk",cat:"Surgical",unit:"pack",qty:9,min:4,reorder:12,
+  batch:"S-7731",exp:"06/2027",loc:"Surgical drawer",sup:"Ethicon",low:false}
+];
+
+/* Implants are not a single count — clinically that is insufficient.
+   Tracked to the component level. */
+var IMPLANTS=[
+ {brand:"Nobel",line:"Active",plat:"NP 3.5",dia:"3.5",len:"10",imp:2,heal:2,impr:1,pros:1},
+ {brand:"Nobel",line:"Active",plat:"RP 4.3",dia:"4.3",len:"11.5",imp:4,heal:3,impr:2,pros:2},
+ {brand:"Nobel",line:"Active",plat:"RP 4.3",dia:"4.3",len:"13",imp:1,heal:0,impr:1,pros:0},
+ {brand:"Straumann",line:"BLX",plat:"RB 4.0",dia:"4.0",len:"10",imp:3,heal:3,impr:2,pros:2},
+ {brand:"Straumann",line:"BLX",plat:"RB 4.5",dia:"4.5",len:"12",imp:0,heal:1,impr:1,pros:1}
+];
+
+/* ---- the six engines ------------------------------------- */
+var ENGINES=[
+ {nm:"Time Engine",         n:57,d:"Creates activity from the clock — attendance deadline, opening readiness, morning confirmations, closing controls, weekly inventory, monthly emergency audit."},
+ {nm:"Patient Event Engine",n:47,d:"The clinical journey generates its own work. Surgery booked raises pre-op requirements; surgery completed raises post-op, follow-up and documentation."},
+ {nm:"Equipment Engine",    n:12,d:"Every asset carries its own record — daily check, service frequency, last and next service, breakdown history, AMC. Next service date reached creates the task."},
+ {nm:"Inventory Engine",    n:13,d:"Current stock at or below reorder level generates a purchase requirement. Implants tracked to brand, line, platform, diameter and length, not a single count."},
+ {nm:"Compliance Engine",   n:18,d:"Mandatory gates. Missing requirements do not quietly disappear — the procedure reads NOT READY until they are satisfied."},
+ {nm:"Exception Engine",    n:0, d:"Continuously asks what should have happened and did not, then escalates on a clock. This is what management actually looks at."}
+];
+
+/* ---- roles ----------------------------------------------- */
+var ROLES=[
+ {id:"owner",      name:"Owner",       who:"Dr Viveyk Mittel",
+  tabs:["dash","exc","engines","assets","stock","anatomy"]},
+ {id:"manager",    name:"Clinic Manager",who:"Priya S.",
+  tabs:["work","exc","assets","stock","dash"]},
+ {id:"doctor",     name:"Doctor",      who:"Dr A. Rao",
+  tabs:["work","gate","exc"]},
+ {id:"reception",  name:"Reception",   who:"Neha K.",
+  tabs:["work"]},
+ {id:"assistant",  name:"Dental Assistant",who:"Sunita M.",
+  tabs:["work","gate"]},
+ {id:"housekeeping",name:"Housekeeping",who:"Ramesh P.",
+  tabs:["work"]}
+];
+var TABS={dash:"Dashboard",work:"My work",exc:"Exceptions",gate:"Procedure gate",
+  engines:"Engines",assets:"Equipment",stock:"Inventory",anatomy:"Anatomy"};
+
+/* ---- state ----------------------------------------------- */
+var S={role:"owner",tab:"dash",openScore:null,openItem:null,openExc:null,
+  openAsset:null};
+function role(){for(var i=0;i<ROLES.length;i++)if(ROLES[i].id===S.role)return ROLES[i];}
+
+/* ---- helpers --------------------------------------------- */
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function band(v){return v>=95?"green":v>=85?"amber":"red";}
+function col(b){return b==="green"?"var(--green)":b==="amber"?"var(--amber)":
+  b==="red"?"var(--red)":"var(--ink-4)";}
+function toast(m){var d=document.createElement("div");d.className="toast";
+  d.textContent=m;document.body.appendChild(d);
+  setTimeout(function(){d.remove();},2200);}
+function overall(){var t=0;for(var i=0;i<SCORES.length;i++)t+=SCORES[i].v;
+  return Math.round(t/SCORES.length);}
+
+/* ============================================================
+   VIEWS
+   ============================================================ */
+
+/* ---- OWNER DASHBOARD: exceptions first, not 150 tasks ----- */
+function viewDash(){
+  var o=overall(), h="";
+  h+='<div class="card"><div class="pad health">'+
+     '<div><div class="tiny muted" style="letter-spacing:.08em;text-transform:uppercase">'+
+     'Operational health</div>'+
+     '<div class="num" style="color:'+col(band(o))+'">'+o+'%</div></div>'+
+     '<div class="grow small muted">Eight management scores, each rolled up from its '+
+     'control parameters. Tap a score to see only what is wrong inside it.</div></div>';
+
+  for(var i=0;i<SCORES.length;i++){
+    var s=SCORES[i], b=band(s.v), open=S.openScore===s.id;
+    h+='<button class="scoreline" data-score="'+s.id+'">'+
+       '<div class="row"><span class="grow"><b>'+esc(s.name)+'</b></span>'+
+       '<span class="chip c-'+b+'">'+s.v+'%</span>'+
+       '<span class="muted tiny">'+(s.exc.length?s.exc.length+' issue'+
+         (s.exc.length>1?'s':''):'clear')+'</span></div>'+
+       '<div class="bar"><i style="width:'+s.v+'%;background:'+col(b)+'"></i></div>'+
+       '</button>';
+    if(open){
+      h+='<div class="drill">';
+      if(!s.exc.length){h+='<div class="small muted">Nothing outstanding.</div>';}
+      else{h+='<div class="small"><b>'+s.exc.length+' exception'+
+        (s.exc.length>1?'s':'')+'</b> — the '+s.v+'% is this and nothing else.</div><ul class="small">';
+        for(var j=0;j<s.exc.length;j++)h+='<li>'+esc(s.exc[j])+'</li>';
+        h+='</ul>';}
+      h+='</div>';
+    }
+  }
+  h+='</div>';
+
+  /* requires your attention */
+  var red=[],amb=[];
+  for(var k=0;k<EXC.length;k++)(EXC[k].sev==="red"?red:amb).push(EXC[k]);
+  h+='<div class="card"><h2>Requires your attention</h2>';
+  h+=excRows(red.concat(amb));
+  h+='</div>';
+  h+='<div class="card"><div class="pad small muted">Everything else is running and '+
+     'stays in the background. '+countAll()+' activities ran today; only the '+
+     EXC.length+' above need a person.</div></div>';
+  return h;
+}
+function countAll(){var n=0;for(var r in WORK)n+=WORK[r].length;return n+124;}
+
+/* ---- EXCEPTION QUEUE with escalation ladder --------------- */
+function viewExc(){
+  return '<div class="card"><h2>Exception queue — what should have happened and did not</h2>'+
+    excRows(EXC)+'</div>';
+}
+function excRows(list){
+  var h="";
+  for(var i=0;i<list.length;i++){
+    var e=list[i], open=S.openExc===e.id;
+    h+='<button class="item" data-exc="'+e.id+'">'+
+       '<span class="chip c-'+e.sev+'">'+(e.sev==="red"?"CRITICAL":"ATTENTION")+'</span>'+
+       '<span class="grow"><span class="nm">'+esc(e.what)+'</span>'+
+       '<div class="tiny muted">'+esc(e.ref)+'</div></span></button>';
+    if(open){
+      h+='<div class="detail">'+
+         kv("Parameter",e.param)+kv("Doer",e.doer)+kv("Owner",e.owner);
+      if(e.ladder.length){
+        h+='<div class="tiny muted" style="margin-top:10px;text-transform:uppercase;'+
+           'letter-spacing:.06em">Escalation clock</div><div class="ladder">';
+        for(var j=0;j<e.ladder.length;j++){var st=e.ladder[j];
+          h+='<div class="step '+st.s+'"><span class="tiny muted">'+esc(st.t)+
+             '</span> &nbsp;<span class="who small">'+esc(st.who)+'</span>'+
+             (st.s==="now"?' <span class="chip c-red">now</span>':'')+'</div>';}
+        h+='</div>';
+      }
+      h+='</div>';
+    }
+  }
+  return h||'<div class="pad small muted">Nothing outstanding.</div>';
+}
+function kv(k,v){return '<div class="kv"><b>'+esc(k)+'</b><span>'+esc(v)+'</span></div>';}
+
+/* ---- MY WORK: grouped by why the item exists -------------- */
+function viewWork(){
+  var list=WORK[S.role]||[], order=["D","C","B","A"], h="";
+  h+='<div class="card"><h2>'+esc(role().name)+' — today</h2>'+
+     '<div class="pad small muted">Grouped by why each item exists. Nothing here was '+
+     'typed in by hand — every line was raised by an engine.</div>';
+  for(var c=0;c<order.length;c++){
+    var cls=order[c], rows=list.filter(function(x){return x.cls===cls;});
+    if(!rows.length)continue;
+    h+='<div class="grp"><div class="ghead"><span class="gname" style="color:'+
+       (cls==="D"?"var(--red)":cls==="C"?"var(--amber)":"var(--blue)")+'">'+
+       esc(CLASSES[cls].name)+'</span>'+
+       '<span class="gwhy">'+esc(CLASSES[cls].why)+'</span></div>';
+    for(var i=0;i<rows.length;i++)h+=itemRow(rows[i]);
+    h+='</div>';
+  }
+  h+='</div>';
+
+  /* the event engine, made visible */
+  if(S.role==="doctor"||S.role==="owner"||S.role==="manager")h+=cascadeCard();
+  return h;
+}
+function itemRow(t){
+  var open=S.openItem===t.id, done=t.st==="done";
+  var dc=done?"done":t.st==="late"?"late":t.blocked?"lock":"";
+  var h='<button class="item'+(done?" isdone":"")+'" data-item="'+t.id+'">'+
+    '<span class="dot '+dc+'"></span><span class="grow">'+
+    '<span class="nm">'+esc(t.nm)+'</span>'+
+    '<div class="tiny muted">'+(t.blocked?"🔒 Waiting for "+esc(t.blocked):
+      (done?"Done · ":t.st==="late"?"Overdue · ":t.st==="part"?"Partly done · ":"By ")+
+      esc(t.due))+'</div></span>'+
+    (t.st==="late"?'<span class="chip c-red">late</span>':
+     t.st==="part"?'<span class="chip c-amber">15/18</span>':'')+'</button>';
+  if(open){
+    h+='<div class="detail">'+
+       kv("Parameter",t.param)+kv("Trigger",t.trig)+kv("Doer",t.doer)+
+       kv("Checker",t.checker)+kv("Evidence",t.ev)+kv("Due",t.due);
+    if(t.blocked){
+      h+='<div class="small" style="color:var(--red);margin-top:8px">'+
+         'Blocked by '+esc(t.blocked)+'. This is a gate, not a reminder — it cannot '+
+         'be completed out of order.</div>';
+    }else if(!done){
+      h+='<button class="btn" data-do="'+t.id+'">Mark done</button>'+
+         '<button class="btn ghost" data-skip="'+t.id+'">Not applicable</button>';
+    }else{
+      h+='<div class="small" style="margin-top:8px">Completed · evidence recorded '+
+         '· awaiting check by '+esc(t.checker)+'</div>';
+    }
+    h+='</div>';
+  }
+  return h;
+}
+
+/* ---- patient event cascade -------------------------------- */
+function cascadeCard(){
+  var h='<div class="card"><h2>Patient Event Engine</h2><div class="pad">';
+  if(!CASCADE.fired){
+    h+='<div class="small">Nobody types these in. Record the clinical event and the '+
+       'system raises the work it implies, to the right person, at the right time.</div>'+
+       '<button class="btn" data-fire="1">Record: '+esc(CASCADE.event)+'</button>';
+  }else{
+    h+='<div class="small"><b>'+esc(CASCADE.event)+'</b> — raised '+
+       CASCADE.spawn.length+' activities automatically:</div>';
+    var when=["Today","Tomorrow","Later"];
+    for(var w=0;w<when.length;w++){
+      var rows=CASCADE.spawn.filter(function(x){return x.when===when[w];});
+      if(!rows.length)continue;
+      h+='<div class="tiny muted" style="margin-top:10px;text-transform:uppercase;'+
+         'letter-spacing:.06em">'+when[w]+'</div>';
+      for(var i=0;i<rows.length;i++)
+        h+='<div class="small" style="padding:4px 0">• '+esc(rows[i].nm)+
+           ' <span class="chip c-grey">'+esc(rows[i].role)+'</span></div>';
+    }
+    h+='<button class="btn ghost" data-unfire="1">Reset</button>';
+  }
+  return h+'</div></div>';
+}
+
+/* ---- COMPLIANCE GATE -------------------------------------- */
+function viewGate(){
+  var bad=GATE.checks.filter(function(c){return !c.ok;});
+  var h='<div class="card"><h2>Procedure readiness</h2><div class="gate">'+
+    '<div class="small"><b>'+esc(GATE.proc)+'</b></div>'+
+    '<div class="tiny muted" style="margin-bottom:8px">Tap any requirement to satisfy '+
+    'it and watch the verdict change.</div>';
+  for(var i=0;i<GATE.checks.length;i++){var c=GATE.checks[i];
+    h+='<button class="gcheck" data-gate="'+c.id+'">'+
+       '<span class="gbox '+(c.ok?"ok":"no")+'">'+(c.ok?"✓":"!")+'</span>'+
+       '<span class="grow small">'+esc(c.nm)+'</span>'+
+       '<span class="chip c-'+(c.ok?"green":"red")+'">'+(c.ok?"met":"missing")+
+       '</span></button>';}
+  h+= bad.length
+    ? '<div class="verdict no">⚠ PROCEDURE NOT READY<div class="small" '+
+      'style="font-weight:400;margin-top:5px">'+bad.length+
+      ' mandatory requirement'+(bad.length>1?'s':'')+' outstanding. The procedure '+
+      'cannot be started and the requirement does not disappear.</div></div>'
+    : '<div class="verdict ok">✓ READY FOR SURGERY</div>';
+  return h+'</div></div>';
+}
+
+/* ---- ENGINES ---------------------------------------------- */
+function viewEngines(){
+  var h='<div class="card"><h2>Six automation engines</h2>'+
+    '<div class="pad small muted">Work is created by these, not by anyone remembering. '+
+    'Counts are the activities in the dictionary each engine owns.</div>';
+  for(var i=0;i<ENGINES.length;i++){var e=ENGINES[i];
+    h+='<div class="item" style="cursor:default"><span class="grow">'+
+       '<span class="nm">'+esc(e.nm)+'</span>'+
+       '<div class="tiny muted" style="margin-top:3px">'+esc(e.d)+'</div></span>'+
+       (e.n?'<span class="chip c-blue">'+e.n+'</span>':
+            '<span class="chip c-red">live</span>')+'</div>';}
+  return h+'</div>';
+}
+
+/* ---- EQUIPMENT ENGINE ------------------------------------- */
+function viewAssets(){
+  var h='<div class="card"><h2>Equipment register</h2>'+
+    '<div class="pad small muted">Every important asset carries its own record. '+
+    'When next service date is reached, the service task is created — nobody diarises it.</div>';
+  for(var i=0;i<ASSETS.length;i++){var a=ASSETS[i], open=S.openAsset===a.id;
+    h+='<button class="item" data-asset="'+a.id+'">'+
+       '<span class="dot '+(a.due?"late":"done")+'"></span>'+
+       '<span class="grow"><span class="nm">'+esc(a.nm)+'</span>'+
+       '<div class="tiny muted">'+esc(a.id)+' · '+esc(a.loc)+' · next service '+
+       esc(a.next)+'</div></span>'+
+       (a.due?'<span class="chip c-red">service due</span>':
+              '<span class="chip c-green">ok</span>')+'</button>';
+    if(open){
+      h+='<div class="detail">'+
+         kv("Asset ID",a.id)+kv("Location",a.loc)+kv("Responsible",a.resp)+
+         kv("Daily check",a.daily)+kv("Service every",a.freq)+
+         kv("Last service",a.last)+kv("Next service",a.next)+
+         kv("AMC",a.amc)+kv("Downtime",a.downtime)+kv("Documents",a.docs);
+      h+='<div class="tiny muted" style="margin-top:10px;text-transform:uppercase;'+
+         'letter-spacing:.06em">Breakdown history</div>';
+      if(!a.breakdowns.length)h+='<div class="small muted">None recorded.</div>';
+      else for(var j=0;j<a.breakdowns.length;j++)
+        h+='<div class="small">• '+esc(a.breakdowns[j].d)+' — '+
+           esc(a.breakdowns[j].w)+' <span class="muted">('+
+           esc(a.breakdowns[j].dt)+' downtime)</span></div>';
+      if(a.due)h+='<div class="small" style="margin-top:10px;color:var(--red)">'+
+        'Next service date is today — the Equipment Engine has already raised the '+
+        'service task to '+esc(a.resp)+'.</div>';
+      h+='</div>';
+    }
+  }
+  return h+'</div>';
+}
+
+/* ---- INVENTORY ENGINE ------------------------------------- */
+function viewStock(){
+  var low=STOCK.filter(function(s){return s.low;});
+  var h='<div class="card"><h2>Consumable stock</h2>'+
+    '<div class="pad small muted">Rule: current stock at or below minimum raises a '+
+    'purchase requirement automatically. '+low.length+' item'+
+    (low.length===1?'':'s')+' triggered today.</div><div class="scroller"><table>'+
+    '<tr><th>Item</th><th>Category</th><th>Qty</th><th>Min</th><th>Reorder</th>'+
+    '<th>Batch</th><th>Expiry</th><th>Location</th><th>Supplier</th><th></th></tr>';
+  for(var i=0;i<STOCK.length;i++){var s=STOCK[i];
+    h+='<tr'+(s.low?' style="background:#FBEAE7"':'')+'><td><b>'+esc(s.item)+'</b></td>'+
+       '<td>'+esc(s.cat)+'</td><td>'+s.qty+' '+esc(s.unit)+'</td><td>'+s.min+'</td>'+
+       '<td>'+s.reorder+'</td><td>'+esc(s.batch)+'</td><td>'+esc(s.exp)+'</td>'+
+       '<td>'+esc(s.loc)+'</td><td>'+esc(s.sup)+'</td><td>'+
+       (s.low?'<span class="chip c-red">reorder</span>':'')+'</td></tr>';}
+  h+='</table></div></div>';
+
+  h+='<div class="card"><h2>Implant inventory</h2>'+
+    '<div class="pad small muted">“10 implants available” is clinically insufficient. '+
+    'Stock is held to brand, line, platform, diameter and length — with the healing '+
+    'abutment, impression and prosthetic components that go with it.</div>'+
+    '<div class="scroller"><table>'+
+    '<tr><th>Brand</th><th>Line</th><th>Platform</th><th>Dia</th><th>Len</th>'+
+    '<th>Implant</th><th>Healing ab.</th><th>Impression</th><th>Prosthetic</th></tr>';
+  for(var k=0;k<IMPLANTS.length;k++){var m=IMPLANTS[k];
+    var gap=(m.imp>0)&&(m.heal===0||m.impr===0||m.pros===0);
+    h+='<tr'+(m.imp===0?' style="background:#EDF2F5;color:var(--ink-3)"':
+              gap?' style="background:#FDF1E1"':'')+'>'+
+       '<td>'+esc(m.brand)+'</td><td>'+esc(m.line)+'</td><td>'+esc(m.plat)+'</td>'+
+       '<td>'+esc(m.dia)+'</td><td>'+esc(m.len)+'</td>'+
+       '<td><b>'+m.imp+'</b></td><td>'+m.heal+'</td><td>'+m.impr+'</td>'+
+       '<td>'+m.pros+'</td></tr>';}
+  h+='</table></div>'+
+    '<div class="pad small">Amber rows hold an implant but are missing a matching '+
+    'component — that gap only appears if you track the hierarchy. It is what makes '+
+    '“implant and components available” answerable at the surgery gate.</div></div>';
+  return h;
+}
+
+/* ---- ANATOMY: one requirement, fully modelled ------------- */
+function viewAnatomy(){
+  var pct=Math.round(STER.num/STER.den*1000)/10;
+  var h='<div class="card"><h2>How one line of the SOP is actually stored</h2>'+
+    '<div class="pad">'+
+    '<div class="small muted">Same-day instruments should be ultrasonic cleaned and '+
+    'autoclaved.</div>'+
+    '<div class="small" style="margin:8px 0;padding:8px 11px;background:#FBEAE7;'+
+    'border-radius:6px;color:var(--red)">Not stored as: ☐ Instruments autoclaved</div>'+
+    kv("Parameter",STER.param)+kv("Process",STER.process)+kv("Trigger",STER.trigger)+
+    kv("Owner",STER.owner)+kv("Due",STER.due)+
+    '<div class="sop">'+STER.sop.map(esc).join(' &rarr; ')+'</div>'+
+    kv("Evidence",STER.evidence)+kv("Verification",STER.verification)+
+    kv("KPI",STER.kpi)+
+    '</div>'+
+    '<h2>'+esc(STER.kpi)+'</h2><div class="pad">'+
+    '<div class="tiny muted">'+esc(STER.formula)+'</div>'+
+    '<div class="row" style="margin-top:8px"><span class="num" style="font-size:30px;'+
+    'font-weight:700;color:'+col(band(pct))+'">'+pct+'%</span>'+
+    '<span class="grow small muted">'+STER.num+' of '+STER.den+
+    ' · target '+STER.target+'%</span></div>'+
+    '<div class="bar"><i style="width:'+pct+'%;background:'+col(band(pct))+'"></i></div>'+
+    '<div class="small" style="margin-top:10px">Management does not ask '+
+    '“did you autoclave everything?”. The one instrument set that missed is '+
+    'in the exception queue with a name against it.</div>'+
+    '</div></div>';
+  return h;
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function draw(){
+  var r=role();
+  var rb="";
+  rb+='<span class="lbl">Signed in as</span>';
+  for(var i=0;i<ROLES.length;i++)
+    rb+='<button data-role="'+ROLES[i].id+'" class="'+(ROLES[i].id===S.role?"on":"")+
+        '">'+esc(ROLES[i].name)+'</button>';
+  document.getElementById("rolebar").innerHTML=rb;
+
+  document.getElementById("hTitle").textContent=
+    S.role==="owner"?"Today — K.B. Dental":r.name;
+  document.getElementById("hSub").textContent=
+    r.who+" · Monday 3 August · "+
+    (S.role==="owner"?"4 clinics · viewing Main":"Main clinic");
+
+  var nv="";
+  for(var j=0;j<r.tabs.length;j++)
+    nv+='<button data-tab="'+r.tabs[j]+'" class="'+(r.tabs[j]===S.tab?"on":"")+'">'+
+        esc(TABS[r.tabs[j]])+'</button>';
+  document.getElementById("nav").innerHTML=nv;
+
+  var v=S.tab==="dash"?viewDash():S.tab==="exc"?viewExc():S.tab==="gate"?viewGate():
+        S.tab==="engines"?viewEngines():S.tab==="assets"?viewAssets():
+        S.tab==="stock"?viewStock():S.tab==="anatomy"?viewAnatomy():viewWork();
+  document.getElementById("main").innerHTML=v;
+}
+
+/* ---- one delegated click handler -------------------------- */
+document.addEventListener("click",function(ev){
+  var el=ev.target;
+  while(el&&el!==document.body){
+    var d=el.dataset||{};
+    if(d.role){S.role=d.role;S.tab=role0(d.role).tabs[0];clearOpen();return draw();}
+    if(d.tab){S.tab=d.tab;clearOpen();return draw();}
+    if(d.score){S.openScore=S.openScore===d.score?null:d.score;return draw();}
+    if(d.exc){S.openExc=S.openExc===d.exc?null:d.exc;return draw();}
+    if(d.asset){S.openAsset=S.openAsset===d.asset?null:d.asset;return draw();}
+    if(d.item){S.openItem=S.openItem===d.item?null:d.item;return draw();}
+    if(d.do){return setItem(d.do,"done");}
+    if(d.skip){return setItem(d.skip,"na");}
+    if(d.gate){return toggleGate(d.gate);}
+    if(d.fire){CASCADE.fired=true;applyCascade(true);
+      toast("6 activities raised across 3 roles");return draw();}
+    if(d.unfire){CASCADE.fired=false;applyCascade(false);return draw();}
+    el=el.parentNode;
+  }
+});
+function role0(id){for(var i=0;i<ROLES.length;i++)if(ROLES[i].id===id)return ROLES[i];}
+function clearOpen(){S.openScore=null;S.openItem=null;S.openExc=null;S.openAsset=null;}
+
+function setItem(id,st){
+  var list=WORK[S.role]||[];
+  for(var i=0;i<list.length;i++){
+    if(list[i].id!==id)continue;
+    if(st==="done"&&list[i].blocked){
+      toast("Cannot complete — waiting for "+list[i].blocked);return;}
+    if(st==="na"){list.splice(i,1);S.openItem=null;
+      toast("Marked not applicable — grey, excluded from the score");return draw();}
+    list[i].st="done";S.openItem=null;
+    /* satisfying the autoclave reading releases the gated item */
+    if(id==="w4"){for(var j=0;j<list.length;j++)if(list[j].id==="w5"){
+      delete list[j].blocked;
+      toast("Cycle PASS recorded — sterile pack release unblocked");return draw();}}
+    toast("Done — evidence recorded, awaiting check");
+    return draw();
+  }
+}
+function toggleGate(id){
+  for(var i=0;i<GATE.checks.length;i++)if(GATE.checks[i].id===id){
+    GATE.checks[i].ok=!GATE.checks[i].ok;
+    var bad=GATE.checks.filter(function(c){return !c.ok;}).length;
+    toast(bad?bad+" requirement"+(bad>1?"s":"")+" still missing":
+      "All requirements met — procedure may start");
+    return draw();
+  }
+}
+function applyCascade(on){
+  for(var i=0;i<CASCADE.spawn.length;i++){
+    var s=CASCADE.spawn[i], list=WORK[s.role]; if(!list)continue;
+    var id="cas"+i, at=-1;
+    for(var j=0;j<list.length;j++)if(list[j].id===id)at=j;
+    if(on&&at<0)list.push({id:id,cls:"B",nm:s.nm,due:s.due,st:"open",param:s.param,
+      doer:s.role,checker:"Clinic Manager",ev:"Confirmation",
+      trig:CASCADE.event});
+    if(!on&&at>=0)list.splice(at,1);
+  }
+}
+
+draw();
+</script>
+</body>
+</html>

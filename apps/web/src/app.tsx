@@ -18,6 +18,8 @@ import { Checks } from './screens/checks.js';
 import { Standards } from './screens/standards.js';
 import { ConfirmationsBoard } from './screens/confirmations.js';
 import { Exceptions } from './screens/exceptions.js';
+import { Engines } from './screens/engines.js';
+import { Gate } from './screens/gate.js';
 import { Clinic } from './screens/clinic.js';
 import {
   IconToday, IconClinic, IconAttention, IconChecks,
@@ -237,7 +239,12 @@ export function App() {
           {/* Engine 6, the owner called it the most important: what should
               have happened and did not, with the ladder running. */}
           {data.overview && <Tab id="EXCEPTIONS" label="Not happening" now={here} go={setChosen} />}
+          {/* Engine D. Whoever is at the chair needs the verdict, not a list. */}
+          {['TREATING_DOCTOR','DENTAL_ASSISTANT','SENIOR_ASSISTANT','CLINICAL_DIRECTOR']
+            .some((r) => data.me.roleCodes.includes(r))
+            && <Tab id="GATE" label="Gate" now={here} go={setChosen} />}
           {data.overview && <Tab id="STANDARDS" label="Standards" now={here} go={setChosen} />}
+          {data.overview && <Tab id="ENGINES" label="How work appears" now={here} go={setChosen} />}
           <Tab id="ME" label="Me" now={here} go={setChosen} />
         </div>
         <div className="nav-who">
@@ -282,6 +289,8 @@ export function App() {
       {here === 'STANDARDS' && <Standards />}
       {here === 'CONFIRMATIONS' && <ConfirmationsBoard />}
       {here === 'EXCEPTIONS' && <Exceptions />}
+      {here === 'ENGINES' && <Engines />}
+      {here === 'GATE' && <Gate />}
       {here === 'ME' && (
         <MeScreen me={data.me} onSignedOut={() => { setData(null); setChosen('TODAY'); }} />
       )}
@@ -307,6 +316,8 @@ const TAB_ICON: Record<string, (p: { filled: boolean }) => ReactElement> = {
   STANDARDS: ({ filled }) => <IconChecks filled={filled} />,
   CONFIRMATIONS: ({ filled }) => <IconClinic filled={filled} />,
   EXCEPTIONS: ({ filled }) => <IconAlert filled={filled} />,
+  ENGINES: ({ filled }) => <IconOperations filled={filled} />,
+  GATE: ({ filled }) => <IconChecks filled={filled} />,
   CHECKS: ({ filled }) => <IconChecks filled={filled} />,
   ME: ({ filled }) => <IconMe filled={filled} />,
 };

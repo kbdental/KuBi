@@ -25,6 +25,7 @@
 import {
   PARAMETER_SPEC, TaskOrigin, Engine, ladder, ORIGIN_LABEL,
   SCORE_SPEC, SCORE_ORDER, outcomeOf, operationalScore, rollUp, rungAt,
+  STERILIZATION_SAME_DAY,
   type ManagementScore,
   type Responsibility, type EscalationRung,
 } from '@kubi/contracts';
@@ -117,6 +118,22 @@ interface Task {
  * accountable for the result, and neither hears about it when it does not
  * happen.
  */
+/**
+ * The patient-event cascade — engine B made visible.
+ *
+ * The argument prototype B made better than anything in A: nobody types these
+ * in. Record the clinical event and the system raises the work it implies, to
+ * the right person, at the right time.
+ */
+const CASCADE_SPAWN = [
+  { when: 'Today', role: 'Doctor', title: 'Post-op instructions issued', due: 'Before discharge', parameter: 'Surgical & high-risk' },
+  { when: 'Today', role: 'Doctor', title: 'Prescription verification', due: 'Before discharge', parameter: 'Patient journey' },
+  { when: 'Today', role: 'Reception', title: 'Next appointment booked', due: 'Before discharge', parameter: 'Appointment control' },
+  { when: 'Today', role: 'Housekeeping', title: 'Deep clean surgical room', due: 'After procedure', parameter: 'Cleanliness' },
+  { when: 'Tomorrow', role: 'Doctor', title: 'Surgery follow-up call', due: 'Tomorrow', parameter: 'Follow-up & experience' },
+  { when: 'Later', role: 'Doctor', title: 'Clinical documentation check', due: 'Within 24h', parameter: 'Clinical documentation' },
+];
+
 /**
  * Confirmation state, per the §6 example. Kept beside the visits rather than
  * on them because in the real system these are interaction records — a call
@@ -811,6 +828,21 @@ function freshState() {
     tasks, visits, attention, incidents, patientProcedures, followups,
     assets, stock, implants, batches, labCases,
     nextIncidentNumber: 8,
+    /** Engine B demo state — has the clinical event been recorded yet. */
+    cascadeFired: false,
+    /**
+     * Engine D. The seven checks before an implant may start. Two fail on
+     * purpose: a gate that is satisfied on first render proves nothing.
+     */
+    gate: [
+      { id: 'g1', label: 'Consent signed', met: false },
+      { id: 'g2', label: 'Medical history updated', met: true },
+      { id: 'g3', label: 'Pre-op instructions given', met: true },
+      { id: 'g4', label: 'Medication reminder completed', met: true },
+      { id: 'g5', label: 'Implant and components available', met: true },
+      { id: 'g6', label: 'Surgical kit sterilised', met: false },
+      { id: 'g7', label: 'Pre-op records available', met: true },
+    ],
     signedIn: null as Person | null,
     /**
      * Set by the demo's "Jump to the end of the day" control. A real clinic
@@ -1913,6 +1945,100 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
    * no percentages except the one progress figure that is genuinely a fraction
    * of work done.
    */
+  // ---- ENGINES: the six, the cascade, and one activity fully modelled ----
+  //
+  // From prototype B, which showed these and A did not. Three things on one
+  // screen because they are one argument: work is created by engines, not by
+  // anybody remembering; a clinical event raises its own consequences; and a
+  // single SOP line is stored as a whole specification rather than a checkbox.
+
+  if (path === '/api/v1/engines' && method === 'GET') {
+    return json({
+      engines: [
+        {
+          id: 'TIME', name: 'Time engine', count: 57,
+          what: 'Creates activity from the clock — attendance deadline, opening '
+            + 'readiness, morning confirmations, closing controls, weekly inventory, '
+            + 'monthly emergency audit.',
+        },
+        {
+          id: 'PATIENT_EVENT', name: 'Patient event engine', count: 47,
+          what: 'The clinical journey generates its own work. Surgery booked raises '
+            + 'pre-op requirements; surgery completed raises post-op, follow-up and '
+            + 'documentation.',
+        },
+        {
+          id: 'EQUIPMENT', name: 'Equipment engine', count: 12,
+          what: 'Every asset carries its own record — daily check, service frequency, '
+            + 'last and next service, breakdown history, AMC. Next service date '
+            + 'reached creates the task.',
+        },
+        {
+          id: 'INVENTORY', name: 'Inventory engine', count: 13,
+          what: 'Current stock at or below reorder level generates a purchase '
+            + 'requirement. Implants tracked to brand, line, platform, diameter and '
+            + 'length, not a single count.',
+        },
+        {
+          id: 'COMPLIANCE', name: 'Compliance engine', count: 18,
+          what: 'Mandatory gates. Missing requirements do not quietly disappear — the '
+            + 'procedure reads NOT READY until they are satisfied.',
+        },
+        {
+          id: 'EXCEPTION', name: 'Exception engine', count: null,
+          what: 'Continuously asks what should have happened and did not, then '
+            + 'escalates on a clock. This is what management actually looks at.',
+        },
+      ],
+      cascade: {
+        fired: db.cascadeFired,
+        event: 'Implant surgery completed — SYNTHETIC Priyanka N.',
+        spawn: CASCADE_SPAWN,
+      },
+      // The owner's §5: one line of the SOP, stored as a specification.
+      anatomy: {
+        requirement: 'Same-day instruments should be ultrasonic cleaned and autoclaved.',
+        notStoredAs: '☐ Instruments autoclaved',
+        parameter: 'Infection control',
+        process: 'Instrument sterilisation',
+        trigger: 'Instrument used',
+        owner: 'Dental assistant',
+        due: 'Same working day',
+        sop: STERILIZATION_SAME_DAY.sop,
+        evidence: 'Autoclave cycle / batch record',
+        verification: 'Closing sterilisation check',
+        kpi: STERILIZATION_SAME_DAY.kpi.name,
+        formula: STERILIZATION_SAME_DAY.kpi.formula,
+        numerator: 47, denominator: 48, target: 100,
+      },
+    });
+  }
+
+  if (path === '/api/v1/engines/cascade' && method === 'POST') {
+    db.cascadeFired = body.fired !== false;
+    return json({ fired: db.cascadeFired, raised: CASCADE_SPAWN.length });
+  }
+
+  // ---- COMPLIANCE GATE: engine D, with a verdict rather than a checklist ----
+
+  if (path === '/api/v1/gate' && method === 'GET') {
+    const missing = db.gate.filter((c) => !c.met);
+    return json({
+      procedure: 'Implant surgery — SYNTHETIC Priyanka N., 16:30',
+      checks: db.gate,
+      ready: missing.length === 0,
+      missingCount: missing.length,
+    });
+  }
+
+  const gateMatch = /^\/api\/v1\/gate\/([^/]+)$/.exec(path);
+  if (gateMatch && method === 'POST') {
+    const c = db.gate.find((x) => x.id === gateMatch[1]);
+    if (!c) return json({ error: 'Not found' }, 404);
+    c.met = !c.met;
+    return json({ ok: true });
+  }
+
   // ---- CONFIRMATIONS: the owner's §6 worked example ----
   //
   //   Patient | Appointment | Confirmation | Reminder | Special instructions | Status
