@@ -1748,3 +1748,44 @@ label.field-label {
   font: 11.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--ink-faint); margin-top: 2px;
 }
+
+/* ---- Why this task exists -----------------------------------------------
+   Below the fold on purpose: at 09:40 a person needs the checklist, not the
+   governance. But on the same screen, because "who is waiting on me" must
+   never be in a policy folder. */
+
+.why {
+  margin-top: 26px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.why-summary {
+  display: flex; align-items: center; gap: 10px;
+  cursor: pointer; list-style: none;
+  font-size: 14px; font-weight: 600; color: var(--ink-soft);
+  min-height: 44px;
+}
+.why-summary::-webkit-details-marker { display: none; }
+.why-summary::after { content: '›'; margin-left: auto; font-size: 18px; color: var(--ink-faint); }
+.why[open] .why-summary::after { content: '⌄'; }
+.why-origin {
+  background: var(--accent-soft); color: var(--accent);
+  border-radius: 999px; padding: 3px 10px;
+  font-size: 11.5px; font-weight: 650; letter-spacing: .02em;
+}
+.why-body { padding: 6px 0 4px; }
+.why-head {
+  font-size: 11.5px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 18px 0 7px;
+}
+.why-chain { display: grid; gap: 5px; margin: 0; }
+.why-chain div { display: flex; gap: 12px; font-size: 14.5px; }
+.why-chain dt { flex: 0 0 108px; color: var(--ink-soft); }
+.why-chain dd { margin: 0; text-transform: capitalize; font-weight: 550; }
+.why-ladder { margin: 0; padding-left: 20px; display: grid; gap: 5px; font-size: 14.5px; }
+.why-ladder li { text-transform: capitalize; }
+.why-ladder b { text-transform: none; }
+.why-kpi {
+  margin: 18px 0 0; font-size: 14px; color: var(--ink-soft);
+  background: var(--line-soft); border-radius: var(--radius-sm); padding: 10px 13px;
+}

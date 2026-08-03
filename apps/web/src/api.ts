@@ -127,6 +127,33 @@ export interface TaskSheet {
   canOverrideBlock: boolean;
   blockedBy: string | null;
   problemKinds: Array<{ key: string; label: string }>;
+  /** Why this task exists, who owns it, and what it moves. */
+  spec: WorkSpecView | null;
+}
+
+/**
+ * The chain, per task: parameter → process → trigger → four responsibilities →
+ * escalation ladder → KPI.
+ *
+ * Carried on the task itself so a person can always answer "why am I doing
+ * this and who is waiting on it" without leaving the screen.
+ */
+export interface WorkSpecView {
+  origin: string;
+  originLabel: string;
+  engine: string;
+  trigger: string;
+  parameter: string;
+  process: string;
+  responsibility: {
+    doer: string;
+    /** Null means self-verification is allowed — never "nobody checks". */
+    checker: string | null;
+    owner: string;
+    escalation: string;
+  };
+  escalation: Array<{ level: number; afterMinutes: number; to: string }>;
+  kpi: string | null;
 }
 
 export interface CompleteResult {

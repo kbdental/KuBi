@@ -247,7 +247,72 @@ export function TaskSheetScreen({
           Let this go ahead
         </button>
       )}
+
+      {sheet.spec && <WhyThisExists spec={sheet.spec} />}
     </div>
+  );
+}
+
+/**
+ * Why this task exists, who the four people are, and what it moves.
+ *
+ * Below the fold on purpose — somebody doing the work at 09:40 needs the
+ * checklist, not the governance. But it is on the same screen, because the
+ * moment anyone asks "why am I doing this" or "who is waiting on me", the
+ * answer has to be one scroll away and not in a policy folder.
+ *
+ * The four levels are the point. Doer and checker alone leave nobody
+ * accountable for the result and nobody to hear about it when it does not
+ * happen — which is exactly how "I thought somebody else had done it" happens.
+ */
+function WhyThisExists({ spec }: { spec: NonNullable<TaskSheet['spec']> }) {
+  const role = (r: string) => r.replace(/_/g, ' ').toLowerCase();
+
+  return (
+    <details className="why">
+      <summary className="why-summary">
+        <span className="why-origin">{spec.originLabel}</span>
+        Why this exists
+      </summary>
+
+      <div className="why-body">
+        <dl className="why-chain">
+          <div><dt>Control</dt><dd>{role(spec.parameter)}</dd></div>
+          <div><dt>Process</dt><dd>{spec.process}</dd></div>
+          <div><dt>Triggered by</dt><dd>{spec.trigger}</dd></div>
+          <div><dt>Engine</dt><dd>{role(spec.engine)}</dd></div>
+        </dl>
+
+        <div className="why-head">Who is responsible</div>
+        <dl className="why-chain">
+          <div><dt>Doer</dt><dd>{role(spec.responsibility.doer)}</dd></div>
+          <div>
+            <dt>Checker</dt>
+            {/* Null is "may check their own", never "nobody checks". */}
+            <dd>{spec.responsibility.checker
+              ? role(spec.responsibility.checker)
+              : 'may verify their own'}</dd>
+          </div>
+          <div><dt>Owner</dt><dd>{role(spec.responsibility.owner)}</dd></div>
+          <div><dt>Escalates to</dt><dd>{role(spec.responsibility.escalation)}</dd></div>
+        </dl>
+
+        <div className="why-head">If it does not happen</div>
+        <ol className="why-ladder">
+          {spec.escalation.map((r) => (
+            <li key={r.level}>
+              <b>{r.afterMinutes} min late</b> → {role(r.to)}
+            </li>
+          ))}
+        </ol>
+
+        {spec.kpi && (
+          <p className="why-kpi">
+            Moves <b>{spec.kpi}</b>
+          </p>
+        )}
+      </div>
+    </details>
   );
 }
 

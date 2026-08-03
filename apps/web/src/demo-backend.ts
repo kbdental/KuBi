@@ -22,7 +22,10 @@
  *   - cancelling always records a reason
  */
 
-import { PARAMETER_SPEC } from '@kubi/contracts';
+import {
+  PARAMETER_SPEC, TaskOrigin, Engine, ladder, ORIGIN_LABEL,
+  type Responsibility, type EscalationRung,
+} from '@kubi/contracts';
 
 type Role =
   | 'OWNER_DIRECTOR'
@@ -98,6 +101,58 @@ interface Task {
   blockedBy: string | null;
   releasedAt: number | null;
   completedBy: string | null;
+}
+
+/**
+ * Why a task exists, and who the four people are.
+ *
+ * Derived rather than stored per task: in the real system this comes off the
+ * activity record, and duplicating it onto every instance is how the copies
+ * drift. The demo derives it the same way so the two cannot disagree.
+ *
+ * The four levels exist to kill one failure — "I thought somebody else had
+ * done it". An assignee and a checker cannot express it: neither of them is
+ * accountable for the result, and neither hears about it when it does not
+ * happen.
+ */
+function workSpecFor(t: Task): {
+  origin: TaskOrigin; engine: Engine; trigger: string;
+  responsibility: Responsibility; escalation: EscalationRung[];
+  kpi: string | null;
+} {
+  const infection = t.parameter === 'INFECTION_CONTROL';
+  const safety = t.parameter === 'SAFETY_EMERGENCY';
+
+  const responsibility: Responsibility = {
+    doer: 'DENTAL_ASSISTANT' as Responsibility['doer'],
+    checker: t.selfVerifyAllowed ? null : (t.checkerRoles[0] ?? 'SENIOR_ASSISTANT') as never,
+    // Accountable for the result, whoever happened to do it. Clinical work
+    // answers to the clinical director; the rest to the clinic manager.
+    owner: (infection || safety ? 'CLINICAL_DIRECTOR' : 'CLINIC_MANAGER') as never,
+    escalation: 'CLINIC_HEAD' as never,
+  };
+
+  // Patient-safety work escalates faster. The ladder is data precisely so this
+  // is a different row rather than a different service.
+  const minutes: [number, number, number] = infection || safety ? [10, 20, 40] : [15, 30, 60];
+
+  const KPI: Partial<Record<ParameterKey, string>> = {
+    INFECTION_CONTROL: 'Same-day sterilisation compliance',
+    OPENING_READINESS: 'Opening on-time %',
+    SAFETY_EMERGENCY: 'Emergency readiness %',
+    ROOM_CHAIR_READINESS: 'Chairside readiness %',
+    CLEANLINESS: 'Cleanliness compliance %',
+  };
+
+  return {
+    origin: TaskOrigin.RECURRING,
+    engine: Engine.TIME,
+    trigger: t.process === 'Opening Readiness'
+      ? 'Clinic opening' : 'Clinic closing',
+    responsibility,
+    escalation: ladder(responsibility, minutes),
+    kpi: KPI[t.parameter] ?? null,
+  };
 }
 
 interface Attention {
@@ -1046,6 +1101,23 @@ function taskView(t: Task, me: Person) {
     canOverrideBlock: t.cantConfirm !== null,
     blockedBy: t.blockedBy,
     problemKinds: PROBLEM_KINDS,
+    // Why this exists, who the four people are, and what it moves. Without
+    // these a task is a tickable box, which is the thing the owner said this
+    // must not degrade into.
+    spec: (() => {
+      const w = workSpecFor(t);
+      return {
+        origin: w.origin,
+        originLabel: ORIGIN_LABEL[w.origin],
+        engine: w.engine,
+        trigger: w.trigger,
+        parameter: t.parameter,
+        process: t.process,
+        responsibility: w.responsibility,
+        escalation: w.escalation,
+        kpi: w.kpi,
+      };
+    })(),
   };
 }
 
