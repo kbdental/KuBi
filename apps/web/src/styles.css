@@ -2200,3 +2200,36 @@ label.field-label {
 .p360-reqs .is-ok { color: var(--ink-soft); }
 .p360-reqs .is-not { color: var(--safety); font-weight: 550; }
 .p360-missing { display: grid; gap: 6px; opacity: .85; }
+
+/* ---- The answer, before the detail --------------------------------------
+   Every dashboard used to open at level 2: sections of equal weight and
+   nothing telling the eye where to go first. Biggest is the answer, medium is
+   the question, small is the explanation. */
+.bf-answer {
+  display: grid; gap: 4px; justify-items: start;
+  padding: 18px 20px; margin: 0 0 24px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--card);
+}
+.bf-answer b { font-size: 22px; font-weight: 700; letter-spacing: -.018em; line-height: 1.2; }
+.bf-answer span { font-size: 15.5px; color: var(--ink-soft); line-height: 1.45; }
+.bf-answer-critical { background: var(--safety-tint); border-color: var(--safety-line); }
+.bf-answer-critical b { color: var(--safety); }
+.bf-answer-important { background: var(--warn-tint); border-color: var(--warn-line); }
+.bf-answer-important b { color: var(--warn); }
+.bf-answer-ok { background: var(--accent-soft); border-color: var(--accent-line); }
+.bf-answer-ok b { color: var(--accent); }
+.bf-answer-go { margin-top: 10px; }
+
+.sb-verdict {
+  display: grid; gap: 4px; justify-items: center; text-align: center;
+  margin: 22px auto 0; max-width: 460px;
+  padding: 16px 18px; border-radius: var(--radius);
+  border: 1px solid var(--line); background: var(--card);
+}
+.sb-verdict b { font-size: 18px; font-weight: 650; }
+.sb-verdict span { font-size: 14.5px; color: var(--ink-soft); }
+.sb-verdict .btn { margin-top: 10px; }
+.sb-verdict.is-bad { background: var(--safety-tint); border-color: var(--safety-line); }
+.sb-verdict.is-bad b { color: var(--safety); }
+.sb-verdict.is-ok { background: var(--accent-soft); border-color: var(--accent-line); }
+.sb-verdict.is-ok b { color: var(--accent); }

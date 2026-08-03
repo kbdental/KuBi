@@ -35,6 +35,12 @@ export function OwnerBusiness({ onOpenQuality }: { onOpenQuality?: () => void })
   useEffect(() => { void api.scoreboard().then(setSb).catch(() => setSb(null)); }, []);
   if (!sb) return <div className="screen"><p className="screen-sub">Loading…</p></div>;
 
+  // The weakest line that actually has something wrong with it. Sorting by
+  // percentage alone would point at a low score with nothing to act on.
+  const worst = [...sb.lines]
+    .filter((l) => l.deviationCount > 0)
+    .sort((a, b) => (a.value ?? 101) - (b.value ?? 101))[0] ?? null;
+
   // The drill-down. Only deviations — never a report.
   if (open) {
     return (
@@ -77,6 +83,30 @@ export function OwnerBusiness({ onOpenQuality }: { onOpenQuality?: () => void })
             : <><b>{sb.operational}</b><span>%</span></>}
         </div>
         <div className="sb-op-label">Clinic operational score</div>
+
+        {/* The answer, and one thing to do about it. The screen previously
+            opened with eight equal lines and no action at all — an owner could
+            read it and still not know where to start. */}
+        <div className={`sb-verdict ${worst ? 'is-bad' : 'is-ok'}`}>
+          {worst ? (
+            <>
+              <b>{worst.label} is your weakest line</b>
+              <span>
+                {worst.value === null ? 'nothing to measure' : `${worst.value}%`}
+                {worst.deviationCount > 0
+                  && ` · ${worst.deviationCount} thing${worst.deviationCount === 1 ? '' : 's'} wrong`}
+              </span>
+              <button className="btn" type="button" onClick={() => setOpen(worst)}>
+                Show me what is wrong
+              </button>
+            </>
+          ) : (
+            <>
+              <b>Everything is running to standard</b>
+              <span>No line is below its threshold and nothing is outstanding.</span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* The eight. Not sixteen parameters, and not a chart. */}

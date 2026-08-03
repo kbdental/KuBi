@@ -74,6 +74,27 @@ export function BriefingScreen({
       {/* The question this screen answers, said out loud. Constitution rule 8. */}
       <p className="screen-sub">{data.question}</p>
 
+      {/* The answer, before any of the detail that explains it. Every screen
+          used to open at level 2 — six sections of equal weight and nothing
+          telling the eye where to go first. */}
+      <div className={`bf-answer bf-answer-${TONE[data.headline.tone] ?? 'ok'}`}>
+        <b>{data.headline.verdict}</b>
+        <span>{data.headline.why}</span>
+        {/* One primary action. Never two. */}
+        {data.headline.action && (
+          <button
+            className="btn bf-answer-go"
+            type="button"
+            onClick={() => {
+              document.getElementById(`bf-${data.headline.action}`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+          >
+            Take me to it
+          </button>
+        )}
+      </div>
+
       {/* A real fraction of a real denominator, or nothing. Never a score. */}
       {data.work && data.work.total > 0 && (
         <p className="bf-work">
@@ -82,7 +103,7 @@ export function BriefingScreen({
       )}
 
       {data.sections.map((s) => (
-        <section key={s.key} className="bf-section">
+        <section key={s.key} id={`bf-${s.key}`} className="bf-section">
           <h2 className={`bf-head bf-${TONE[s.tone] ?? 'ok'}`}>
             {s.label}
             {s.items.length > 0 && <span className="bf-count">{s.items.length}</span>}

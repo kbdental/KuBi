@@ -1143,7 +1143,29 @@ function briefing(
   work: { total: number; done: number } | null,
   sections: ReturnType<typeof section>[],
 ) {
-  return { roleLabel, question, work, sections };
+  // One answer, then one action, then everything else. Derived from the
+  // sections rather than authored, so a screen can never claim a headline its
+  // own content does not support.
+  //
+  // The rule: the most serious section that actually has something in it. RED
+  // beats AMBER; within a tone, the earlier section wins, because the sections
+  // are already ordered by how much they matter to this role.
+  const live = sections.filter((s) => s.items.length > 0);
+  const worst = live.find((s) => s.tone === 'RED') ?? live.find((s) => s.tone === 'AMBER') ?? null;
+
+  const headline = worst
+    ? {
+      verdict: worst.label,
+      why: worst.items.length === 1
+        ? worst.items[0]!.text
+        : `${worst.items.length} things — ${worst.items[0]!.text} and ${worst.items.length - 1} more`,
+      tone: worst.tone,
+      // The one thing to do about it. Never more than one.
+      action: worst.key,
+    }
+    : { verdict: 'All clear', why: 'Nothing needs you right now.', tone: 'GREEN', action: null };
+
+  return { roleLabel, question, work, headline, sections };
 }
 
 /**

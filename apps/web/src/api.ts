@@ -499,6 +499,11 @@ export interface Briefing {
   /** The one question this dashboard answers, shown as the subtitle. */
   question: string;
   roleLabel: string;
+  /**
+   * The answer, first and biggest — derived from the sections, so a screen
+   * can never claim a headline its own content does not support.
+   */
+  headline: { verdict: string; why: string; tone: string; action: string | null };
   /** Null when this role has no countable work — a doctor is not a task list. */
   work: { total: number; done: number } | null;
   sections: BriefingSection[];
