@@ -644,6 +644,12 @@ export interface JourneyStage {
   detail: string | null;
   /** What is standing in the way, by name. Null when nothing is. */
   needs: string | null;
+  /**
+   * The one thing to do at this stage, executable from the record. Null when
+   * the stage is blocked or already done — a blocked stage says what is
+   * refusing rather than offering a button that would fail.
+   */
+  act: { label: string; kind: string; id: string } | null;
 }
 
 export interface Patient360 {
@@ -669,6 +675,8 @@ export interface Patient360 {
     id: string; procedureName: string; dueLabel: string;
     outcome: string; redFlagReason: string | null;
   }>;
+  /** One continuous log of what happened to this person. */
+  timeline: Array<{ at: string; what: string; tone: string }>;
   /** Named rather than omitted — a silently incomplete record looks complete. */
   notHeld: Array<{ what: string; needs: string }>;
 }

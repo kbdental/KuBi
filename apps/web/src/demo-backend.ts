@@ -2071,16 +2071,35 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     // Journey 2, as the spine of the record: patient → readiness → consent →
     // treatment → lab → payment → review → recall.
     const consentReq = planned?.requirements.find((r) => /consent/i.test(r.label)) ?? null;
+    // A stage carries its own action. The journey is executable from the
+    // record rather than being a picture of work that happens elsewhere —
+    // which was the difference between a patient screen and a patient
+    // workflow, and the reason it took seven screens to move one person
+    // through a morning.
     const stage = (
       key: string, label: string, state: 'DONE' | 'NOW' | 'BLOCKED' | 'WAITING' | 'ABSENT',
       detail: string | null, needs: string | null = null,
-    ) => ({ key, label, state, detail, needs });
+      act: { label: string; kind: string; id: string } | null = null,
+    ) => ({ key, label, state, detail, needs, act });
+
+    const NEXT_VISIT_STEP: Record<string, { to: string; label: string }> = {
+      BOOKED: { to: 'ARRIVED', label: 'They’re here' },
+      ARRIVED: { to: 'IN_CHAIR', label: 'Taken through' },
+      IN_CHAIR: { to: 'COMPLETED', label: 'Finished' },
+    };
 
     const journey = [
       stage('arrival', 'Arrival',
         today?.status === 'ARRIVED' || today?.status === 'IN_CHAIR' ? 'DONE'
           : today ? 'WAITING' : 'ABSENT',
-        today ? `${today.visitType} · ${today.chairLabel}` : 'Nothing booked today'),
+        today ? `${today.visitType} · ${today.chairLabel}` : 'Nothing booked today',
+        null,
+        today && NEXT_VISIT_STEP[today.status]
+          ? {
+            label: NEXT_VISIT_STEP[today.status]!.label,
+            kind: 'VISIT', id: `${today.id}:${NEXT_VISIT_STEP[today.status]!.to}`,
+          }
+          : null),
       stage('readiness', 'Readiness',
         !planned ? 'ABSENT' : blocking.length === 0 ? 'DONE' : 'BLOCKED',
         planned ? planned.procedureName : 'No procedure planned',
@@ -2092,7 +2111,14 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         procedures.some((pp) => pp.status === 'COMPLETED') ? 'DONE'
           : procedures.some((pp) => pp.status === 'IN_PROGRESS') ? 'NOW'
             : blocking.length > 0 ? 'BLOCKED' : 'WAITING',
-        planned?.procedureName ?? null),
+        planned?.procedureName ?? null,
+        // A blocked stage says what is refusing rather than offering a button
+        // that would fail — the gate is the point, not an obstacle to route
+        // around.
+        blocking.length > 0 ? blocking.map((r) => r.label).join(' · ') : null,
+        planned && blocking.length === 0
+          ? { label: 'Start the procedure', kind: 'PROCEDURE', id: planned.id }
+          : null),
       stage('lab', 'Laboratory',
         labCases.length === 0 ? 'ABSENT'
           : labCases.every((l) => l.deliveryReady) ? 'DONE'
@@ -2114,7 +2140,17 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         : planned
           ? { verdict: 'READY', why: `${planned.procedureName} may start` }
           : today
-            ? { verdict: 'BOOKED', why: `${today.visitType} · ${today.chairLabel}` }
+            // The headline must agree with the journey beneath it. It said
+            // BOOKED while the journey showed Arrival complete — a record
+            // contradicting itself in the two places a person looks first.
+            ? {
+              verdict: today.status === 'IN_CHAIR' ? 'IN THE CHAIR'
+                : today.status === 'ARRIVED' ? 'WAITING'
+                  : 'BOOKED',
+              why: today.status === 'ARRIVED'
+                ? `Arrived · ${today.visitType} · ${today.chairLabel}`
+                : `${today.visitType} · ${today.chairLabel}`,
+            }
             : { verdict: 'NOTHING DUE', why: 'No open procedure or appointment' };
 
     return json({
@@ -2141,6 +2177,46 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         id: f.id, procedureName: f.procedureName, dueLabel: f.dueLabel,
         outcome: f.outcome, redFlagReason: f.redFlagReason,
       })),
+      /**
+       * One continuous log of what happened to this person, built from the
+       * records the app already holds rather than a new store. A timeline
+       * explains a day without opening a report.
+       */
+      timeline: [
+        ...visits.map((v) => ({
+          at: v.status === 'BOOKED' ? `in ${v.startsInMinutes} min` : 'today',
+          what: v.status === 'BOOKED' ? `${v.visitType} booked`
+            : v.status === 'ARRIVED' ? 'Arrived, waiting'
+              : v.status === 'IN_CHAIR' ? `Seated in ${v.chairLabel}`
+                : v.status === 'COMPLETED' ? `${v.visitType} finished`
+                  : `${v.visitType} ${v.status.toLowerCase()}`,
+          tone: v.status === 'CANCELLED' || v.status === 'NO_SHOW' ? 'RED' : 'GREEN',
+        })),
+        ...procedures.map((pp) => ({
+          at: pp.whenLabel,
+          what: `${pp.procedureName} — ${pp.status.toLowerCase().replace(/_/g, ' ')}`,
+          tone: pp.status === 'COMPLETED' ? 'GREEN' : 'AMBER',
+        })),
+        ...labCases.map((l) => ({
+          at: l.expectedLabel ?? 'no date',
+          what: `${l.workType} · ${l.nextStep ?? l.status.toLowerCase()}`,
+          tone: l.overdue || l.status === 'REMAKE' ? 'RED' : 'GREEN',
+        })),
+        ...followups.map((f) => ({
+          at: f.dueLabel,
+          what: `Follow-up — ${f.outcome.toLowerCase().replace(/_/g, ' ')}`,
+          tone: f.outcome === 'RED_FLAG' ? 'RED' : 'GREEN',
+        })),
+        // The audit trail is the only source that records refusals, which are
+        // exactly the events a timeline is read for.
+        ...db.audit
+          .filter((e) => e.subject.includes(id) || e.deviation?.includes(id))
+          .map((e) => ({
+            at: new Date(e.at).toLocaleTimeString(),
+            what: `${e.action.toLowerCase().replace(/_/g, ' ')} — ${e.subject}`,
+            tone: e.deviation ? 'RED' : 'GREEN',
+          })),
+      ],
       /** Said out loud, per principle 3 — not quietly missing. */
       notHeld: [
         { what: 'Payments and estimates', needs: 'Billing module' },

@@ -15,7 +15,7 @@
  * payments looks complete and is not.
  */
 import { useEffect, useState } from 'react';
-import { api, type Patient360 } from '../api.js';
+import { api, type Patient360, type JourneyStage } from '../api.js';
 
 const STATE_CLASS: Record<string, string> = {
   DONE: 'jr-done', NOW: 'jr-now', BLOCKED: 'jr-blocked',
@@ -34,10 +34,38 @@ export function Patient360({
   const [p, setP] = useState<Patient360 | null>(null);
   const [failed, setFailed] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
 
-  useEffect(() => {
-    void api.patient(patientLabel).then(setP).catch(() => setFailed(true));
-  }, [patientLabel]);
+  const load = () => { void api.patient(patientLabel).then(setP).catch(() => setFailed(true)); };
+  useEffect(load, [patientLabel]);
+
+  /**
+   * Move the journey on, from the journey.
+   *
+   * The whole point of the domain pass: a patient screen that only describes
+   * work is a picture. Moving somebody through a morning used to mean leaving
+   * this record for the clinic list and back again.
+   */
+  async function advance(act: NonNullable<JourneyStage['act']>) {
+    setBusy(act.id);
+    setProblem(null);
+    try {
+      if (act.kind === 'VISIT') {
+        const [visitId, to] = act.id.split(':');
+        await api.setAppointmentStatus(visitId!, to as 'ARRIVED' | 'IN_CHAIR' | 'COMPLETED');
+      } else {
+        await api.startPatientProcedure(act.id);
+      }
+      load();
+    } catch (e) {
+      // The server's refusal, passed through unchanged. It is written for a
+      // person to read and is usually more useful than anything invented here.
+      setProblem(e instanceof Error ? e.message : 'That did not work.');
+    } finally {
+      setBusy(null);
+    }
+  }
 
   if (failed) {
     return (
@@ -73,6 +101,8 @@ export function Patient360({
         </div>
       )}
 
+      {problem && <div className="notice notice-stop" role="alert">{problem}</div>}
+
       {/* Journey 2, as the spine of the record. */}
       <h2 className="cc-head">The journey</h2>
       <ol className="jr">
@@ -84,6 +114,17 @@ export function Patient360({
               {s.detail && <div className="row-note">{s.detail}</div>}
               {/* What is standing in the way, by name. */}
               {s.needs && <div className="jr-needs">{s.needs}</div>}
+              {/* One action, at the stage it belongs to. */}
+              {s.act && (
+                <button
+                  className="btn jr-act"
+                  type="button"
+                  disabled={busy === s.act.id}
+                  onClick={() => void advance(s.act!)}
+                >
+                  {busy === s.act.id ? 'Working…' : s.act.label}
+                </button>
+              )}
             </div>
           </li>
         ))}
@@ -102,6 +143,17 @@ export function Patient360({
 
       {showAll && (
         <div className="p360-detail">
+          {/* One continuous log. A timeline explains a day without opening a
+              report, which is why owners read them and not dashboards. */}
+          <Section title="Timeline" empty="Nothing has happened yet.">
+            {p.timeline.map((t, i) => (
+              <div key={`${t.at}-${i}`} className={`p360-tl p360-tl-${t.tone.toLowerCase()}`}>
+                <span className="p360-tl-at">{t.at}</span>
+                <span className="p360-tl-what">{t.what}</span>
+              </div>
+            ))}
+          </Section>
+
           <Section title="Appointments" empty="Nothing booked.">
             {p.appointments.map((a) => (
               <div key={a.id} className="p360-row">

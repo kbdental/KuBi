@@ -2253,3 +2253,20 @@ label.field-label {
 .sb-clear {
   margin: 0 0 14px; font-size: 13.5px; color: var(--ink-faint); line-height: 1.5;
 }
+
+/* An action at the stage it belongs to. The journey is executable from the
+   record rather than a picture of work happening elsewhere. */
+.jr-act { margin-top: 9px; }
+
+.p360-tl {
+  display: flex; gap: 12px; align-items: baseline;
+  padding: 8px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line); background: var(--card); font-size: 14.5px;
+}
+.p360-tl-at {
+  flex: 0 0 96px; font-size: 12.5px; color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.p360-tl-what { flex: 1; }
+.p360-tl-red { border-color: var(--safety-line); background: var(--safety-tint); }
+.p360-tl-amber { border-color: var(--warn-line); background: var(--warn-tint); }
