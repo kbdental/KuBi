@@ -4,7 +4,28 @@ The reference point for every architectural decision. When a proposal and this
 document disagree, this document wins or it gets amended deliberately — it does
 not get quietly ignored.
 
-Status: draft for owner approval. Version 1.0, 3 August 2026.
+Status: draft for owner approval. Version 1.1, 3 August 2026.
+
+---
+
+## 0. The answer to the only question a buyer asks
+
+> **"Why should I buy KuBi instead of another clinic management system?"**
+
+> ## Every other clinic system records what you did.
+> ## KuBi runs your clinic to a standard — and proves it.
+
+The thirty-second version, for a room:
+
+> That proof becomes a grade. Bronze, Silver, Gold, Platinum, Accredited.
+> Earned from what your clinic actually does every day, not from a form you
+> fill in once a year. Your staff work to it, your patients can see it, and
+> you finally know whether your clinic is genuinely good or just busy.
+
+Everything below this line — domains, registries, contracts, evaluation states,
+the whole architecture — exists to make those three sentences true. None of it
+may replace them. If a feature cannot be traced back to "runs your clinic to a
+standard, and proves it", it is somebody's good idea and not this product's.
 
 ---
 
@@ -175,23 +196,106 @@ trade-off to weigh; it is a proposal to redesign.
 10. **Synthetic data only outside production.** No production data or
     credentials in any non-production environment, ever.
 
-## 6. What KuBi will grow into
+## 6. The layer stack
 
-Direction, not a commitment to dates. Detail lives in the dashboard strategy
-and domain documents.
+Added at the owner's review of 3 August. The architecture had three layers;
+it needs six. Two of them are the commercial answer in §0, and neither is an
+operational view.
 
-- **Now** — operations, clinical readiness, quality and the loop. Six
-  dashboards.
-- **Next** — inventory and maintenance as first-class dashboards; patient
-  experience as a domain rather than a set of scattered fields.
-- **Then** — the relationship layer: who the patient is, how they were reached,
-  what was proposed and what they accepted. This unlocks business growth, and
-  nothing in growth is real without it.
-- **Later** — HR, accounts, marketing, rider, maintenance, and a multi-clinic
-  view for a group.
+```
+Business narrative        why anyone buys it
+  └─ Maturity Model       what "good" means, and how a clinic proves it
+      └─ Domains          who owns what
+          └─ Dashboards   one question each
+```
 
-The order is deliberate: **operations first, because a clinic that cannot prove
-it sterilised an instrument has no business measuring its marketing ROI.**
+Crossing all four:
+
+```
+Intelligence Layer        Measure → Predict → Recommend → Act
+Knowledge Layer           Procedure → Checklist → Complication → CAPA → Lesson
+```
+
+### 6.1 Maturity Model — the missing layer
+
+**Bronze → Silver → Gold → Platinum → Accredited KuBi Clinic.** Every parameter
+contributes to certification.
+
+This is the commercial expression of the parameter spine, and it is what turns
+a compliance product into something a clinic *wants* rather than tolerates. It
+gives the owner a goal, the manager a scoreboard that is not a stick, and the
+practice something to put on the wall.
+
+Three design constraints, recorded now because getting them wrong destroys the
+whole idea:
+
+1. **Earned from live compliance over a sustained window, never
+   self-assessed.** The moment a grade can be claimed rather than computed, it
+   is worthless — and every existing dental accreditation already fails here.
+2. **A disabled parameter counts as not met, never as excluded.** This is the
+   gaming vector: the per-parameter live/off switch exists so a clinic can
+   adopt honestly one head at a time, and it would otherwise let a clinic reach
+   Gold by switching off everything it fails. Adoption breadth is itself part
+   of the grade.
+3. **A grade can go down.** A certification that only ratchets upward is a
+   participation trophy.
+
+### 6.2 Intelligence Layer
+
+Today KuBi is Measure → Show → Act. It should be **Measure → Predict →
+Recommend → Act**.
+
+> "Sterilization compliance has fallen for 12 days. A new assistant joined on
+> day 3, and their training is overdue."
+
+Three constraints:
+
+1. **Evidence-linked, and falsifiable.** A recommendation shows the facts it
+   was built from and can be told "not this" — which is itself a signal.
+2. **Never present correlation as cause.** Principle 2 applies with full
+   force: state the observation and the proposed link separately, in those
+   words. "Likely cause" is a claim; "these two things coincide" is a fact.
+3. **A recommendation is a CAPA candidate, not a notification.** It ends in
+   somebody deciding, or it is noise with a nicer font.
+
+### 6.3 Knowledge Layer
+
+**Procedure → Checklist → Complication → CAPA → Lesson.** Not storing
+incidents — accumulating institutional knowledge. Eventually: *clinics using
+protocol A reduced failures by 32%.*
+
+This is the one layer that nobody in this market is building, and it is also
+the only part of KuBi that **must read across tenants** — which puts it in
+direct tension with row-level security being the entire isolation model. It
+therefore needs, from the start and not retrofitted:
+
+- a separate aggregate-only path, physically distinct from the tenant query
+  path, that cannot return a row;
+- no patient identifiers of any kind crossing a clinic boundary, ever;
+- a minimum cohort size before any cross-clinic figure is computed;
+- explicit clinic opt-in, revocable.
+
+Get this wrong once and the product is finished. It is worth building the wall
+before there is anything to put behind it.
+
+## 7. Roadmap
+
+Owner's roadmap, adopted. Note that phases 2 and 3 add **no features** — that
+is the point of them.
+
+| Phase | What | Success looks like |
+|---|---|---|
+| **1 — Build** | Complete the v3 merge on the approved architecture | Six dashboards live; one source of truth; standards primary |
+| **2 — Pilot** | Run KuBi at K.B. Dental for 2–3 months | We know what staff *use* versus what they ignore — measured, not guessed |
+| **3 — First external clinic** | Onboard one clinic outside K.B. | Deployment, training and support work without the author in the room |
+| **4 — Refinement** | Real-world feedback; then Relationship, Learning, predictive intelligence | The core proved itself before we extended it |
+
+The order within phase 1 is deliberate: **operations first, because a clinic
+that cannot prove it sterilised an instrument has no business measuring its
+marketing ROI.**
+
+And the discipline in phases 2–3 is the harder half. A product that keeps
+adding domains is avoiding the question of whether anyone uses the ones it has.
 
 ## 7. How this document is used
 

@@ -99,6 +99,7 @@ you avoid maintaining nine copies of a briefing.
 | **Inventory** | "What runs out before it is reordered?" | INVENTORY_COORDINATOR | 2 | PLANNED |
 | **Maintenance** | "What is broken, due, or out of cover?" | *(new role)* | 2 | PLANNED |
 | **Quality** | "What is repeating, and did our fix work?" | QUALITY_COMPLIANCE | 2 | PLANNED |
+| **Learning** | "Who is allowed to do this, and for how much longer?" | *(new role)* | 3 | PLANNED |
 | **HR** | "Who is short, late, untrained or unavailable?" | *(new role)* | 3 | PENDING_DOMAIN_DEFINITION |
 | **Marketing** | "What brings patients in, and where do they leak?" | *(new role)* | 3 | PENDING_DOMAIN_DEFINITION |
 | **Accounts** | "What is billed, collected and outstanding?" | *(new role)* | 3 | PENDING_DOMAIN_DEFINITION |
@@ -258,7 +259,91 @@ evaluation, the enforcement matrix, RLS, the CAPA loop, or any screen's
 behaviour. Per requirement 10 of the original brief, this is structure, not
 semantics.
 
-## 11. Open decisions
+## 11. Amendments from the owner's second review, 3 August
+
+### 11.1 Patient Relationship becomes its own domain
+
+The chain was `Patient → Experience → Growth`. It becomes:
+
+```
+Patient → Relationship → Experience → Growth
+```
+
+This is cleaner and it settles boundary arguments that the earlier split left
+open — Recall and the referral network were sitting in Growth, where they
+attracted a commercial owner to what is really a contact relationship.
+
+| Domain | Owns |
+|---|---|
+| **Patient Relationship** *(new)* | Identity, family, preferences, communication, **recall**, consent, **referral network**, loyalty, segmentation |
+| **Patient Experience** | Waiting, complaints, reviews, satisfaction |
+| **Business Growth** | Acceptance, marketing, revenue pipeline, high-value cases, ROI |
+
+The rule that follows: **Relationship owns who they are and how we may reach
+them. Experience owns how it felt. Growth owns what it is worth.** Contact
+consent living in Relationship means every domain that wants to message a
+patient must pass through a domain whose job is the patient's side of it.
+
+Supersedes: the boundary table in `domains/business-growth.md` §6 and the
+ownership rule in `domains/patient-experience.md` §4, both amended in place.
+
+### 11.2 Learning becomes a domain — and it is not HR
+
+Owns competency, training, certification, skills, renewals, mentoring,
+assessments.
+
+Worth noting how much substrate already exists: activities `TRN-001`–`TRN-005`
+are in the frozen matrix, `CompetencyLevel` is in contracts,
+`ROLES_DENIED_CLINICAL_AUTHORITY` is enforced, and the matrix already carries
+Role Competency Coverage %, Training Completion %, Competency Gate Compliance %
+and Current Competency %. Learning is **closer to buildable than HR**, and
+separating them is what makes that visible — folded into HR it would have
+waited on an attendance module it does not need.
+
+The distinction that matters: HR asks "is this person here and paid";
+Learning asks "is this person **allowed to do this**". The second is a clinical
+safety gate, and it is already wired to one.
+
+### 11.3 The Executive layer is a decision layer
+
+The Group dashboard registered in §4 was described as an operational view
+across clinics. It is not. Its verbs are **allocate, invest, coach, intervene**
+— not fix. It consumes maturity grade and trend, never task lists.
+
+> Which clinic needs me? Which is declining? Which needs investment? Which
+> manager needs coaching?
+
+Consequence for the registry: `Group` takes its sections from the Maturity
+Model and the Intelligence layer, not from operational domains. A CEO screen
+built out of operational sections is a manager's screen with more rows, which
+is the mistake this whole architecture exists to avoid.
+
+### 11.4 Three cross-cutting layers now exist
+
+Maturity Model, Intelligence and Knowledge are defined in `product-vision.md`
+§6. They are **not domains** — they consume every domain's output and publish
+back into any dashboard. Architecturally they need one thing from this
+document: the domain contract must expose enough for them to consume, which it
+does via `kpis` and `parameters`. No change required, which is the test that
+the contract was right.
+
+### 11.5 Revised phase map
+
+Phases now follow the owner's roadmap in `product-vision.md` §7. Phase 4 is
+explicitly gated on the pilot, not on engineering readiness.
+
+| Domain / layer | Phase |
+|---|---|
+| Operations, Clinical, Quality | 1 — build |
+| Patient Experience, Inventory, Maintenance | 2 — during pilot |
+| Learning | 2–3 |
+| Patient Relationship | 4 — after the core proves itself |
+| Business Growth, Marketing, Accounts, HR | 4 |
+| Maturity Model | 4 — needs sustained real compliance data to grade against |
+| Intelligence, Knowledge | 4 |
+| Rider, Group / Executive | 4 |
+
+## 12. Open decisions
 
 | # | Decision | Needed by |
 |---|---|---|

@@ -9,9 +9,8 @@ import { SignIn } from './screens/sign-in.js';
 import { Today } from './screens/today.js';
 import { TaskSheetScreen } from './screens/task-sheet.js';
 import { Attention } from './screens/attention.js';
-import { CommandCentre } from './screens/command-centre.js';
-import { OwnerBusiness } from './screens/owner-business.js';
-import { ReceptionBoard } from './screens/reception-board.js';
+import { dashboardsFor, homeFor, DashboardStatus } from './app/registry.js';
+import { registerAllDashboards } from './app/dashboards.js';
 import { Operations } from './screens/operations.js';
 import { Patients } from './screens/patients.js';
 import { Quality } from './screens/quality.js';
@@ -43,7 +42,18 @@ const CAN_MOVE_VISITS = [
   'TREATING_DOCTOR', 'CLINICAL_DIRECTOR',
 ];
 
-type Place = 'MIS' | 'CC' | 'DESK' | 'OPERATIONS' | 'TODAY' | 'CLINIC' | 'PATIENTS' | 'ATTENTION' | 'QUALITY' | 'CHECKS' | 'ME';
+/**
+ * Somewhere to be. The fixed screens are named; dashboard ids come from the
+ * registry, so this is a string rather than a closed union — closing it would
+ * mean editing this file for every new dashboard, which is the coupling the
+ * registry exists to remove.
+ */
+type Place = string;
+
+// Once, at module load. Registration throws on a duplicate id or a dashboard
+// that is LIVE with nothing to render, so a mistake here fails at startup
+// rather than on the one screen nobody opened before shipping.
+registerAllDashboards();
 
 interface Loaded {
   me: Me;
@@ -153,14 +163,20 @@ export function App() {
   const showChecks = data.checks.length > 0;
   // The owner's KuBi is a different app, not a filtered one.
   const isOwner = data.me.roleCodes.includes('OWNER_DIRECTOR');
-  const isManager = data.me.roleCodes.includes('CLINIC_MANAGER');
-  const isReception = data.me.roleCodes.includes('RECEPTION');
-  // TODAY does not exist for an owner, so landing there would show an empty
-  // frame. Resolved at render rather than by an effect: a redirect that runs
-  // after paint shows the wrong screen first, which is the flicker every
-  // dashboard has and nobody admits to.
-  // Each role lands on its own command centre rather than a shared screen.
-  const home: Place = isOwner ? 'MIS' : isManager ? 'CC' : isReception ? 'DESK' : 'TODAY';
+
+  // Which dashboards this person can reach, and where they land, both come
+  // from the registry — the shell names no roles. Adding a dashboard is a
+  // registration; it does not appear here.
+  const myDashboards = dashboardsFor(data.me.roleCodes)
+    .filter((d) => d.status === DashboardStatus.LIVE);
+  const myHome = homeFor(data.me.roleCodes);
+
+  // Resolved at render rather than by an effect: a redirect that runs after
+  // paint shows the wrong screen first, which is the flicker every dashboard
+  // has and nobody admits to. Someone with no dashboard yet — housekeeping,
+  // until the Assistant screen ships — lands on their task list rather than
+  // on somebody else's screen.
+  const home: Place = myHome ? myHome.id : 'TODAY';
   const here: Place = chosen ?? home;
 
   return (
@@ -173,11 +189,20 @@ export function App() {
         <div className="nav-items">
           {/* An owner is not a manager with more permissions. "You should not
               see 150 tasks" is a different screen, not a filtered one — so the
-              owner gets the MIS and none of the operational tabs. */}
-          {isOwner && <Tab id="MIS" label="Business" now={here} go={setChosen} />}
-          {isManager && <Tab id="CC" label="Command" now={here} go={setChosen} />}
-          {isReception && <Tab id="DESK" label="The desk" now={here} go={setChosen} />}
-          {!isOwner && <Tab id="TODAY" label={isManager || isReception ? 'My tasks' : 'Today'} now={here} go={setChosen} />}
+              owner gets their own dashboard and none of the operational tabs.
+              Which dashboards appear is the registry's business, not this
+              file's. */}
+          {myDashboards.map((d) => (
+            <Tab key={d.id} id={d.id} label={d.label} now={here} go={setChosen} />
+          ))}
+          {!isOwner && (
+            <Tab
+              id="TODAY"
+              label={myDashboards.length > 0 ? 'My tasks' : 'Today'}
+              now={here}
+              go={setChosen}
+            />
+          )}
           {!isOwner && data.schedule.rows.length > 0 && (
             <Tab id="CLINIC" label="Clinic" now={here} go={setChosen} />
           )}
@@ -232,15 +257,13 @@ export function App() {
           onOpenTask={(id) => void open(id)}
         />
       )}
-      {here === 'MIS' && <OwnerBusiness onOpenQuality={() => setChosen('QUALITY')} />}
-      {here === 'CC' && (
-        <CommandCentre
-          onOpenAttention={() => setChosen('ATTENTION')}
-          onOpenClinic={() => setChosen('CLINIC')}
-          onOpenOperations={() => setChosen('OPERATIONS')}
-        />
-      )}
-      {here === 'DESK' && <ReceptionBoard onOpenClinic={() => setChosen('CLINIC')} />}
+      {/* Dashboards render themselves. The shell hands each one a way to
+          navigate, reload and open a task, and knows nothing else about it. */}
+      {myDashboards.find((d) => d.id === here)?.render?.({
+        go: setChosen,
+        reload,
+        openTask: (id) => void open(id),
+      })}
       {here === 'PATIENTS' && <Patients onChanged={reload} />}
       {here === 'OPERATIONS' && <Operations onChanged={reload} />}
       {here === 'QUALITY' && <Quality onChanged={reload} />}
@@ -253,13 +276,17 @@ export function App() {
   );
 }
 
-const TAB_ICON: Record<Place, (p: { filled: boolean }) => ReactElement> = {
+const TAB_ICON: Record<string, (p: { filled: boolean }) => ReactElement> = {
   TODAY: ({ filled }) => <IconToday filled={filled} />,
   CLINIC: ({ filled }) => <IconClinic filled={filled} />,
   ATTENTION: ({ filled }) => <IconAttention filled={filled} />,
-  MIS: ({ filled }) => <IconOverview filled={filled} />,
-  CC: ({ filled }) => <IconOverview filled={filled} />,
+  OWNER: ({ filled }) => <IconOverview filled={filled} />,
+  COMMAND: ({ filled }) => <IconOverview filled={filled} />,
   DESK: ({ filled }) => <IconClinic filled={filled} />,
+  DOCTOR: ({ filled }) => <IconPatients filled={filled} />,
+  ASSISTANT: ({ filled }) => <IconToday filled={filled} />,
+  LAB: ({ filled }) => <IconOperations filled={filled} />,
+  INVENTORY: ({ filled }) => <IconOperations filled={filled} />,
   PATIENTS: ({ filled }) => <IconPatients filled={filled} />,
   OPERATIONS: ({ filled }) => <IconOperations filled={filled} />,
   QUALITY: ({ filled }) => <IconQuality filled={filled} />,
@@ -277,7 +304,10 @@ function Tab({
   count?: number;
 }) {
   const on = now === id;
-  const Icon = TAB_ICON[id];
+  // A dashboard registered without an icon still gets a tab. Falling back
+  // beats crashing the shell, and beats hiding the tab — which would make a
+  // missing icon look like a missing permission.
+  const Icon = TAB_ICON[id] ?? IconOverview;
   return (
     <button
       className="tab"

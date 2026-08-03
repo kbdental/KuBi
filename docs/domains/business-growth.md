@@ -197,6 +197,15 @@ That is exactly why domains contribute sections rather than owning screens.
 
 ## 6. Boundary with Patient Experience
 
+> **Amended 3 August.** A **Patient Relationship** domain now sits between
+> Patient and Experience, and it takes **recall** and the **referral network**
+> out of Growth. Growth keeps the commercial outcome; Relationship owns the
+> contact, the consent and the network. So §4.4 and §4.5 above describe
+> metrics Growth *consumes* — the records they run on belong to Relationship,
+> and Growth must not create them. The table below is superseded by
+> `kubi-v3-dashboard-strategy.md` §11.1 where the two disagree; it is kept for
+> the asking-versus-getting rule, which still holds.
+
 The two domains overlap on reviews, recalls and referral requests, and the
 boundary needs to be explicit before either is built.
 

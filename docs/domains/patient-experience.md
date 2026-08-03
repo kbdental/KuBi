@@ -152,6 +152,14 @@ when, and whether asking was appropriate.
 
 ## 4. The boundary rule with Business Growth
 
+> **Amended 3 August.** A **Patient Relationship** domain now sits between
+> Patient and Experience, owning identity, family, preferences, communication,
+> recall, consent, referral network, loyalty and segmentation. Experience keeps
+> waiting, complaints, reviews and satisfaction. The dependency in §3.3 and
+> §3.6 — a channel and a consent before anything can be sent — is therefore a
+> dependency on **Relationship**, not on Growth. See
+> `kubi-v3-dashboard-strategy.md` §11.1.
+
 > **Asking a patient for something is Patient Experience. What the clinic gets
 > from it is Business Growth.**
 

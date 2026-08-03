@@ -41,7 +41,14 @@ code{color:#7fd7c4}
 </style></head><body><main>
 <h1>KuBi — Product Vision</h1>
 <p>The reference point for every architectural decision. When a proposal and this document disagree, this document wins or it gets amended deliberately — it does not get quietly ignored.</p>
-<p>Status: draft for owner approval. Version 1.0, 3 August 2026.</p>
+<p>Status: draft for owner approval. Version 1.1, 3 August 2026.</p>
+<hr>
+<h2>0. The answer to the only question a buyer asks</h2>
+<p>&gt; <strong>&quot;Why should I buy KuBi instead of another clinic management system?&quot;</strong></p>
+<p>&gt; ## Every other clinic system records what you did. &gt; ## KuBi runs your clinic to a standard — and proves it.</p>
+<p>The thirty-second version, for a room:</p>
+<p>&gt; That proof becomes a grade. Bronze, Silver, Gold, Platinum, Accredited. &gt; Earned from what your clinic actually does every day, not from a form you &gt; fill in once a year. Your staff work to it, your patients can see it, and &gt; you finally know whether your clinic is genuinely good or just busy.</p>
+<p>Everything below this line — domains, registries, contracts, evaluation states, the whole architecture — exists to make those three sentences true. None of it may replace them. If a feature cannot be traced back to &quot;runs your clinic to a standard, and proves it&quot;, it is somebody's good idea and not this product's.</p>
 <hr>
 <h2>1. What is KuBi?</h2>
 <p><strong>KuBi is a clinic operating system: the standard, the work that proves it, and the loop that improves it.</strong></p>
@@ -84,10 +91,35 @@ code{color:#7fd7c4}
 <ol><li><strong>Never silently resolve an open decision.</strong> A register row marked DECISION_REQUIRED carries no value, and the loader throws rather than inventing one. An unmade decision stays visible until somebody makes it.</li></ol>
 <ol><li><strong>Extension without redesign.</strong> A new domain, dashboard or role is a registration, not a refactor. If adding HR means editing the shell, the architecture was wrong.</li></ol>
 <ol><li><strong>Synthetic data only outside production.</strong> No production data or credentials in any non-production environment, ever.</li></ol>
-<h2>6. What KuBi will grow into</h2>
-<p>Direction, not a commitment to dates. Detail lives in the dashboard strategy and domain documents.</p>
-<ul><li><strong>Now</strong> — operations, clinical readiness, quality and the loop. Six dashboards.</li><li><strong>Next</strong> — inventory and maintenance as first-class dashboards; patient experience as a domain rather than a set of scattered fields.</li><li><strong>Then</strong> — the relationship layer: who the patient is, how they were reached, what was proposed and what they accepted. This unlocks business growth, and nothing in growth is real without it.</li><li><strong>Later</strong> — HR, accounts, marketing, rider, maintenance, and a multi-clinic view for a group.</li></ul>
-<p>The order is deliberate: <strong>operations first, because a clinic that cannot prove it sterilised an instrument has no business measuring its marketing ROI.</strong></p>
+<h2>6. The layer stack</h2>
+<p>Added at the owner's review of 3 August. The architecture had three layers; it needs six. Two of them are the commercial answer in §0, and neither is an operational view.</p>
+<pre><code>Business narrative        why anyone buys it
+  └─ Maturity Model       what &quot;good&quot; means, and how a clinic proves it
+      └─ Domains          who owns what
+          └─ Dashboards   one question each</code></pre>
+<p>Crossing all four:</p>
+<pre><code>Intelligence Layer        Measure → Predict → Recommend → Act
+Knowledge Layer           Procedure → Checklist → Complication → CAPA → Lesson</code></pre>
+<h3>6.1 Maturity Model — the missing layer</h3>
+<p><strong>Bronze → Silver → Gold → Platinum → Accredited KuBi Clinic.</strong> Every parameter contributes to certification.</p>
+<p>This is the commercial expression of the parameter spine, and it is what turns a compliance product into something a clinic <em>wants</em> rather than tolerates. It gives the owner a goal, the manager a scoreboard that is not a stick, and the practice something to put on the wall.</p>
+<p>Three design constraints, recorded now because getting them wrong destroys the whole idea:</p>
+<ol><li><strong>Earned from live compliance over a sustained window, never self-assessed.</strong> The moment a grade can be claimed rather than computed, it is worthless — and every existing dental accreditation already fails here.</li><li><strong>A disabled parameter counts as not met, never as excluded.</strong> This is the gaming vector: the per-parameter live/off switch exists so a clinic can adopt honestly one head at a time, and it would otherwise let a clinic reach Gold by switching off everything it fails. Adoption breadth is itself part of the grade.</li><li><strong>A grade can go down.</strong> A certification that only ratchets upward is a participation trophy.</li></ol>
+<h3>6.2 Intelligence Layer</h3>
+<p>Today KuBi is Measure → Show → Act. It should be <strong>Measure → Predict → Recommend → Act</strong>.</p>
+<p>&gt; &quot;Sterilization compliance has fallen for 12 days. A new assistant joined on &gt; day 3, and their training is overdue.&quot;</p>
+<p>Three constraints:</p>
+<ol><li><strong>Evidence-linked, and falsifiable.</strong> A recommendation shows the facts it was built from and can be told &quot;not this&quot; — which is itself a signal.</li><li><strong>Never present correlation as cause.</strong> Principle 2 applies with full force: state the observation and the proposed link separately, in those words. &quot;Likely cause&quot; is a claim; &quot;these two things coincide&quot; is a fact.</li><li><strong>A recommendation is a CAPA candidate, not a notification.</strong> It ends in somebody deciding, or it is noise with a nicer font.</li></ol>
+<h3>6.3 Knowledge Layer</h3>
+<p><strong>Procedure → Checklist → Complication → CAPA → Lesson.</strong> Not storing incidents — accumulating institutional knowledge. Eventually: <em>clinics using protocol A reduced failures by 32%.</em></p>
+<p>This is the one layer that nobody in this market is building, and it is also the only part of KuBi that <strong>must read across tenants</strong> — which puts it in direct tension with row-level security being the entire isolation model. It therefore needs, from the start and not retrofitted:</p>
+<ul><li>a separate aggregate-only path, physically distinct from the tenant query path, that cannot return a row;</li><li>no patient identifiers of any kind crossing a clinic boundary, ever;</li><li>a minimum cohort size before any cross-clinic figure is computed;</li><li>explicit clinic opt-in, revocable.</li></ul>
+<p>Get this wrong once and the product is finished. It is worth building the wall before there is anything to put behind it.</p>
+<h2>7. Roadmap</h2>
+<p>Owner's roadmap, adopted. Note that phases 2 and 3 add <strong>no features</strong> — that is the point of them.</p>
+<div class="tw"><table><thead><tr><th>Phase</th><th>What</th><th>Success looks like</th></tr></thead><tbody><tr><td><strong>1 — Build</strong></td><td>Complete the v3 merge on the approved architecture</td><td>Six dashboards live; one source of truth; standards primary</td></tr><tr><td><strong>2 — Pilot</strong></td><td>Run KuBi at K.B. Dental for 2–3 months</td><td>We know what staff <em>use</em> versus what they ignore — measured, not guessed</td></tr><tr><td><strong>3 — First external clinic</strong></td><td>Onboard one clinic outside K.B.</td><td>Deployment, training and support work without the author in the room</td></tr><tr><td><strong>4 — Refinement</strong></td><td>Real-world feedback; then Relationship, Learning, predictive intelligence</td><td>The core proved itself before we extended it</td></tr></tbody></table></div>
+<p>The order within phase 1 is deliberate: <strong>operations first, because a clinic that cannot prove it sterilised an instrument has no business measuring its marketing ROI.</strong></p>
+<p>And the discipline in phases 2–3 is the harder half. A product that keeps adding domains is avoiding the question of whether anyone uses the ones it has.</p>
 <h2>7. How this document is used</h2>
 <ul><li>A merge plan, an ADR or a screen design cites the principle it serves.</li><li>A proposal that breaks a principle names it and argues for amending this document first.</li><li>Amendments are dated and attributed. This is a register, not a mood board.</li></ul>
 </main></body></html>
