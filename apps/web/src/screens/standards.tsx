@@ -22,6 +22,7 @@ import {
 import { useEffect, useState } from 'react';
 import { api, type ParameterHealthRow } from '../api.js';
 import { ActivityLibrary } from './activity-library.js';
+import { Engines } from './engines.js';
 
 const CLASS_LABEL: Record<WeightClass, string> = {
   PATIENT_SAFETY: 'Patient safety',
@@ -51,7 +52,7 @@ export function Standards() {
   const [health, setHealth] = useState<ParameterHealthRow[] | null>(null);
   // Parameters and Activities are two views of one spine, so they share a
   // destination rather than adding a tab. Navigation is unchanged.
-  const [view, setView] = useState<'PARAMETERS' | 'ACTIVITIES'>('PARAMETERS');
+  const [view, setView] = useState<'PARAMETERS' | 'ACTIVITIES' | 'ENGINES'>('PARAMETERS');
   useEffect(() => { void api.parameterHealth().then(setHealth).catch(() => setHealth([])); }, []);
 
   const byId = new Map((health ?? []).map((h) => [h.parameter, h]));
@@ -77,9 +78,17 @@ export function Standards() {
         >
           Activities
         </button>
+        <button
+          className={`std-tab ${view === 'ENGINES' ? 'is-on' : ''}`}
+          type="button"
+          onClick={() => setView('ENGINES')}
+        >
+          How work appears
+        </button>
       </div>
 
       {view === 'ACTIVITIES' && <ActivityLibrary />}
+      {view === 'ENGINES' && <Engines embedded />}
 
       {view === 'PARAMETERS' && <>
       <p className="screen-sub">

@@ -30,14 +30,13 @@ const SEVERITY_WORD: Record<string, string> = {
 
 const role = (r: string) => r.replace(/_/g, ' ').toLowerCase();
 
-export function Exceptions() {
+export function Exceptions({ embedded = false }: { embedded?: boolean } = {}) {
   const [rows, setRows] = useState<ExceptionRow[] | null>(null);
   useEffect(() => { void api.exceptions().then(setRows).catch(() => setRows([])); }, []);
-  if (!rows) return <div className="screen"><p className="screen-sub">Loading…</p></div>;
+  if (!rows) return <p className="screen-sub">Loading…</p>;
 
-  return (
-    <div className="screen screen-wide">
-      <h1 className="screen-title">What is not happening</h1>
+  const body = (
+    <>
       <p className="screen-sub">
         Work that was due and is not done, with who has been told.
       </p>
@@ -84,6 +83,16 @@ export function Exceptions() {
           ))}
         </ul>
       )}
+    </>
+  );
+
+  // Rendered inside Attention, which already asks "what needs a person".
+  // A separate destination would split one question across two places.
+  if (embedded) return body;
+  return (
+    <div className="screen screen-wide">
+      <h1 className="screen-title">What is not happening</h1>
+      {body}
     </div>
   );
 }

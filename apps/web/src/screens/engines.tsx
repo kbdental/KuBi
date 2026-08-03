@@ -17,11 +17,11 @@
 import { useEffect, useState } from 'react';
 import { api, type EnginesView } from '../api.js';
 
-export function Engines() {
+export function Engines({ embedded = false }: { embedded?: boolean } = {}) {
   const [d, setD] = useState<EnginesView | null>(null);
   const load = () => { void api.engines().then(setD).catch(() => setD(null)); };
   useEffect(load, []);
-  if (!d) return <div className="screen"><p className="screen-sub">Loading…</p></div>;
+  if (!d) return <p className="screen-sub">Loading…</p>;
 
   const a = d.anatomy;
   const pct = Math.round((a.numerator / a.denominator) * 1000) / 10;
@@ -32,9 +32,8 @@ export function Engines() {
     load();
   }
 
-  return (
-    <div className="screen screen-wide">
-      <h1 className="screen-title">How work appears</h1>
+  const body = (
+    <>
       <p className="screen-sub">
         Nothing on anybody’s list was typed in by hand. Six engines raise it.
       </p>
@@ -133,6 +132,16 @@ export function Engines() {
           that missed is in the exception queue with a name against it.
         </p>
       </section>
+    </>
+  );
+
+  // Reference material, like the parameters and the activity library — so it
+  // shares their destination rather than taking a twelfth tab.
+  if (embedded) return body;
+  return (
+    <div className="screen screen-wide">
+      <h1 className="screen-title">How work appears</h1>
+      {body}
     </div>
   );
 }
