@@ -2132,3 +2132,71 @@ label.field-label {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .au-deviation { margin-top: 6px; font-size: 13.5px; color: var(--safety); font-weight: 550; }
+
+/* ---- Patient 360, journey-shaped ---------------------------------------- */
+.visit-who-link {
+  background: 0; border: 0; padding: 0; font: inherit; color: inherit;
+  cursor: pointer; text-align: left; text-decoration: underline;
+  text-decoration-color: var(--line); text-underline-offset: 3px;
+}
+.visit-who-link:hover { text-decoration-color: var(--accent); }
+
+.p360-name { font-size: 31px; font-weight: 700; letter-spacing: -.024em; margin: 4px 0 2px; }
+.p360-uhid {
+  font: 12.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink-faint); margin-bottom: 16px;
+}
+
+/* The answer, first and biggest. Everything below explains why. */
+.p360-verdict {
+  display: grid; gap: 3px; padding: 16px 18px; border-radius: var(--radius);
+  margin-bottom: 18px; border: 1px solid var(--line); background: var(--card);
+}
+.p360-verdict b { font-size: 21px; font-weight: 700; letter-spacing: .02em; }
+.p360-verdict span { font-size: 15px; color: var(--ink-soft); }
+.p360-verdict.is-ready { background: var(--accent-soft); border-color: var(--accent-line); }
+.p360-verdict.is-ready b { color: var(--accent); }
+.p360-verdict.is-blocked { background: var(--safety-tint); border-color: var(--safety-line); }
+.p360-verdict.is-blocked b { color: var(--safety); }
+
+.p360-alerts {
+  border: 1px solid var(--safety-line); background: var(--safety-tint);
+  border-radius: var(--radius-sm); padding: 13px 15px; margin-bottom: 20px;
+}
+.p360-alerts-head {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--safety); margin-bottom: 5px;
+}
+.p360-alert { font-size: 15px; font-weight: 550; }
+
+/* The journey as the spine of the record. */
+.jr { list-style: none; margin: 0 0 20px; padding: 0; }
+.jr-step {
+  display: flex; gap: 13px; align-items: flex-start;
+  padding: 11px 0 11px 2px; border-left: 2px solid var(--line); padding-left: 16px;
+  margin-left: 9px;
+}
+.jr-mark {
+  flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 12px; font-weight: 700;
+  margin-left: -27px; background: var(--card); border: 2px solid var(--line);
+}
+.jr-done .jr-mark { background: var(--ok); border-color: var(--ok); color: #fff; }
+.jr-now .jr-mark { background: var(--warn); border-color: var(--warn); color: #fff; }
+.jr-blocked .jr-mark { background: var(--safety); border-color: var(--safety); color: #fff; }
+.jr-label { font-weight: 600; font-size: 15.5px; }
+.jr-absent .jr-label, .jr-absent .row-note { color: var(--ink-faint); }
+.jr-needs { margin-top: 3px; font-size: 13.5px; color: var(--safety); font-weight: 550; }
+.jr-absent .jr-needs { color: var(--ink-faint); font-weight: 400; }
+
+.p360-detail { margin-top: 18px; display: grid; gap: 22px; }
+.p360-section { display: grid; gap: 6px; }
+.p360-row {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 11px 14px;
+}
+.p360-row-main { font-weight: 600; font-size: 15px; margin-right: 8px; }
+.p360-reqs { list-style: none; margin: 7px 0 0; padding: 0; display: grid; gap: 3px; font-size: 13.5px; }
+.p360-reqs .is-ok { color: var(--ink-soft); }
+.p360-reqs .is-not { color: var(--safety); font-weight: 550; }
+.p360-missing { display: grid; gap: 6px; opacity: .85; }

@@ -630,6 +630,44 @@ export interface AuditRow {
   supersedes?: string;
 }
 
+/** One stage of Journey 2, as the spine of the patient record. */
+export interface JourneyStage {
+  key: string;
+  label: string;
+  /** DONE | NOW | BLOCKED | WAITING | ABSENT */
+  state: string;
+  detail: string | null;
+  /** What is standing in the way, by name. Null when nothing is. */
+  needs: string | null;
+}
+
+export interface Patient360 {
+  patientLabel: string;
+  uhid: string | null;
+  /** The one answer this screen exists to give. */
+  headline: { verdict: string; why: string };
+  alerts: string[];
+  journey: JourneyStage[];
+  appointments: Array<{
+    id: string; visitType: string; chairLabel: string;
+    status: string; startsInMinutes: number;
+  }>;
+  procedures: Array<{
+    id: string; name: string; status: string;
+    requirements: Array<{ label: string; result: string; enforcement: string; detail: string }>;
+  }>;
+  labCases: Array<{
+    id: string; reference: string; workType: string;
+    status: string; ready: boolean; reason: string | null;
+  }>;
+  followups: Array<{
+    id: string; procedureName: string; dueLabel: string;
+    outcome: string; redFlagReason: string | null;
+  }>;
+  /** Named rather than omitted — a silently incomplete record looks complete. */
+  notHeld: Array<{ what: string; needs: string }>;
+}
+
 export interface OwnerBusiness {
   clinicName: string;
   known: Array<{ name: string; value: string | null; available: boolean; module: string | null }>;
@@ -743,6 +781,8 @@ export const api = {
   gate: () => call<GateView>('/api/v1/gate'),
   notifications: () => call<NotificationRow[]>('/api/v1/notifications'),
   audit: () => call<AuditRow[]>('/api/v1/audit'),
+  patient: (label: string) =>
+    call<Patient360>(`/api/v1/patients/${encodeURIComponent(label)}`),
   toggleGateCheck: (id: string) => post<{ ok: boolean }>(`/api/v1/gate/${id}`, {}),
 
   commandCentre: () => call<CommandCentre>('/api/v1/command-centre'),

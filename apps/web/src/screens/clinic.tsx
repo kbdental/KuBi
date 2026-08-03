@@ -29,13 +29,14 @@ function hhmm(iso: string, timezone: string | undefined): string {
 }
 
 export function Clinic({
-  schedule, canAct, onChanged, showOperations = false,
+  schedule, canAct, onChanged, showOperations = false, onOpenPatient,
 }: {
   schedule: Schedule;
   canAct: boolean;
   onChanged: () => void;
   /** Only for people who may see the clinic as a whole. */
   showOperations?: boolean;
+  onOpenPatient?: (patientLabel: string) => void;
 }) {
   // The clinic is its people and its kit. Splitting those across two tabs made
   // "is the clinic able to work" a two-place question.
@@ -111,7 +112,19 @@ export function Clinic({
           <div key={row.id} className={classes.join(' ')}>
             <div className="visit-head">
               <span className="visit-when">{hhmm(row.scheduledStart, schedule.timezone)}</span>
-              <span className="visit-who">{row.patientLabel}</span>
+              {/* The patient's name is the way into their record — the thing
+                  every question in a clinic eventually ends at. */}
+              {onOpenPatient ? (
+                <button
+                  className="visit-who visit-who-link"
+                  type="button"
+                  onClick={() => onOpenPatient(row.patientLabel)}
+                >
+                  {row.patientLabel}
+                </button>
+              ) : (
+                <span className="visit-who">{row.patientLabel}</span>
+              )}
             </div>
             <div className="visit-what">
               {row.visitType}{row.chairLabel ? ` · ${row.chairLabel}` : ''}

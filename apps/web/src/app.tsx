@@ -17,6 +17,7 @@ import { Standards } from './screens/standards.js';
 import { ConfirmationsBoard } from './screens/confirmations.js';
 import { Gate } from './screens/gate.js';
 import { Clinic } from './screens/clinic.js';
+import { Patient360 } from './screens/patient-360.js';
 import {
   IconToday, IconClinic, IconAttention, IconChecks,
   IconQuality, IconPatients, IconOperations, IconMe, IconOverview,
@@ -75,6 +76,10 @@ export function App() {
   const [chosen, setChosen] = useState<Place | null>(null);
   const [openTask, setOpenTask] = useState<TaskSheet | null>(null);
   const [openHandover, setOpenHandover] = useState<HandoverData | null>(null);
+  // The patient record is opened over whatever you were doing and returns you
+  // there. Everything in a clinic ends at a patient, so it is reachable from
+  // several places rather than living behind one tab.
+  const [openPatient, setOpenPatient] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -123,6 +128,16 @@ export function App() {
             onBack={() => setOpenTask(null)}
             onFinished={() => { setOpenTask(null); reload(); }}
           />
+        </main>
+      </div>
+    );
+  }
+
+  if (openPatient) {
+    return (
+      <div className="app">
+        <main className="main">
+          <Patient360 patientLabel={openPatient} onBack={() => setOpenPatient(null)} />
         </main>
       </div>
     );
@@ -254,6 +269,7 @@ export function App() {
           canAct={CAN_MOVE_VISITS.some((r) => data.me.roleCodes.includes(r))}
           onChanged={reload}
           showOperations={data.overview !== null}
+          onOpenPatient={setOpenPatient}
         />
       )}
       {here === 'ATTENTION' && (
@@ -270,7 +286,7 @@ export function App() {
         reload,
         openTask: (id) => void open(id),
       })}
-      {here === 'PATIENTS' && <Patients onChanged={reload} />}
+      {here === 'PATIENTS' && <Patients onChanged={reload} onOpenPatient={setOpenPatient} />}
       {here === 'QUALITY' && <Quality onChanged={reload} />}
       {here === 'STANDARDS' && <Standards />}
       {here === 'CONFIRMATIONS' && <ConfirmationsBoard />}

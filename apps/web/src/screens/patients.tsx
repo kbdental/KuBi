@@ -40,7 +40,13 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   OVERRIDDEN: { label: 'Released by manager', cls: 'rd-overridden' },
 };
 
-export function Patients({ onChanged }: { onChanged?: () => void }) {
+export function Patients({
+  onChanged, onOpenPatient,
+}: {
+  onChanged?: () => void;
+  /** Everything in a clinic ends at a patient, so every list reaches one. */
+  onOpenPatient?: (patientLabel: string) => void;
+}) {
   const [procs, setProcs] = useState<PatientProcedure[] | null>(null);
   const [followups, setFollowups] = useState<Followup[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +109,7 @@ export function Patients({ onChanged }: { onChanged?: () => void }) {
       <h2 className="group-head">Booked today</h2>
       {procs.map((p) => (
         <ProcedureCard
+          onOpenPatient={onOpenPatient}
           key={p.id}
           p={p}
           expanded={open === p.id}
@@ -123,7 +130,9 @@ export function Patients({ onChanged }: { onChanged?: () => void }) {
 
 function ProcedureCard({
   p, expanded, onToggle, onAct,
+  onOpenPatient,
 }: {
+  onOpenPatient?: ((patientLabel: string) => void) | undefined;
   p: PatientProcedure;
   expanded: boolean;
   onToggle: () => void;
@@ -140,7 +149,19 @@ function ProcedureCard({
           <span className="pt-when">{p.whenLabel}</span>
         </div>
 
-        <div className="row-title">{p.patientLabel}</div>
+        {/* The name opens the record. Everything in a clinic ends at a
+            patient, so every list reaches one. */}
+        {onOpenPatient ? (
+          <button
+            className="row-title visit-who-link"
+            type="button"
+            onClick={() => onOpenPatient(p.patientLabel)}
+          >
+            {p.patientLabel}
+          </button>
+        ) : (
+          <div className="row-title">{p.patientLabel}</div>
+        )}
         <div className="row-note">{p.procedureName} · {p.patientUhid}</div>
 
         {/* Above everything. An allergy is not a detail you go looking for. */}

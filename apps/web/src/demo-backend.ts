@@ -2019,6 +2019,117 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
    * no percentages except the one progress figure that is genuinely a fraction
    * of work done.
    */
+  // ---- PATIENT 360, organised by the journey rather than by module ----
+  //
+  // Sixteen equal sections would be the module-first mistake in one screen.
+  // A patient record has one question — what does this person need next — and
+  // the answer is the journey stage they are stuck at.
+  //
+  // Everything KuBi does not hold is named as missing rather than omitted. A
+  // record that silently lacks payments looks complete and is not.
+
+  const patientMatch = /^\/api\/v1\/patients\/([^/]+)$/.exec(path);
+  if (patientMatch && method === 'GET') {
+    const id = decodeURIComponent(patientMatch[1]!);
+    const visits = db.visits.filter((v) => v.patientLabel === id);
+    const procedures = db.patientProcedures.filter((pp) => pp.patientLabel === id);
+    const labCases = db.labCases.filter((l) => l.patientLabel === id);
+    const followups = db.followups.filter((f) => f.patientLabel === id);
+    if (visits.length === 0 && procedures.length === 0 && labCases.length === 0) {
+      return json({ error: 'Not found' }, 404);
+    }
+
+    const alerts = [...new Set(procedures.flatMap((pp) => pp.alerts))];
+    const planned = procedures.find((pp) => pp.status === 'PLANNED') ?? null;
+    const blocking = planned
+      ? planned.requirements.filter((r) => r.result !== 'PASS' && r.result !== 'NOT_APPLICABLE')
+      : [];
+    const today = visits.find((v) => v.status !== 'CANCELLED' && v.status !== 'COMPLETED') ?? null;
+
+    // Journey 2, as the spine of the record: patient → readiness → consent →
+    // treatment → lab → payment → review → recall.
+    const consentReq = planned?.requirements.find((r) => /consent/i.test(r.label)) ?? null;
+    const stage = (
+      key: string, label: string, state: 'DONE' | 'NOW' | 'BLOCKED' | 'WAITING' | 'ABSENT',
+      detail: string | null, needs: string | null = null,
+    ) => ({ key, label, state, detail, needs });
+
+    const journey = [
+      stage('arrival', 'Arrival',
+        today?.status === 'ARRIVED' || today?.status === 'IN_CHAIR' ? 'DONE'
+          : today ? 'WAITING' : 'ABSENT',
+        today ? `${today.visitType} · ${today.chairLabel}` : 'Nothing booked today'),
+      stage('readiness', 'Readiness',
+        !planned ? 'ABSENT' : blocking.length === 0 ? 'DONE' : 'BLOCKED',
+        planned ? planned.procedureName : 'No procedure planned',
+        blocking.length > 0 ? blocking.map((r) => r.label).join(' · ') : null),
+      stage('consent', 'Consent',
+        !consentReq ? 'ABSENT' : consentReq.result === 'PASS' ? 'DONE' : 'BLOCKED',
+        consentReq ? consentReq.detail : 'No consent required yet'),
+      stage('treatment', 'Treatment',
+        procedures.some((pp) => pp.status === 'COMPLETED') ? 'DONE'
+          : procedures.some((pp) => pp.status === 'IN_PROGRESS') ? 'NOW'
+            : blocking.length > 0 ? 'BLOCKED' : 'WAITING',
+        planned?.procedureName ?? null),
+      stage('lab', 'Laboratory',
+        labCases.length === 0 ? 'ABSENT'
+          : labCases.every((l) => l.deliveryReady) ? 'DONE'
+            : labCases.some((l) => l.status === 'REMAKE') ? 'BLOCKED' : 'WAITING',
+        labCases.length === 0 ? 'No lab work'
+          : labCases.map((l) => `${l.workType} · ${l.nextStep ?? l.status.toLowerCase()}`).join(' · ')),
+      // Named as absent rather than left out. A record that silently lacks
+      // payments looks complete and is not.
+      stage('payment', 'Payment', 'ABSENT', null, 'needs a billing module'),
+      stage('review', 'Review', 'ABSENT', null, 'needs review tracking'),
+      stage('recall', 'Recall', 'ABSENT', null, 'needs the relationship layer'),
+    ];
+
+    // The one answer this screen exists to give.
+    const headline = alerts.length > 0 && blocking.length > 0
+      ? { verdict: 'NOT READY', why: blocking.map((r) => r.label).join(' · ') }
+      : blocking.length > 0
+        ? { verdict: 'NOT READY', why: blocking.map((r) => r.label).join(' · ') }
+        : planned
+          ? { verdict: 'READY', why: `${planned.procedureName} may start` }
+          : today
+            ? { verdict: 'BOOKED', why: `${today.visitType} · ${today.chairLabel}` }
+            : { verdict: 'NOTHING DUE', why: 'No open procedure or appointment' };
+
+    return json({
+      patientLabel: id,
+      uhid: procedures[0]?.patientUhid ?? visits[0]?.patientUhid ?? null,
+      headline,
+      alerts,
+      journey,
+      appointments: visits.map((v) => ({
+        id: v.id, visitType: v.visitType, chairLabel: v.chairLabel,
+        status: v.status, startsInMinutes: v.startsInMinutes,
+      })),
+      procedures: procedures.map((pp) => ({
+        id: pp.id, name: pp.procedureName, status: pp.status,
+        requirements: pp.requirements.map((r) => ({
+          label: r.label, result: r.result, enforcement: r.enforcement, detail: r.detail,
+        })),
+      })),
+      labCases: labCases.map((l) => ({
+        id: l.id, reference: l.reference, workType: l.workType, status: l.status,
+        ready: l.deliveryReady, reason: l.deliveryReason,
+      })),
+      followups: followups.map((f) => ({
+        id: f.id, procedureName: f.procedureName, dueLabel: f.dueLabel,
+        outcome: f.outcome, redFlagReason: f.redFlagReason,
+      })),
+      /** Said out loud, per principle 3 — not quietly missing. */
+      notHeld: [
+        { what: 'Payments and estimates', needs: 'Billing module' },
+        { what: 'Treatment plan and acceptance', needs: 'Billing module' },
+        { what: 'Scans, photographs and documents', needs: 'Evidence storage' },
+        { what: 'Clinical notes', needs: 'Clinical records module' },
+        { what: 'Reviews and communication', needs: 'Patient Relationship domain' },
+      ],
+    });
+  }
+
   // ---- NOTIFICATIONS: derived from state, never stored ----
   //
   // A stored notification outlives the condition that caused it, and then
