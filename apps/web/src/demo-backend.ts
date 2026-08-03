@@ -24,6 +24,8 @@
 
 import {
   PARAMETER_SPEC, TaskOrigin, Engine, ladder, ORIGIN_LABEL,
+  SCORE_SPEC, SCORE_ORDER, outcomeOf, operationalScore, rollUp, rungAt,
+  type ManagementScore,
   type Responsibility, type EscalationRung,
 } from '@kubi/contracts';
 
@@ -115,6 +117,18 @@ interface Task {
  * accountable for the result, and neither hears about it when it does not
  * happen.
  */
+/**
+ * Confirmation state, per the §6 example. Kept beside the visits rather than
+ * on them because in the real system these are interaction records — a call
+ * attempt is an event with a time and a person, not a flag.
+ */
+const CONFIRM_ATTEMPTS: Record<string, number> = { v4: 2, v5: 1 };
+const REMINDER_SENT: string[] = ['v1', 'v2', 'v3'];
+const SPECIAL_INSTRUCTIONS: Record<string, string> = {
+  v2: 'Nil by mouth from 06:00 — surgery',
+  v4: 'Bring previous OPG',
+};
+
 function workSpecFor(t: Task): {
   origin: TaskOrigin; engine: Engine; trigger: string;
   responsibility: Responsibility; escalation: EscalationRung[];
@@ -1899,6 +1913,256 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
    * no percentages except the one progress figure that is genuinely a fraction
    * of work done.
    */
+  // ---- CONFIRMATIONS: the owner's §6 worked example ----
+  //
+  //   Patient | Appointment | Confirmation | Reminder | Special instructions | Status
+  //
+  // Status is DERIVED, never typed by anybody: Confirmed / No response /
+  // Reschedule / Cancelled / Action required. A status somebody sets by hand
+  // is a status that goes stale, and then the morning list lies.
+  //
+  // "Management needs to see the exceptions, not 18 green ticks" — so the
+  // summary leads with what is unresolved.
+
+  if (path === '/api/v1/confirmations' && method === 'GET') {
+    const rows = db.visits.map((v) => {
+      const confirmed = v.status !== 'BOOKED' && v.status !== 'CANCELLED';
+      const attempts = CONFIRM_ATTEMPTS[v.id] ?? 0;
+
+      // Derived, in the owner's own vocabulary.
+      const status = v.status === 'CANCELLED' ? 'CANCELLED'
+        : v.status === 'NO_SHOW' ? 'ACTION_REQUIRED'
+          : confirmed ? 'CONFIRMED'
+            : attempts >= 2 ? 'ACTION_REQUIRED'
+              : attempts >= 1 ? 'NO_RESPONSE'
+                : 'NO_RESPONSE';
+
+      return {
+        id: v.id,
+        patientLabel: v.patientLabel,
+        appointment: `${v.visitType} · ${v.chairLabel}`,
+        startsInMinutes: v.startsInMinutes,
+        confirmation: confirmed ? 'Confirmed' : attempts > 0
+          ? `${attempts} attempt${attempts > 1 ? 's' : ''}, no answer` : 'Not yet called',
+        reminderSent: REMINDER_SENT.includes(v.id),
+        specialInstructions: SPECIAL_INSTRUCTIONS[v.id] ?? null,
+        status,
+      };
+    });
+
+    const count = (s: string) => rows.filter((r) => r.status === s).length;
+    return json({
+      rows,
+      summary: {
+        appointments: rows.filter((r) => r.status !== 'CANCELLED').length,
+        confirmed: count('CONFIRMED'),
+        unconfirmed: count('NO_RESPONSE'),
+        actionRequired: count('ACTION_REQUIRED'),
+        cancelled: count('CANCELLED'),
+      },
+    });
+  }
+
+  // ---- EXCEPTION QUEUE: what should have happened and did not ----
+  //
+  // The owner's engine 6, with the ladder live rather than described:
+  //   autoclave due 19:00 · not done 19:15 → assistant · 19:30 → senior ·
+  //   20:00 → clinic head.
+  //
+  // Escalation is computed from minutes past due, so it keeps climbing whether
+  // or not anybody is still in the building.
+
+  if (path === '/api/v1/exceptions' && method === 'GET') {
+    if (!MAY_SEE_CLINIC.some((r) => me.roles.includes(r))) return json({ error: 'Forbidden' }, 403);
+
+    const rows = db.attention.filter((a) => a.open).map((a) => {
+      const t = db.tasks.find((x) => x.id === a.instanceId);
+      const w = t ? workSpecFor(t) : null;
+      const dueAt = t ? startOf(t) : Date.now();
+      const minutesLate = Math.max(0, Math.round((Date.now() - dueAt) / 60000));
+      const rung = w ? rungAt(w.escalation, minutesLate) : null;
+
+      return {
+        id: a.id,
+        headline: a.headline,
+        severity: a.severity,
+        detail: a.detail ?? null,
+        minutesLate,
+        // Null before the first rung — not yet escalated is a real state, and
+        // showing L1 immediately would make every late thing look the same.
+        level: rung?.level ?? null,
+        escalatedTo: rung ? rung.to : null,
+        nextRung: w
+          ? w.escalation.find((r) => r.afterMinutes > minutesLate) ?? null
+          : null,
+        owner: w?.responsibility.owner ?? null,
+        activityCode: t?.code ?? null,
+      };
+    });
+
+    // Most escalated first, then most overdue. A queue ordered by creation
+    // time buries the thing that has been failing longest.
+    rows.sort((x, y) => (y.level ?? 0) - (x.level ?? 0) || y.minutesLate - x.minutesLate);
+    return json(rows);
+  }
+
+  // ---- SCOREBOARD: sixteen parameters into eight management scores ----
+  //
+  // The owner's §7. Every line carries its own exceptions, because §8 says a
+  // click on Lab 76% must reveal only the deviations — not a report, and not
+  // the ninety things that went right.
+
+  if (path === '/api/v1/scoreboard' && method === 'GET') {
+    if (!MAY_SEE_CLINIC.some((r) => me.roles.includes(r))) return json({ error: 'Forbidden' }, 403);
+
+    // Live where the demo has real state; fixed where a parameter has no
+    // activity today. Null means nothing to measure — never a zero.
+    const opening = tally('Opening Readiness');
+    const chairs = db.assets.filter((a) => a.category === 'DENTAL_CHAIR');
+    const chairsUp = chairs.filter((a) => a.status === 'OPERATIONAL').length;
+    const labTotal = db.labCases.length;
+    const labOk = db.labCases.filter((l) => !l.overdue && l.status !== 'REMAKE').length;
+    const stockTotal = db.stock.length;
+    const stockOk = db.stock.filter((s) => s.state === 'OK').length;
+    const batchesOk = db.batches.filter((b) => b.stage === 'RELEASED').length;
+
+    const pct = (n: number, d: number) => (d === 0 ? null : Math.round((n / d) * 100));
+
+    const PARAM_PCT: Partial<Record<ParameterKey, number | null>> = {
+      OPENING_READINESS: opening ? pct(opening.done, opening.total) : null,
+      ROOM_CHAIR_READINESS: pct(chairsUp, chairs.length),
+      CLEANLINESS: 95,
+      MAINTENANCE_UTILITIES: pct(chairsUp, chairs.length),
+      // A batch still moving through the loop is not a failure — it is work in
+      // progress. Only batches that should have been released by now count.
+      // Measuring not-yet-due work as failed is the same error as counting a
+      // GREY as zero, and it makes every dashboard red at nine in the morning.
+      INFECTION_CONTROL: pct(batchesOk, batchesOk + db.batches.filter(
+        (b) => b.stage === 'QUARANTINED',
+      ).length),
+      SAFETY_EMERGENCY: 93,
+      PATIENT_JOURNEY: 91,
+      SURGICAL_HIGH_RISK: 96,
+      FOLLOWUP_EXPERIENCE: pct(
+        db.followups.filter((f) => f.outcome !== 'PENDING').length, db.followups.length,
+      ),
+      CLINICAL_DOCUMENTATION: 88,
+      // "Confirmation, cancellation, no-show, utilisation" — confirmation, not
+      // arrival. Counting arrivals scored 0% at 08:52 because nobody had come
+      // in yet, which read as total failure when the day simply had not
+      // started. A score must never punish the clock.
+      APPOINTMENT_CONTROL: pct(
+        db.visits.filter((v) => v.status !== 'CANCELLED'
+          && (v.status !== 'BOOKED' || (CONFIRM_ATTEMPTS[v.id] ?? 0) === 0)).length,
+        db.visits.filter((v) => v.status !== 'CANCELLED').length,
+      ),
+      LABORATORY: pct(labOk, labTotal),
+      INVENTORY_IMPLANTS: pct(stockOk, stockTotal),
+      ATTENDANCE_LEAVE: 97,
+      // Nothing to measure: no conduct activity has run today. GREY, not zero.
+      STAFF_CONDUCT: null,
+      QUALITY_CAPA: 89,
+    };
+
+    // The deviations behind each line. Only these are shown on a drill-down.
+    const DEVIATIONS: Partial<Record<ManagementScore, Array<{
+      label: string; severity: string; detail: string | null;
+    }>>> = {
+      LAB_EFFICIENCY: [
+        ...db.labCases.filter((l) => l.overdue).map((l) => ({
+          label: `${l.patientLabel} · ${l.workType} overdue`,
+          severity: 'RED',
+          detail: `${l.reference} · ${l.vendor} · expected ${l.expectedLabel}`,
+        })),
+        ...db.labCases.filter((l) => l.qcResult === null && l.status === 'QC_PENDING').map((l) => ({
+          label: `${l.patientLabel} · received but QC pending`,
+          severity: 'AMBER',
+          detail: l.reference,
+        })),
+        ...db.labCases.filter((l) => l.deliveryReady).map((l) => ({
+          label: `${l.patientLabel} · awaiting a delivery appointment`,
+          severity: 'AMBER',
+          detail: `${l.reference} · passed QC`,
+        })),
+        ...db.labCases.filter((l) => l.status === 'REMAKE').map((l) => ({
+          label: `${l.patientLabel} · remake`,
+          severity: 'RED',
+          detail: `${l.reference} · remake ${l.remakeCount}`,
+        })),
+      ],
+      INFECTION_CONTROL: db.batches
+        .filter((b) => b.stage !== 'RELEASED')
+        .map((b) => ({
+          label: b.stage === 'QUARANTINED'
+            ? `${b.batchRef} quarantined` : `${b.batchRef} not released`,
+          severity: b.stage === 'QUARANTINED' ? 'RED' : 'AMBER',
+          detail: `${b.stage.toLowerCase()} · ${b.packCount} packs · ${b.operator}`,
+        })),
+      INVENTORY_READINESS: db.stock
+        .filter((s) => s.state !== 'OK')
+        .map((s) => ({
+          label: `${s.name} ${s.state === 'SHORTAGE' ? 'out of stock' : 'below minimum'}`,
+          severity: s.state === 'SHORTAGE' ? 'RED' : 'AMBER',
+          detail: null,
+        })),
+      CLINIC_READINESS: [
+        ...(opening && !opening.complete ? [{
+          label: `Opening ${opening.done} of ${opening.total} done`,
+          severity: 'AMBER', detail: null as string | null,
+        }] : []),
+        ...db.assets.filter((a) => a.status !== 'OPERATIONAL').map((a) => ({
+          label: `${a.name} out of service`, severity: 'RED', detail: null as string | null,
+        })),
+      ],
+      PATIENT_CARE_COMPLIANCE: db.followups
+        .filter((f) => f.outcome === 'RED_FLAG' || (f.overdue && f.outcome === 'PENDING'))
+        .map((f) => ({
+          label: `${f.patientLabel} · ${f.outcome === 'RED_FLAG' ? 'red flag' : 'follow-up overdue'}`,
+          severity: f.outcome === 'RED_FLAG' ? 'RED' : 'AMBER',
+          detail: f.redFlagReason ?? f.procedureName,
+        })),
+      APPOINTMENT_EFFICIENCY: db.visits
+        .filter((v) => v.status === 'BOOKED')
+        .map((v) => ({
+          label: `${v.patientLabel} not confirmed`, severity: 'AMBER',
+          detail: v.visitType as string | null,
+        })),
+    };
+
+    const safety = db.attention.some((a) => a.open && a.severity === 'PATIENT_SAFETY');
+
+    const lines = SCORE_ORDER.map((id) => {
+      const spec = SCORE_SPEC[id];
+      const parts = spec.parameters.map((p) => PARAM_PCT[p as ParameterKey] ?? null);
+      const value = rollUp(parts);
+      const devs = DEVIATIONS[id] ?? [];
+      // Patient safety forces RED on the line it belongs to, whatever the
+      // percentage says. 97% with an unverified cycle is not green.
+      const unsafe = id === 'INFECTION_CONTROL' && safety;
+      return {
+        id,
+        label: spec.label,
+        measure: spec.measure,
+        value,
+        outcome: outcomeOf(value, unsafe),
+        deviations: devs,
+        deviationCount: devs.length,
+        /** Which control heads feed this, so the number is traceable. */
+        parameters: spec.parameters,
+      };
+    });
+
+    return json({
+      clinicName: 'SYNTHETIC KB Dental Andheri',
+      operational: operationalScore(lines.map((l) => l.value)),
+      lines,
+      critical: db.attention.filter((a) => a.open && a.severity === 'PATIENT_SAFETY')
+        .map((a) => ({ id: a.id, headline: a.headline })),
+      attention: db.attention.filter((a) => a.open && a.severity !== 'PATIENT_SAFETY')
+        .map((a) => ({ id: a.id, headline: a.headline })),
+    });
+  }
+
   // ---- PARAMETER HEALTH: layer 5, with the trend that matters more ----
   //
   // A parameter is capped by what it stands on: a room-readiness score cannot

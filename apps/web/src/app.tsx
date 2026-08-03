@@ -16,10 +16,12 @@ import { Patients } from './screens/patients.js';
 import { Quality } from './screens/quality.js';
 import { Checks } from './screens/checks.js';
 import { Standards } from './screens/standards.js';
+import { ConfirmationsBoard } from './screens/confirmations.js';
+import { Exceptions } from './screens/exceptions.js';
 import { Clinic } from './screens/clinic.js';
 import {
   IconToday, IconClinic, IconAttention, IconChecks,
-  IconQuality, IconPatients, IconOperations, IconMe, IconOverview,
+  IconQuality, IconPatients, IconOperations, IconMe, IconOverview, IconAlert,
 } from './icons.js';
 
 /**
@@ -230,6 +232,11 @@ export function App() {
           {data.overview && <Tab id="QUALITY" label="Quality" now={here} go={setChosen} />}
           {/* The published standard — primary, not buried in settings. It is
               the thing no competitor has, and burying it hides it. */}
+          {data.me.roleCodes.includes('RECEPTION')
+            && <Tab id="CONFIRMATIONS" label="Confirmations" now={here} go={setChosen} />}
+          {/* Engine 6, the owner called it the most important: what should
+              have happened and did not, with the ladder running. */}
+          {data.overview && <Tab id="EXCEPTIONS" label="Not happening" now={here} go={setChosen} />}
           {data.overview && <Tab id="STANDARDS" label="Standards" now={here} go={setChosen} />}
           <Tab id="ME" label="Me" now={here} go={setChosen} />
         </div>
@@ -273,6 +280,8 @@ export function App() {
       {here === 'QUALITY' && <Quality onChanged={reload} />}
       {here === 'CHECKS' && <Checks items={data.checks} onDone={reload} />}
       {here === 'STANDARDS' && <Standards />}
+      {here === 'CONFIRMATIONS' && <ConfirmationsBoard />}
+      {here === 'EXCEPTIONS' && <Exceptions />}
       {here === 'ME' && (
         <MeScreen me={data.me} onSignedOut={() => { setData(null); setChosen('TODAY'); }} />
       )}
@@ -296,6 +305,8 @@ const TAB_ICON: Record<string, (p: { filled: boolean }) => ReactElement> = {
   OPERATIONS: ({ filled }) => <IconOperations filled={filled} />,
   QUALITY: ({ filled }) => <IconQuality filled={filled} />,
   STANDARDS: ({ filled }) => <IconChecks filled={filled} />,
+  CONFIRMATIONS: ({ filled }) => <IconClinic filled={filled} />,
+  EXCEPTIONS: ({ filled }) => <IconAlert filled={filled} />,
   CHECKS: ({ filled }) => <IconChecks filled={filled} />,
   ME: ({ filled }) => <IconMe filled={filled} />,
 };

@@ -1789,3 +1789,143 @@ label.field-label {
   margin: 18px 0 0; font-size: 14px; color: var(--ink-soft);
   background: var(--line-soft); border-radius: var(--radius-sm); padding: 10px 13px;
 }
+
+/* ---- The owner's scoreboard ---------------------------------------------
+   §7 and §8: one operational score, eight management lines, and a drill-down
+   that reveals only deviations. A drill-down showing a report has changed the
+   subject — the owner asked what is wrong. */
+
+.sb-top { text-align: center; margin: 6px 0 26px; }
+.sb-op { line-height: 1; font-variant-numeric: tabular-nums; }
+.sb-op b { font-size: clamp(56px, 12vw, 74px); font-weight: 300; letter-spacing: -.04em; }
+.sb-op span { font-size: 24px; font-weight: 300; color: var(--ink-faint); }
+.sb-nil { font-size: 20px; font-weight: 300; color: var(--ink-faint); }
+.sb-op-label {
+  margin-top: 8px; font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.sb-lines { list-style: none; margin: 0 0 30px; padding: 0; display: grid; gap: 6px; }
+.sb-line {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  min-height: var(--tap); padding: 12px 15px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); cursor: pointer; font: inherit; text-align: left;
+}
+.sb-line:hover { border-color: var(--ink-faint); }
+.sb-dot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; }
+.sb-label { flex: 1; font-weight: 550; font-size: 15.5px; }
+.sb-value { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.sb-count {
+  background: var(--safety-tint); color: var(--safety);
+  border-radius: 999px; padding: 1px 8px; font-size: 12px; font-weight: 700;
+}
+.sb-go { color: var(--ink-faint); font-size: 17px; }
+
+.sb-green { background: var(--ok); color: var(--ok); }
+.sb-amber { background: var(--warn); color: var(--warn); }
+.sb-red { background: var(--safety); color: var(--safety); }
+.sb-grey { background: var(--ink-faint); color: var(--ink-faint); }
+.sb-value.sb-green, .sb-value.sb-amber, .sb-value.sb-red, .sb-value.sb-grey {
+  background: 0;
+}
+
+.sb-group { margin-bottom: 14px; }
+.sb-group-head {
+  font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  margin-bottom: 6px; background: 0;
+}
+.sb-item {
+  padding: 12px 14px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line); background: var(--card);
+  font-size: 15px; font-weight: 550; margin-bottom: 6px;
+}
+.sb-item-red { border-color: var(--safety-line); background: var(--safety-tint); }
+.sb-item-amber { border-color: var(--warn-line); background: var(--warn-tint); }
+
+.sb-devs { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 7px; }
+.sb-dev {
+  padding: 13px 15px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line); background: var(--card);
+}
+.sb-dev-red { border-color: var(--safety-line); background: var(--safety-tint); }
+.sb-dev-amber { border-color: var(--warn-line); background: var(--warn-tint); }
+.sb-dev-label { font-weight: 600; font-size: 15.5px; }
+
+/* ---- §6 confirmation board ---------------------------------------------- */
+.cf-summary {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 0 22px;
+}
+.cf-summary div {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 13px 15px; display: grid; gap: 2px;
+}
+.cf-summary dt { font-size: 27px; font-weight: 600; letter-spacing: -.025em; }
+.cf-summary dd {
+  margin: 0; font-size: 12px; color: var(--ink-soft);
+  letter-spacing: .03em; text-transform: uppercase;
+}
+.cf-summary .is-bad { border-color: var(--safety-line); background: var(--safety-tint); }
+.cf-summary .is-bad dt { color: var(--safety); }
+.cf-summary .is-warn { border-color: var(--warn-line); background: var(--warn-tint); }
+.cf-summary .is-warn dt { color: var(--warn); }
+/* Confirmed is present, but never the headline. */
+.cf-summary .is-quiet dt { color: var(--ink-faint); font-weight: 400; }
+
+.cf-wrap {
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.cf-table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 720px; }
+.cf-table th, .cf-table td {
+  text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.cf-table th {
+  font-size: 11.5px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ink-soft); white-space: nowrap;
+}
+.cf-table tbody tr:last-child td { border-bottom: 0; }
+.cf-table .is-off { opacity: .5; }
+.cf-name { font-weight: 600; white-space: nowrap; }
+.cf-note { color: var(--ink-soft); max-width: 26ch; }
+.cf-status {
+  display: inline-block; white-space: nowrap;
+  border-radius: 999px; padding: 3px 10px; font-size: 12.5px; font-weight: 650;
+}
+.cf-ok { background: var(--accent-soft); color: var(--accent); }
+.cf-warn { background: var(--warn-tint); color: var(--warn); }
+.cf-bad { background: var(--safety-tint); color: var(--safety); }
+.cf-grey { background: var(--line-soft); color: var(--ink-faint); }
+
+/* ---- Exception queue, with the ladder running --------------------------- */
+.ex-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ex-row {
+  background: var(--card); border: 1px solid var(--line);
+  border-left-width: 3px; border-radius: var(--radius-sm); padding: 14px 16px;
+}
+.ex-safety { border-left-color: var(--safety); }
+.ex-critical { border-left-color: var(--warn); }
+.ex-important { border-left-color: var(--accent-line); }
+.ex-routine { border-left-color: var(--line); }
+
+.ex-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 5px; }
+.ex-level {
+  background: var(--safety); color: #fff; border-radius: 5px;
+  padding: 1px 8px; font-size: 12px; font-weight: 700;
+}
+.ex-level-none {
+  background: var(--line-soft); color: var(--ink-faint);
+  border-radius: 999px; padding: 2px 10px; font-size: 11.5px; font-weight: 600;
+}
+.ex-sev {
+  font-size: 11.5px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.ex-code {
+  font: 11.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink-faint);
+}
+.ex-title { font-weight: 600; font-size: 15.5px; }
+.ex-ladder { margin-top: 7px; font-size: 13.5px; color: var(--ink-soft); }
+.ex-ladder b { color: var(--ink); }
+.ex-owner { margin-top: 3px; font-size: 12.5px; color: var(--ink-faint); text-transform: capitalize; }

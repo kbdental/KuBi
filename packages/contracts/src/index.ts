@@ -3,3 +3,4 @@ export * from './tenancy.js';
 export * from './parameter-model.js';
 export * from './activity-record.js';
 export * from './work-model.js';
+export * from './management-scores.js';

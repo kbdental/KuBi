@@ -515,6 +515,66 @@ export interface ParameterHealthRow {
   blockedBy: string[];
 }
 
+/** One line of the owner's scoreboard: a management score and its deviations. */
+export interface ScoreLine {
+  id: string;
+  label: string;
+  /** How it is measured, in the owner's own words. */
+  measure: string;
+  /** Null means nothing to measure today. Never rendered as 0. */
+  value: number | null;
+  /** GREEN | AMBER | RED | GREY. */
+  outcome: string;
+  deviations: Array<{ label: string; severity: string; detail: string | null }>;
+  deviationCount: number;
+  parameters: string[];
+}
+
+/** Sixteen control parameters rolled into the eight management scores. */
+export interface Scoreboard {
+  clinicName: string;
+  operational: number | null;
+  lines: ScoreLine[];
+  critical: Array<{ id: string; headline: string }>;
+  attention: Array<{ id: string; headline: string }>;
+}
+
+/** §6 — one row of the morning confirmation board. Status is derived. */
+export interface ConfirmationRow {
+  id: string;
+  patientLabel: string;
+  appointment: string;
+  startsInMinutes: number;
+  confirmation: string;
+  reminderSent: boolean;
+  specialInstructions: string | null;
+  /** CONFIRMED | NO_RESPONSE | RESCHEDULE | CANCELLED | ACTION_REQUIRED */
+  status: string;
+}
+
+export interface Confirmations {
+  rows: ConfirmationRow[];
+  summary: {
+    appointments: number; confirmed: number; unconfirmed: number;
+    actionRequired: number; cancelled: number;
+  };
+}
+
+/** One thing that should have happened and did not, with the ladder running. */
+export interface ExceptionRow {
+  id: string;
+  headline: string;
+  severity: string;
+  detail: string | null;
+  minutesLate: number;
+  /** Null before the first rung — not yet escalated is a real state. */
+  level: number | null;
+  escalatedTo: string | null;
+  nextRung: { level: number; afterMinutes: number; to: string } | null;
+  owner: string | null;
+  activityCode: string | null;
+}
+
 export interface OwnerBusiness {
   clinicName: string;
   known: Array<{ name: string; value: string | null; available: boolean; module: string | null }>;
@@ -618,6 +678,10 @@ export const api = {
   briefing: () => call<Briefing>('/api/v1/briefing'),
 
   parameterHealth: () => call<ParameterHealthRow[]>('/api/v1/parameter-health'),
+
+  scoreboard: () => call<Scoreboard>('/api/v1/scoreboard'),
+  confirmations: () => call<Confirmations>('/api/v1/confirmations'),
+  exceptions: () => call<ExceptionRow[]>('/api/v1/exceptions'),
 
   commandCentre: () => call<CommandCentre>('/api/v1/command-centre'),
   ownerBusiness: () => call<OwnerBusiness>('/api/v1/owner-business'),
