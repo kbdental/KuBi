@@ -1,0 +1,1668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0078B4">
+<title>KuBi — Demo</title>
+<!--
+  KuBi — Clinic Operating System
+  Design language from the KB Dental Clinical Suite: medical blue #0078B4,
+  #F0F6FB section bars with a 3px left rule, uppercase tracked labels.
+
+  The parameter and activity structure is embedded, so Parameters,
+  Activities and Reports are populated the moment the app opens — before a
+  single task exists. An operating system should show what it governs, not
+  only what happened today.
+-->
+<style>
+:root{
+  --blue:#0078B4; --blue-hi:#0090CC; --blue-dk:#005F91;
+  --blue-tint:#F0F6FB; --blue-tint2:#DCF4FB; --blue-wash:#F8FBFE;
+  --green:#059669; --green-tint:#F0FFF4;
+  --amber:#D97706; --amber-tint:#FFFBF0;
+  --red:#C0392B; --red-2:#E24B4A; --red-tint:#FFF0F0;
+  --purple:#7C3AED; --purple-tint:#F5F0FF;
+  --grey:#6B7280; --grey-tint:#F5F5F5;
+  --ink:#222; --ink-2:#555; --ink-3:#777; --ink-4:#9AA5AE;
+  --bg:#F4F6F8; --surface:#FFF; --line:#E5E9ED; --line-2:#D5DCE2;
+  --r:8px; --r-sm:6px; --r-lg:12px;
+  --sh:0 1px 3px rgba(20,30,40,.07); --sh-2:0 4px 20px rgba(20,30,40,.09);
+  --sh-3:0 10px 40px rgba(0,0,0,.25);
+  --safe:env(safe-area-inset-bottom,0px); --nav:62px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans Devanagari',sans-serif;
+  background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;padding-bottom:calc(var(--nav) + var(--safe))}
+.hide{display:none!important}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+::-webkit-scrollbar{width:7px;height:7px}::-webkit-scrollbar-thumb{background:#c8d0d6;border-radius:4px}
+
+h1,h2,h3{font-weight:700;letter-spacing:-.01em}
+.t-xl{font-size:30px;letter-spacing:-.025em;font-weight:800}
+.t-lg{font-size:18px}.t-md{font-size:15px}
+.cap{font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--blue)}
+.cap-g{font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.sub{font-size:12.5px;color:var(--ink-2)}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.02em}
+
+header{position:sticky;top:0;z-index:20;background:var(--blue);color:#fff;padding:12px 16px;
+  display:flex;align-items:center;gap:10px;box-shadow:var(--sh)}
+header h1{font-size:17px}header .who{font-size:11px;opacity:.9;display:block;margin-top:1px}
+.hbtn{height:32px;min-width:32px;padding:0 10px;border:0;border-radius:var(--r-sm);
+  background:rgba(255,255,255,.18);color:#fff;font:inherit;font-size:12px;font-weight:700;
+  cursor:pointer;display:grid;place-items:center}
+.hbtn:hover{background:rgba(255,255,255,.3)}
+main{padding:14px 16px 32px;max-width:1000px;margin:0 auto}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--sh);margin-bottom:12px;overflow:hidden}
+.card-p{padding:16px}
+.sec{background:var(--blue-tint);border-left:3px solid var(--blue);padding:8px 12px;
+  font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--blue);
+  display:flex;align-items:center;gap:8px}
+.sec .n{margin-left:auto;color:var(--ink-3);font-size:11px}
+.sec.warn{background:var(--amber-tint);border-left-color:var(--amber);color:#8a5a00}
+.sec.bad{background:var(--red-tint);border-left-color:var(--red);color:var(--red)}
+.sec.ok{background:var(--green-tint);border-left-color:var(--green);color:var(--green)}
+
+.btn{background:var(--blue);color:#fff;border:0;border-radius:var(--r);padding:12px 18px;
+  font:inherit;font-weight:700;cursor:pointer;width:100%;transition:background .12s}
+.btn:hover{background:var(--blue-hi)}.btn:disabled{opacity:.45}
+.btn.sm{width:auto;padding:7px 13px;font-size:13px}
+.btn.ghost{background:#fff;color:var(--blue);border:1px solid var(--line-2)}
+.btn.ghost:hover{background:var(--blue-tint);border-color:var(--blue)}
+.btn.ok{background:var(--green)}.btn.bad{background:var(--red)}
+.btn.big{padding:15px;font-size:16px;border-radius:var(--r-lg)}
+.btn.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+label{display:block;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--ink-2);margin:14px 0 5px}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line-2);
+  border-radius:var(--r-sm);background:#fff;color:var(--ink);font:inherit}
+
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;
+  padding:3px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.02em}
+.c-blue{background:var(--blue-tint2);color:var(--blue)}
+.c-green{background:var(--green-tint);color:var(--green)}
+.c-amber{background:var(--amber-tint);color:#8a5a00}
+.c-red{background:var(--red-tint);color:var(--red)}
+.c-grey{background:var(--grey-tint);color:var(--ink-3)}
+.c-purple{background:var(--purple-tint);color:var(--purple)}
+
+/* ── Dashboard hero ── */
+.hero{display:flex;align-items:center;gap:20px;padding:20px 18px;
+  background:linear-gradient(160deg,var(--blue-wash),#fff 60%)}
+.ring{position:relative;flex:0 0 auto}
+.ring .v{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.ring .v b{font-size:30px;font-weight:800;letter-spacing:-.03em;display:block;line-height:1}
+.ring .v i{font-size:9px;font-style:normal;font-weight:800;letter-spacing:.07em;color:var(--ink-3)}
+
+/* ── KPI grid ── */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:1px;background:var(--line)}
+.kpi{background:#fff;padding:13px 14px;cursor:pointer;transition:background .12s}
+.kpi:hover{background:var(--blue-wash)}
+.kpi .kt{display:flex;align-items:baseline;gap:6px}
+.kpi b{font-size:21px;font-weight:800;letter-spacing:-.02em}
+.kpi .of{font-size:11px;color:var(--ink-4)}
+.kpi .kl{font-size:11.5px;color:var(--ink-2);margin-top:2px;line-height:1.3}
+.meter{height:4px;border-radius:4px;background:var(--line);margin-top:8px;overflow:hidden}
+.meter>i{display:block;height:100%;border-radius:4px;transition:width .3s}
+.kpi .dev{font-size:10px;font-weight:800;color:var(--red);margin-top:5px}
+
+/* ── Stat strip ── */
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:1px;background:var(--line)}
+.st{background:#fff;padding:12px 10px;text-align:center}
+.st b{display:block;font-size:19px;font-weight:800;letter-spacing:-.02em}
+.st span{font-size:10px;color:var(--ink-3);font-weight:600}
+
+/* ── Rows ── */
+.row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);
+  background:#fff;transition:background .12s}
+.row:last-child{border-bottom:0}
+.row.click{cursor:pointer}.row.click:hover{background:var(--blue-wash)}
+.row .grow{flex:1;min-width:0}
+.row .arw{color:var(--ink-4);font-size:16px}
+.dot{width:10px;height:10px;flex:0 0 10px;border-radius:50%}
+.d-green{background:var(--green)}.d-amber{background:var(--amber)}
+.d-red{background:var(--red)}.d-grey{background:var(--line-2)}
+.rname{font-weight:600;line-height:1.3}
+.rmeta{font-size:11.5px;color:var(--ink-3);margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+
+/* ── Task row (staff) ── */
+.task{position:relative;display:flex;gap:14px;align-items:center;padding:15px 16px 15px 19px;
+  border-bottom:1px solid var(--line);background:#fff;cursor:pointer}
+.task:last-child{border-bottom:0}.task:hover{background:var(--blue-wash)}
+.task.attn{background:var(--red-tint)}.task.late{background:var(--amber-tint)}
+.task.settled{background:#fcfdfe}
+.pri{position:absolute;left:0;top:0;bottom:0;width:3px}
+.pri-PATIENT_SAFETY{background:var(--red)}.pri-CRITICAL{background:var(--amber)}
+.pri-IMPORTANT{background:var(--blue)}.pri-ROUTINE{background:var(--line-2)}
+.tick{width:40px;height:40px;flex:0 0 40px;border-radius:11px;border:2px solid var(--line-2);
+  background:#fff;display:grid;place-items:center;font-size:19px;color:transparent;transition:all .12s}
+.task:hover .tick{border-color:var(--blue)}
+.tick.on{background:var(--green);border-color:var(--green);color:#fff}
+.tick.ver{background:var(--blue);border-color:var(--blue);color:#fff}
+.tick.na{background:var(--ink-4);border-color:var(--ink-4);color:#fff}
+.tick.lock{border-style:dashed;color:var(--ink-4);background:var(--grey-tint)}
+.task.attn .tick:not(.on):not(.ver):not(.na){border-color:var(--red)}
+.ttitle{font-weight:600;font-size:15.5px;line-height:1.35}
+.task.settled .ttitle{color:var(--ink-3)}
+.blocked{margin-top:8px;padding:8px 11px;background:var(--amber-tint);color:#8a5a00;
+  border-radius:var(--r-sm);font-size:12px;font-weight:600}
+
+/* ── Bars for reports ── */
+.bar-row{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--line)}
+.bar-row:last-child{border-bottom:0}
+.bar-lbl{flex:0 0 40%;font-size:13px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;height:18px;background:var(--grey-tint);border-radius:4px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:4px;transition:width .4s}
+.bar-val{flex:0 0 62px;text-align:right;font-weight:800;font-size:13px}
+
+/* ── Detail table ── */
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:640px}
+th{background:var(--blue-tint);text-align:left;padding:8px 10px;font-size:10px;font-weight:800;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--blue);border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid #EFF3F6;vertical-align:top}
+tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--blue-wash)}
+
+/* ── Toggle ── */
+.sw{width:42px;height:24px;flex:0 0 42px;border-radius:20px;background:var(--line-2);
+  position:relative;cursor:pointer;transition:background .16s;border:0;padding:0}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;
+  background:#fff;transition:transform .16s;box-shadow:var(--sh)}
+.sw.on{background:var(--green)}.sw.on::after{transform:translateX(18px)}
+
+nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--line);
+  display:flex;padding-bottom:var(--safe);box-shadow:0 -2px 8px rgba(0,0,0,.05)}
+nav button{flex:1;background:0;border:0;padding:8px 2px;color:var(--ink-3);cursor:pointer;font:inherit;
+  font-size:9.5px;font-weight:700;display:grid;gap:3px;justify-items:center;position:relative}
+nav button.on{color:var(--blue)}nav button i{font-style:normal;font-size:18px;line-height:1}
+nav .dot-n{position:absolute;top:3px;right:calc(50% - 18px);min-width:16px;height:16px;padding:0 4px;
+  background:var(--red);color:#fff;border-radius:9px;font-size:9px;font-weight:800;display:grid;place-items:center}
+
+.scrim{position:fixed;inset:0;background:rgba(15,25,35,.45);z-index:50;display:grid;
+  align-items:end;justify-items:center;animation:fd .15s ease}
+@keyframes fd{from{opacity:0}}
+.sheet{background:#fff;width:100%;max-width:1000px;border-radius:16px 16px 0 0;max-height:92vh;
+  overflow:auto;box-shadow:var(--sh-3);animation:up .22s cubic-bezier(.2,.8,.3,1)}
+@keyframes up{from{transform:translateY(24px)}}
+.sheet-h{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:15px 18px;z-index:2}
+.sheet-b{padding:0}.sheet-f{padding:16px 18px calc(20px + var(--safe));display:grid;gap:8px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav) + 18px + var(--safe));
+  background:var(--ink);color:#fff;padding:11px 18px;border-radius:var(--r);font-size:14px;
+  font-weight:600;z-index:70;max-width:88%;box-shadow:var(--sh-2)}
+.toast.bad{background:var(--red)}.toast.ok{background:var(--green)}
+
+.empty{text-align:center;padding:34px 20px;color:var(--ink-3)}
+.empty .ico{width:52px;height:52px;margin:0 auto 12px;border-radius:50%;background:var(--green-tint);
+  color:var(--green);display:grid;place-items:center;font-size:24px}
+.empty .ttl{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:4px}
+.seg{display:flex;gap:0;border:1px solid var(--line-2);border-radius:var(--r-sm);overflow:hidden;margin-bottom:12px}
+.seg button{flex:1;background:#fff;border:0;padding:9px 6px;font:inherit;font-size:12.5px;font-weight:650;
+  color:var(--ink-2);cursor:pointer;border-right:1px solid var(--line-2)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--blue);color:#fff}
+aside{display:none}
+
+@media (min-width:920px){
+  body{padding-bottom:0}
+  #app:not(.hide){display:flex;min-height:100vh}
+  nav{display:none}
+  aside{display:flex;flex-direction:column;width:230px;flex:0 0 230px;background:#fff;
+    border-right:1px solid var(--line);position:sticky;top:0;height:100vh;overflow-y:auto}
+  .brand{padding:15px 18px;background:var(--blue);color:#fff}
+  .brand b{display:block;font-size:17px;font-weight:800;letter-spacing:-.01em}
+  .brand span{font-size:10.5px;opacity:.9}
+  .side{padding:10px;flex:1}
+  .side button{width:100%;text-align:left;background:0;border:0;color:var(--ink-2);padding:9px 12px;
+    border-radius:var(--r-sm);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;
+    display:flex;gap:10px;align-items:center;margin-bottom:2px}
+  .side button:hover{background:var(--blue-tint);color:var(--blue)}
+  .side button.on{background:var(--blue);color:#fff}
+  .side .bdg{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:800;
+    padding:1px 6px;border-radius:9px}
+  .side .grp{font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--ink-4);padding:14px 12px 5px}
+  .side-f{padding:10px;border-top:1px solid var(--line);display:grid;gap:6px}
+  #shell{flex:1;min-width:0}
+  header{padding:14px 26px}
+  main{padding:20px 26px 40px;max-width:1180px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+  .grid2 .card{margin-bottom:0}
+  .scrim{align-items:center;padding:26px}
+  .sheet{border-radius:var(--r-lg);max-height:88vh}
+  .toast{bottom:26px}
+}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <main style="max-width:390px;padding-top:46px">
+    <div style="text-align:center;margin-bottom:22px">
+      <div style="width:60px;height:60px;margin:0 auto;border-radius:16px;background:var(--blue);
+        color:#fff;display:grid;place-items:center;font-size:26px;font-weight:800;box-shadow:var(--sh-2)">Ku</div>
+      <h1 class="t-xl" style="margin-top:14px;color:var(--blue)">KuBi</h1>
+      <div class="sub">K.B. Dental — Clinic Operating System</div>
+    </div>
+    <div class="card card-p">
+      <div id="cfgWarn" class="chip c-amber hide" style="margin-bottom:10px"></div>
+      <label data-t="mobile">Mobile number</label>
+      <input id="lPhone" type="tel" inputmode="numeric" placeholder="10 digits">
+      <label data-t="pin">PIN</label>
+      <input id="lPin" type="password" inputmode="numeric" maxlength="6" placeholder="••••">
+      <div style="height:16px"></div>
+      <button class="btn big" id="bLogin" data-t="signIn">Sign in</button>
+      <div style="height:9px"></div>
+      <button class="btn ghost sm" style="width:100%" id="bCfg" data-t="server">Server settings</button>
+      <div style="display:flex;gap:6px;justify-content:center;margin-top:13px">
+        <button class="btn ghost sm" data-lang="en">English</button>
+        <button class="btn ghost sm" data-lang="hi">हिंदी</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="app" class="hide">
+  <aside>
+    <div class="brand"><b>KuBi</b><span>K.B. Dental</span></div>
+    <div class="side" id="side"></div>
+    <div class="side-f">
+      <button class="btn ghost sm" id="bCfg2" data-t="server">Server settings</button>
+      <button class="btn ghost sm" id="bOut" data-t="signOut">Sign out</button>
+    </div>
+  </aside>
+  <div id="shell">
+    <header>
+      <div style="flex:1;min-width:0"><h1 id="vTitle">Dashboard</h1><span class="who" id="vWho"></span></div>
+      <button class="hbtn" id="bLang">हिंदी</button>
+    </header>
+    <main id="view"></main>
+  </div>
+  <nav id="nav"></nav>
+</div>
+
+
+<script>
+// ── Embedded dictionary: 16 control parameters, 119 activities ──
+var P_META={
+  ATTENDANCE_LEAVE: { name:"Attendance & Leave", control:"Reporting time, late arrival, absence, leave request, approval, Saturday–Monday sandwich rule, attendance compliance", rollsInto:"Team Compliance Score", kpis:["On-Time Attendance %","Attendance Record Completeness %","Planned Leave Compliance %","Leave Approval SLA %"] },
+  OPENING_READINESS: { name:"Opening Readiness", control:"Clinic opened on time, floors ready, AC/diffuser/lights, water, reception, treatment rooms, equipment readiness", rollsInto:"Clinic Readiness Score", kpis:["Opening On-Time %","Room Readiness %","Reception Readiness %","Environment Compliance %","Emergency Readiness %"] },
+  CLEANLINESS: { name:"Cleanliness & Housekeeping", control:"Treatment rooms, chairs, slabs, mirrors, washrooms, reception, staff areas, high-touch surfaces, plants", rollsInto:"Clinic Readiness Score", kpis:[] },
+  MAINTENANCE_UTILITIES: { name:"Maintenance & Utilities", control:"AC, plumbing, electricals, chairs, compressor, suction, switches, doors, faucets, water pump, repair reporting", rollsInto:"Clinic Readiness Score", kpis:["Equipment Availability %","PM Compliance %","Calibration Compliance %","Breakdown Reporting Time","Verified Return-to-Service %","AMC/Warranty Coverage %"] },
+  INFECTION_CONTROL: { name:"Infection Control & Sterilization", control:"Dirty-to-clean instrument flow, ultrasonic cycle, packing/sealing, autoclave cycle, storage, same-day completion, biomedical waste", rollsInto:"Infection Control Score", kpis:["Instrument Traceability %","Same-Day Processing %","Packing Compliance %","Autoclave Pass %","Sterile Release Compliance %","Same-Day Sterilization %","BMW Compliance %"] },
+  ROOM_CHAIR_READINESS: { name:"Room & Chair Readiness", control:"Consumables, instruments, PPE, RVG sleeves, materials, chair/equipment functionality before patient seating", rollsInto:"Clinic Readiness Score", kpis:[] },
+  APPOINTMENT_CONTROL: { name:"Appointment Control", control:"Morning confirmation, reminders, cancellations, rescheduling, unconfirmed patients, next appointment", rollsInto:"Appointment Efficiency", kpis:["Confirmation %","Confirmation Resolution %","Recall Contact %","Registration Completeness %","Average Waiting Time","No-Show Recovery %"] },
+  PATIENT_JOURNEY: { name:"Patient Clinical Journey", control:"Arrival → examination → records → consent → treatment → instructions → billing → next appointment → exit", rollsInto:"Patient Care Compliance", kpis:["Medical History Compliance %","Consent Compliance %","Pre-Treatment Documentation %","Radiograph Compliance %","Chairside Readiness %","Pre-op Reminder Compliance %","Pre-op Instruction Compliance %","Procedure Readiness %","Post-Treatment Documentation %","Post-op Instruction Compliance %","Clinical Note Completion %"] },
+  CLINICAL_DOCUMENTATION: { name:"Clinical Documentation", control:"Pre/post scans, photographs, X-rays, notes, treatment plan, consent, prescriptions, procedure documentation", rollsInto:"Clinical Documentation Score", kpis:["Medical History Compliance %","Consent Compliance %","Pre-Treatment Documentation %","Radiograph Compliance %","Chairside Readiness %","Pre-op Reminder Compliance %","Pre-op Instruction Compliance %","Procedure Readiness %","Post-Treatment Documentation %","Post-op Instruction Compliance %","Clinical Note Completion %"] },
+  SURGICAL_HIGH_RISK: { name:"Surgical & High-Risk Protocols", control:"Pre-op medicine reminder, meal instruction, consent, surgical checklist, post-op instructions, next-day follow-up", rollsInto:"Patient Care Compliance", kpis:["Implant Master Completeness %","Implant Planning Completeness %","Implant Readiness %","Valid Implant Batch %","Implant Traceability %","Implant Inventory Accuracy %"] },
+  FOLLOWUP_EXPERIENCE: { name:"Patient Follow-up & Experience", control:"Follow-up due/completed, treatment progress, unresolved complaints, satisfaction, Google review request", rollsInto:"Patient Care Compliance", kpis:["Follow-up Generation %","Surgery Follow-up Compliance %","Clinical Alert Response Time","Follow-up Compliance %","Review Request %","Complaint Capture %","Complaint Acknowledgement Time","Complaint Resolution Time","Complaint Closure %"] },
+  LABORATORY: { name:"Laboratory Case Management", control:"Lab dispatch, due date, receipt, QC, crown availability, appointment linkage, remake/delay tracking", rollsInto:"Lab Efficiency", kpis:["Lab Record Completeness %","Lab Dispatch Compliance %","On-Time Lab %","Lab Receipt Accuracy %","Lab QC Pass %","Lab-Ready Scheduling Compliance %","Lab Remake %"] },
+  INVENTORY_IMPLANTS: { name:"Inventory & Implant Stock", control:"Minimum stock, current stock, expiry, consumption, reorder, implant brands/components, shortages, wastage", rollsInto:"Inventory Readiness", kpis:["Critical Consumable Availability %","Receipt Accuracy %","Stock Transaction Accuracy %","Stock-Out Rate","Expiry/Wastage %","PR Approval SLA %","GRN Accuracy %","Inventory Variance %","Implant Master Completeness %","Implant Planning Completeness %","Implant Readiness %","Valid Implant Batch %","Implant Traceability %","Implant Inventory Accuracy %"] },
+  STAFF_CONDUCT: { name:"Staff Conduct & Coordination", control:"Role responsibility, lunch coverage, reception support, handovers, communication, conduct incidents, training", rollsInto:"Team Compliance Score", kpis:["Role Competency Coverage %","Training Completion %","Competency Coverage %","Competency Gate Compliance %","Current Competency %","Conduct Incident Closure %","Patient-Facing Conduct Incidents","Conduct Action Closure %"] },
+  SAFETY_EMERGENCY: { name:"Safety, Emergency & Compliance", control:"Emergency kit, emergency readiness, OPG competency, biomedical waste, equipment safety, incident reporting", rollsInto:"Infection Control Score", kpis:["Emergency Readiness %","Emergency Audit Score","Emergency Incident Documentation %","Emergency Drill Compliance %"] },
+  QUALITY_CAPA: { name:"Quality, Incident & CAPA", control:"Incident → containment → root cause → corrective action → preventive action → verification → closure; repeat-failure detection and audit findings", rollsInto:"Team Compliance Score", kpis:["Incident Reporting Time","Containment Time","RCA Completion %","CAPA Initiation %","CAPA On-Time Completion %","CAPA Effectiveness %","Repeat Failure Rate","Weekly Clinic Health Score","Monthly Review Compliance %","Infection Control Audit Score","Equipment Compliance Score","Inventory Accuracy %","Audit Finding Closure %"] },
+  CLOSING_FACILITY: { name:"Closing & Facility", control:"These 6 activities each belong to a different control head — the closing run is a moment in the day, not a parameter. Filing them together would have put patient-safety checks under a facilities heading.", rollsInto:"", kpis:[] },
+};
+var P_ORDER=["ATTENDANCE_LEAVE","OPENING_READINESS","CLEANLINESS","MAINTENANCE_UTILITIES","INFECTION_CONTROL","ROOM_CHAIR_READINESS","APPOINTMENT_CONTROL","PATIENT_JOURNEY","CLINICAL_DOCUMENTATION","SURGICAL_HIGH_RISK","FOLLOWUP_EXPERIENCE","LABORATORY","INVENTORY_IMPLANTS","STAFF_CONDUCT","SAFETY_EMERGENCY","QUALITY_CAPA","CLOSING_FACILITY"];
+var A_ROWS=[
+["ATT-001","ATTENDANCE_LEAVE","Daily Attendance","Report for duty","All scheduled staff checked in by 09:45","TIME","DAILY","09:45","All Staff","Clinic Manager","SYSTEM","","IMPORTANT","required on repeat","defined"],
+["ATT-003","ATTENDANCE_LEAVE","Daily Attendance","Submit planned leave","Planned leave submitted in advance per policy","MANUAL","AS_REQUIRED","Policy-defined","Employee","Reporting Manager","ATTACHMENT","Leave policy","IMPORTANT","required on repeat","defined"],
+["ATT-004","ATTENDANCE_LEAVE","Daily Attendance","Approve/reject leave","Every submitted leave has disposition and coverage check","EVENT","AS_REQUIRED","Before leave","Reporting Manager","Clinic Head","VERIFICATION","Leave submitted","IMPORTANT","","defined"],
+["ATT-002","ATTENDANCE_LEAVE","Daily Attendance","Record checkout","All present staff record end-of-shift checkout","TIME","DAILY","Shift end","All Staff","Clinic Manager","SYSTEM","","ROUTINE","","defined"],
+["OPN-005","OPENING_READINESS","Clinic Opening","Emergency readiness quick check","Emergency equipment/critical items available and accessible","TIME","DAILY","Opening","Assigned Assistant","Doctor/Manager","VERIFICATION","Emergency inventory","PATIENT_SAFETY","required on critical","defined"],
+["OPN-001","OPENING_READINESS","Clinic Opening","Open clinic/floors","Required clinic areas opened before first patient","TIME","DAILY","Before first patient","Assigned Opening Staff","Clinic Manager","CONFIRMATION","","CRITICAL","required on repeat","defined"],
+["OPN-002","OPENING_READINESS","Clinic Opening","Treatment room readiness","All scheduled operatories clean, stocked and functional","TIME","DAILY","Before first patient","Dental Assistant","Senior Assistant","CONFIRMATION","Chair/equipment status","CRITICAL","required on repeat","defined"],
+["OPN-003","OPENING_READINESS","Clinic Opening","Reception readiness","Phones, appointment list, payment/reception systems ready","TIME","DAILY","Before first patient","Reception","Reception Lead","CONFIRMATION","","IMPORTANT","required on repeat","defined"],
+["OPN-004","OPENING_READINESS","Clinic Opening","Environment readiness","AC 24°C where applicable, diffuser/lights as schedule","TIME","DAILY","Opening","Housekeeping/Assistant","Clinic Manager","VALUE","","ROUTINE","","defined"],
+["HK-002","CLEANLINESS","Clinical areas","Dental chair surfaces","Clean/disinfected","TIME","DAILY","Opening, between patients, and closing","Assistant","","CONFIRMATION","","PATIENT_SAFETY","required on critical","proposed"],
+["HK-001","CLEANLINESS","Clinical areas","Treatment-room cleaning","Clean before operations","TIME","DAILY","Opening, between patients, and closing","Housekeeping","Assistant","CONFIRMATION","","CRITICAL","required on repeat","proposed"],
+["HK-003","CLEANLINESS","Clinical areas","Slabs/worktops","Clean/disinfected","TIME","DAILY","Opening, between patients, and closing","Assistant","","CONFIRMATION","","CRITICAL","required on repeat","proposed"],
+["HK-010","CLEANLINESS","Washrooms","Soap/hand wash","Available","TIME","open","open","Housekeeping","","VALUE","","CRITICAL","required on repeat","proposed"],
+["HK-005","CLEANLINESS","Clinical areas","Floors","Clean/dry","TIME","DAILY","Opening, between patients, and closing","Housekeeping","","CONFIRMATION","","IMPORTANT","required on repeat","proposed"],
+["HK-006","CLEANLINESS","High-touch areas","Door handles","Clean/disinfected","TIME","open","open","Housekeeping","","CONFIRMATION","","IMPORTANT","required on repeat","proposed"],
+["HK-007","CLEANLINESS","High-touch areas","Switches/high-touch surfaces","Clean","TIME","open","open","Housekeeping","","CONFIRMATION","","IMPORTANT","required on repeat","proposed"],
+["HK-008","CLEANLINESS","Washrooms","Washbasins/faucets","Clean/functioning","TIME","open","open","Housekeeping","","CONFIRMATION","","IMPORTANT","required on repeat","proposed"],
+["HK-009","CLEANLINESS","Washrooms","Toilets","Clean/hygienic","TIME","open","open","Housekeeping","Manager","CONFIRMATION","","IMPORTANT","required on repeat","proposed"],
+["HK-011","CLEANLINESS","Washrooms","Toilet paper/tissue","Available","TIME","open","open","Housekeeping","","CONFIRMATION","","IMPORTANT","required on repeat","proposed"],
+["HK-013","CLEANLINESS","","Reception sub-process open","Clean/organized","TIME","DAILY","Opening","HK/Reception","","CONFIRMATION","","IMPORTANT","required on repeat","proposed"],
+["HK-004","CLEANLINESS","Clinical areas","Mirrors/glass","Clean","TIME","DAILY","Opening, between patients, and closing","Housekeeping","","CONFIRMATION","","ROUTINE","","proposed"],
+["HK-012","CLEANLINESS","Staff areas","Staff dining area","Clean","TIME","DAILY","Closing","Staff/HK","","CONFIRMATION","","ROUTINE","","proposed"],
+["HK-014","CLEANLINESS","","Plants sub-process open","Watered according to schedule","TIME","open","open","HK","","CONFIRMATION","","ROUTINE","","proposed"],
+["EQP-001","MAINTENANCE_UTILITIES","Asset Control","Daily functional check","Critical assets checked before clinical use","TIME","DAILY","Opening","Assigned Assistant","Clinic Manager","CONFIRMATION","Asset active","PATIENT_SAFETY","required on critical","defined"],
+["EQP-004","MAINTENANCE_UTILITIES","Asset Control","Calibration control","Calibration completed before expiry where required","TIME","PER_PLAN","Before due","Equipment Owner","Clinic Manager","ATTACHMENT","Calibration plan","PATIENT_SAFETY","required on critical","defined"],
+["EQP-005","MAINTENANCE_UTILITIES","Asset Control","Breakdown reporting","Failure creates breakdown ticket and asset restriction","EVENT","PER_FAILURE","Immediate","Any Authorized User","Clinic Manager","SYSTEM","Functional failure","PATIENT_SAFETY","required on critical","defined"],
+["EQP-006","MAINTENANCE_UTILITIES","Asset Control","Return to service","Repaired asset independently verified before availability","DEPENDENCY","PER_BREAKDOWN","After repair","Equipment Owner/Vendor","Clinic Manager/Qualified Verifier","VERIFICATION","Repair complete","PATIENT_SAFETY","required on critical","defined"],
+["EQP-002","MAINTENANCE_UTILITIES","Asset Control","Preventive maintenance scheduling","PM task generated before due date","TIME","PER_PLAN","Lead-time configured","System","Equipment Owner","SYSTEM","Maintenance plan","CRITICAL","required on repeat","defined"],
+["EQP-003","MAINTENANCE_UTILITIES","Asset Control","Complete preventive maintenance","PM completed with service evidence","DEADLINE","PER_PLAN","By due date","Equipment Owner/Vendor","Clinic Manager","ATTACHMENT","PM due","CRITICAL","required on repeat","defined"],
+["EQP-007","MAINTENANCE_UTILITIES","Asset Control","AMC/warranty monitoring","Upcoming expiry surfaced","TIME","MONTHLY","Configured lead time","System/Manager","Clinic Head","SYSTEM","Asset master","IMPORTANT","","defined"],
+["STER-001","INFECTION_CONTROL","Instrument Cycle","Collect used instruments","Used instruments moved into dirty workflow safely","EVENT","PER_BATCH","After use","Dental Assistant","Senior Assistant","CONFIRMATION","Instrument use","PATIENT_SAFETY","required on critical","defined"],
+["STER-002","INFECTION_CONTROL","Instrument Cycle","Ultrasonic cleaning","Required instruments ultrasonically cleaned same day","EVENT","PER_BATCH","Same day","Dental Assistant","Senior Assistant","SYSTEM","Batch collected","PATIENT_SAFETY","required on critical","defined"],
+["STER-003","INFECTION_CONTROL","Instrument Cycle","Inspect/dry/pack","Instruments inspected and properly sealed/packed","STATUS_CHANGE","PER_BATCH","After cleaning","Dental Assistant","Senior Assistant","VERIFICATION","Cleaning complete","PATIENT_SAFETY","required on critical","defined"],
+["STER-004","INFECTION_CONTROL","Instrument Cycle","Autoclave cycle","Cycle parameters/result recorded","STATUS_CHANGE","PER_BATCH","Same day","Dental Assistant","Senior Assistant","VALUE","Packing complete","PATIENT_SAFETY","required on critical","defined"],
+["STER-005","INFECTION_CONTROL","Instrument Cycle","Release sterile packs","Only passed verified batches released","DEPENDENCY","PER_BATCH","After pass","Senior Assistant","Doctor/Manager","VERIFICATION","Cycle PASS","PATIENT_SAFETY","required on critical","defined"],
+["STER-006","INFECTION_CONTROL","Instrument Cycle","Closing pending instrument check","No used instruments remain unprocessed at closing","TIME","DAILY","Closing","Senior Assistant","Clinic Manager","SYSTEM","End of day","PATIENT_SAFETY","required on critical","defined"],
+["STER-007","INFECTION_CONTROL","Instrument Cycle","Biomedical waste disposal","Waste segregated/disposed on schedule","TIME","DAILY","Configured","Assigned Assistant/Housekeeping","Clinic Manager","CONFIRMATION","","CRITICAL","required on repeat","defined"],
+["RCR-002","ROOM_CHAIR_READINESS","Instruments","Procedure instruments available","Procedure-specific instruments present and sterile before the procedure","DEPENDENCY","PER_PROCEDURE","Before procedure","Assistant","Senior Assistant","VERIFICATION","Sterile stock + procedure plan","PATIENT_SAFETY","required on critical","proposed"],
+["RCR-003","ROOM_CHAIR_READINESS","Equipment","Chair and equipment operational","Chair, suction and attached equipment functional before patient seating","TIME","DAILY","Opening","Assistant","","CONFIRMATION","Asset active","PATIENT_SAFETY","required on critical","proposed"],
+["RCR-004","ROOM_CHAIR_READINESS","Turnaround","Reset chair after every patient","Chair reset and surfaces disinfected before the next patient is seated","EVENT","PER_PATIENT","At patient checkout","Assistant","","CONFIRMATION","Patient checkout","PATIENT_SAFETY","required on critical","proposed"],
+["RCR-001","ROOM_CHAIR_READINESS","Consumables","Consumables ready for the day","Gloves, gauze, tissues, RVG sleeves and procedure consumables available","TIME","DAILY","Opening","Assistant","","CONFIRMATION","Room readiness","CRITICAL","required on repeat","proposed"],
+["APT-001","APPOINTMENT_CONTROL","Daily Schedule","Confirm today's patients","All today's patients contacted/confirmed early morning","TIME","DAILY","Morning","Reception","Reception Lead","SYSTEM","Today's appointments","IMPORTANT","required on repeat","defined"],
+["APT-002","APPOINTMENT_CONTROL","Daily Schedule","Retry no-response confirmations","Configured retry attempts completed","EVENT","DAILY","Before appointment","Reception","Reception Lead","SYSTEM","No response","IMPORTANT","","defined"],
+["APT-004","APPOINTMENT_CONTROL","Daily Schedule","Patient arrival registration","Arrival recorded and record verified","EVENT","PER_PATIENT","At arrival","Reception","Reception Lead","SYSTEM","Appointment/patient","IMPORTANT","","defined"],
+["APT-005","APPOINTMENT_CONTROL","Daily Schedule","Manage waiting patient","Waiting time monitored against threshold","THRESHOLD","CONTINUOUS","Configured minutes","Reception","Clinic Manager","SYSTEM","Arrival","IMPORTANT","required on repeat","defined"],
+["APT-006","APPOINTMENT_CONTROL","Daily Schedule","No-show handling","No-show recorded and follow-up workflow initiated","DEADLINE","PER_APPOINTMENT","After grace period","Reception","Reception Lead","SYSTEM","Scheduled appointment","IMPORTANT","","defined"],
+["APT-003","APPOINTMENT_CONTROL","Daily Schedule","Review reminders and recalls","Due reminders/recalls actioned","TIME","DAILY","Morning","Reception","Reception Lead","SYSTEM","","ROUTINE","","defined"],
+["CLN-001","PATIENT_JOURNEY","Pre-Treatment","Update medical history","Medical history current before applicable treatment","EVENT","PER_VISIT","Before treatment","Doctor/Assistant","Treating Doctor","VERIFICATION","Patient visit","PATIENT_SAFETY","required on critical","defined"],
+["CLN-002","PATIENT_JOURNEY","Pre-Treatment","Verify procedure consent","Valid procedure-specific consent signed","DEPENDENCY","PER_PROCEDURE","Before procedure","Doctor/Assistant","Treating Doctor","SIGNATURE","Procedure requires consent","PATIENT_SAFETY","required on critical","defined"],
+["CLN-004","PATIENT_JOURNEY","Pre-Treatment","Verify radiograph requirement","Required radiograph available/current","DEPENDENCY","PER_PROCEDURE","Before procedure","Doctor","Clinical Director","VERIFICATION","Procedure protocol","PATIENT_SAFETY","required on critical","defined"],
+["CLN-008","PATIENT_JOURNEY","Pre-Treatment","Procedure readiness evaluation","All mandatory configured requirements evaluated","DEPENDENCY","PER_PROCEDURE","Before start","System","Treating Doctor","SYSTEM","All readiness inputs","PATIENT_SAFETY","required on critical","defined"],
+["CLN-003","PATIENT_JOURNEY","Pre-Treatment","Pre-treatment scan/photo","Required baseline scan/photo documented","EVENT","PER_PROCEDURE","Before procedure","Assistant/Doctor","Treating Doctor","ATTACHMENT","Procedure protocol","CRITICAL","required on repeat","defined"],
+["CLN-005","PATIENT_JOURNEY","Pre-Treatment","Chairside setup","Procedure-specific instruments/materials ready","EVENT","PER_PATIENT","Before seating/procedure","Dental Assistant","Doctor","CONFIRMATION","Procedure plan","CRITICAL","required on repeat","defined"],
+["CLN-006","PATIENT_JOURNEY","Pre-Treatment","Pre-op medication reminder","Surgical patient reminded per prescribed plan","TIME","PER_SURGERY","Protocol-defined","Reception/Assistant","Treating Doctor","SYSTEM","Surgery scheduled","CRITICAL","required on repeat","defined"],
+["CLN-007","PATIENT_JOURNEY","Pre-Treatment","Pre-op meal/instruction reminder","Surgical patient receives clinic-approved pre-op instructions","TIME","PER_SURGERY","Protocol-defined","Reception/Assistant","Treating Doctor","SYSTEM","Surgery scheduled","CRITICAL","required on repeat","defined"],
+["CLN-009","PATIENT_JOURNEY","Pre-Treatment","Post-treatment scan/photo","Required post-treatment record captured","EVENT","PER_PROCEDURE","Before visit closure","Assistant/Doctor","Treating Doctor","ATTACHMENT","Procedure protocol","CRITICAL","required on repeat","defined"],
+["CLN-010","PATIENT_JOURNEY","Pre-Treatment","Post-op instructions","Applicable patient receives documented instructions","EVENT","PER_PROCEDURE","Before discharge","Doctor/Assistant","Treating Doctor","CONFIRMATION","Procedure completed","CRITICAL","required on repeat","defined"],
+["CLN-011","PATIENT_JOURNEY","Pre-Treatment","Clinical notes completion","Required clinical note completed","DEADLINE","PER_VISIT","Before/within configured SLA","Treating Doctor","Clinical Director","SYSTEM","Visit","CRITICAL","required on repeat","defined"],
+["CLN-001","CLINICAL_DOCUMENTATION","Pre-Treatment","Update medical history","Medical history current before applicable treatment","EVENT","PER_VISIT","Before treatment","Doctor/Assistant","Treating Doctor","VERIFICATION","Patient visit","PATIENT_SAFETY","required on critical","defined"],
+["CLN-002","CLINICAL_DOCUMENTATION","Pre-Treatment","Verify procedure consent","Valid procedure-specific consent signed","DEPENDENCY","PER_PROCEDURE","Before procedure","Doctor/Assistant","Treating Doctor","SIGNATURE","Procedure requires consent","PATIENT_SAFETY","required on critical","defined"],
+["CLN-004","CLINICAL_DOCUMENTATION","Pre-Treatment","Verify radiograph requirement","Required radiograph available/current","DEPENDENCY","PER_PROCEDURE","Before procedure","Doctor","Clinical Director","VERIFICATION","Procedure protocol","PATIENT_SAFETY","required on critical","defined"],
+["CLN-008","CLINICAL_DOCUMENTATION","Pre-Treatment","Procedure readiness evaluation","All mandatory configured requirements evaluated","DEPENDENCY","PER_PROCEDURE","Before start","System","Treating Doctor","SYSTEM","All readiness inputs","PATIENT_SAFETY","required on critical","defined"],
+["CLN-003","CLINICAL_DOCUMENTATION","Pre-Treatment","Pre-treatment scan/photo","Required baseline scan/photo documented","EVENT","PER_PROCEDURE","Before procedure","Assistant/Doctor","Treating Doctor","ATTACHMENT","Procedure protocol","CRITICAL","required on repeat","defined"],
+["CLN-005","CLINICAL_DOCUMENTATION","Pre-Treatment","Chairside setup","Procedure-specific instruments/materials ready","EVENT","PER_PATIENT","Before seating/procedure","Dental Assistant","Doctor","CONFIRMATION","Procedure plan","CRITICAL","required on repeat","defined"],
+["CLN-006","CLINICAL_DOCUMENTATION","Pre-Treatment","Pre-op medication reminder","Surgical patient reminded per prescribed plan","TIME","PER_SURGERY","Protocol-defined","Reception/Assistant","Treating Doctor","SYSTEM","Surgery scheduled","CRITICAL","required on repeat","defined"],
+["CLN-007","CLINICAL_DOCUMENTATION","Pre-Treatment","Pre-op meal/instruction reminder","Surgical patient receives clinic-approved pre-op instructions","TIME","PER_SURGERY","Protocol-defined","Reception/Assistant","Treating Doctor","SYSTEM","Surgery scheduled","CRITICAL","required on repeat","defined"],
+["CLN-009","CLINICAL_DOCUMENTATION","Pre-Treatment","Post-treatment scan/photo","Required post-treatment record captured","EVENT","PER_PROCEDURE","Before visit closure","Assistant/Doctor","Treating Doctor","ATTACHMENT","Procedure protocol","CRITICAL","required on repeat","defined"],
+["CLN-010","CLINICAL_DOCUMENTATION","Pre-Treatment","Post-op instructions","Applicable patient receives documented instructions","EVENT","PER_PROCEDURE","Before discharge","Doctor/Assistant","Treating Doctor","CONFIRMATION","Procedure completed","CRITICAL","required on repeat","defined"],
+["CLN-011","CLINICAL_DOCUMENTATION","Pre-Treatment","Clinical notes completion","Required clinical note completed","DEADLINE","PER_VISIT","Before/within configured SLA","Treating Doctor","Clinical Director","SYSTEM","Visit","CRITICAL","required on repeat","defined"],
+["IMP-002","SURGICAL_HIGH_RISK","Readiness & Traceability","Upcoming surgery requirements","Planned implant/components captured per case","EVENT","PER_SURGERY","Before surgery","Treating Doctor","Implant Coordinator","VERIFICATION","Surgery scheduled","PATIENT_SAFETY","required on critical","defined"],
+["IMP-003","SURGICAL_HIGH_RISK","Readiness & Traceability","Implant stock readiness","Required implant/components compared to usable stock","DEPENDENCY","PER_SURGERY","Configured lead time","System/Implant Coordinator","Treating Doctor","SYSTEM","Case requirements","PATIENT_SAFETY","required on critical","defined"],
+["IMP-004","SURGICAL_HIGH_RISK","Readiness & Traceability","Implant lot/expiry verification","Selected implant batch valid and not expired","DEPENDENCY","PER_IMPLANT","Before use","Assistant/Doctor","Treating Doctor","VERIFICATION","Implant selected","PATIENT_SAFETY","required on critical","defined"],
+["IMP-005","SURGICAL_HIGH_RISK","Readiness & Traceability","Record implant usage","Patient/site/SKU/lot/dimensions/doctor permanently linked","EVENT","PER_IMPLANT","At placement","Treating Doctor/Assistant","Treating Doctor","SYSTEM","Procedure","PATIENT_SAFETY","required on critical","defined"],
+["IMP-001","SURGICAL_HIGH_RISK","Readiness & Traceability","Maintain implant SKU master","Manufacturer/system/platform/dimensions/components current","MANUAL","AS_REQUIRED","Before use","Implant Coordinator","Clinical Director","VERIFICATION","","CRITICAL","","defined"],
+["IMP-006","SURGICAL_HIGH_RISK","Readiness & Traceability","Implant stock reconciliation","Physical vs system implant stock reconciled","TIME","WEEKLY","Week end","Implant Coordinator","Clinic Manager","VERIFICATION","","CRITICAL","required on repeat","defined"],
+["FUP-003","FOLLOWUP_EXPERIENCE","Post-Treatment","Escalate red flags","Configured symptoms routed to qualified clinician","EVENT","PER_FOLLOWUP","Immediate","System","Treating Doctor","SYSTEM","Red-flag response","PATIENT_SAFETY","required on critical","defined"],
+["CMP-001","FOLLOWUP_EXPERIENCE","Complaint Management","Register complaint","Every complaint captured with channel/category/severity","EVENT","PER_COMPLAINT","At receipt","Reception/Manager","Clinic Manager","SYSTEM","","CRITICAL","required on repeat","defined"],
+["CMP-003","FOLLOWUP_EXPERIENCE","Complaint Management","Investigate complaint","Facts reviewed and action documented","STATUS_CHANGE","PER_COMPLAINT","Within SLA","Complaint Owner","Clinic Head","ATTACHMENT","Acknowledged","CRITICAL","required on repeat","defined"],
+["FUP-001","FOLLOWUP_EXPERIENCE","Post-Treatment","Generate surgical follow-up","Protocol follow-up auto-created after surgery","STATUS_CHANGE","PER_SURGERY","At completion","System","Reception Lead","SYSTEM","Surgery completed","CRITICAL","required on repeat","defined"],
+["FUP-002","FOLLOWUP_EXPERIENCE","Post-Treatment","Day-after surgery call","Surgery patient contacted next day","TIME","PER_SURGERY","+1 day","Reception/Assistant","Treating Doctor","SYSTEM","Follow-up due","CRITICAL","required on repeat","defined"],
+["CMP-002","FOLLOWUP_EXPERIENCE","Complaint Management","Acknowledge complaint","Patient acknowledgement within configured SLA","DEADLINE","PER_COMPLAINT","SLA-defined","Complaint Owner","Clinic Manager","SYSTEM","Complaint received","IMPORTANT","required on repeat","defined"],
+["CMP-004","FOLLOWUP_EXPERIENCE","Complaint Management","Close complaint","Resolution and patient contact documented","DEPENDENCY","PER_COMPLAINT","Within SLA","Complaint Owner","Clinic Head","VERIFICATION","Action complete","IMPORTANT","required on repeat","defined"],
+["FUP-004","FOLLOWUP_EXPERIENCE","Post-Treatment","Treatment progress follow-up","Protocol review/follow-up completed","TIME","PER_PROTOCOL","Protocol-defined","Reception/Doctor","Treating Doctor","SYSTEM","Procedure protocol","IMPORTANT","required on repeat","defined"],
+["FUP-005","FOLLOWUP_EXPERIENCE","Post-Treatment","Google review request","Eligible completed patient asked for review","STATUS_CHANGE","PER_TREATMENT","After completion","Reception","Reception Lead","SYSTEM","Treatment completed/eligibility","ROUTINE","","defined"],
+["LAB-001","LABORATORY","Tracking & QC","Create lab case","All sent work has complete digital lab record","EVENT","PER_CASE","Before dispatch","Lab Coordinator/Assistant","Doctor","SYSTEM","Lab work prescribed","CRITICAL","required on repeat","defined"],
+["LAB-004","LABORATORY","Tracking & QC","Receive and cross-check case","Received work matched to case/patient/specification","EVENT","PER_CASE","At receipt","Lab Coordinator","Doctor","VERIFICATION","Lab received","CRITICAL","required on repeat","defined"],
+["LAB-005","LABORATORY","Tracking & QC","Doctor QC","Clinical/lab QC completed before patient-ready","STATUS_CHANGE","PER_CASE","After receipt","Doctor","Clinical Lead","VERIFICATION","Case received","CRITICAL","required on repeat","defined"],
+["LAB-006","LABORATORY","Tracking & QC","Schedule after readiness","Patient delivery appointment only after configured lab readiness","DEPENDENCY","PER_CASE","After QC pass","Reception","Lab Coordinator","SYSTEM","QC passed","CRITICAL","required on repeat","defined"],
+["LAB-007","LABORATORY","Tracking & QC","Manage remake/correction","Failed QC creates correction/remake workflow","EVENT","PER_CASE","Immediate","Lab Coordinator","Doctor","SYSTEM","QC failed","CRITICAL","required on repeat","defined"],
+["LAB-002","LABORATORY","Tracking & QC","Dispatch lab case","Dispatch date/materials recorded","EVENT","PER_CASE","At dispatch","Lab Coordinator","Doctor","SYSTEM","Case created","IMPORTANT","","defined"],
+["LAB-003","LABORATORY","Tracking & QC","Monitor expected return","Cases tracked against due date","DEADLINE","DAILY","Before due date","Lab Coordinator","Clinic Manager","SYSTEM","Expected return date","IMPORTANT","required on repeat","defined"],
+["IMP-002","INVENTORY_IMPLANTS","Readiness & Traceability","Upcoming surgery requirements","Planned implant/components captured per case","EVENT","PER_SURGERY","Before surgery","Treating Doctor","Implant Coordinator","VERIFICATION","Surgery scheduled","PATIENT_SAFETY","required on critical","defined"],
+["IMP-003","INVENTORY_IMPLANTS","Readiness & Traceability","Implant stock readiness","Required implant/components compared to usable stock","DEPENDENCY","PER_SURGERY","Configured lead time","System/Implant Coordinator","Treating Doctor","SYSTEM","Case requirements","PATIENT_SAFETY","required on critical","defined"],
+["IMP-004","INVENTORY_IMPLANTS","Readiness & Traceability","Implant lot/expiry verification","Selected implant batch valid and not expired","DEPENDENCY","PER_IMPLANT","Before use","Assistant/Doctor","Treating Doctor","VERIFICATION","Implant selected","PATIENT_SAFETY","required on critical","defined"],
+["IMP-005","INVENTORY_IMPLANTS","Readiness & Traceability","Record implant usage","Patient/site/SKU/lot/dimensions/doctor permanently linked","EVENT","PER_IMPLANT","At placement","Treating Doctor/Assistant","Treating Doctor","SYSTEM","Procedure","PATIENT_SAFETY","required on critical","defined"],
+["IMP-001","INVENTORY_IMPLANTS","Readiness & Traceability","Maintain implant SKU master","Manufacturer/system/platform/dimensions/components current","MANUAL","AS_REQUIRED","Before use","Implant Coordinator","Clinical Director","VERIFICATION","","CRITICAL","","defined"],
+["IMP-006","INVENTORY_IMPLANTS","Readiness & Traceability","Implant stock reconciliation","Physical vs system implant stock reconciled","TIME","WEEKLY","Week end","Implant Coordinator","Clinic Manager","VERIFICATION","","CRITICAL","required on repeat","defined"],
+["INV-001","INVENTORY_IMPLANTS","Stock Control","Daily critical consumable check","Critical room consumables available","TIME","DAILY","Opening","Dental Assistant","Inventory Coordinator","CONFIRMATION","Room readiness","CRITICAL","required on repeat","defined"],
+["INV-005","INVENTORY_IMPLANTS","Stock Control","Expiry monitoring","Near-expiry batches surfaced and FEFO applied","TIME","DAILY","Configured horizon","System/Inventory Coordinator","Clinic Manager","SYSTEM","Batch expiry","CRITICAL","required on repeat","defined"],
+["INV-002","INVENTORY_IMPLANTS","Stock Control","Record stock receipt","All received stock entered by batch/expiry where applicable","EVENT","PER_RECEIPT","At receipt","Inventory Coordinator","Clinic Manager","SYSTEM","PO/receipt","IMPORTANT","","defined"],
+["INV-003","INVENTORY_IMPLANTS","Stock Control","Record stock issue","Material issues recorded through controlled transaction","EVENT","AS_USED","At issue","Authorized Staff","Inventory Coordinator","SYSTEM","Available stock","IMPORTANT","required on repeat","defined"],
+["INV-004","INVENTORY_IMPLANTS","Stock Control","Low-stock reorder","Reorder action generated at configured threshold","THRESHOLD","CONTINUOUS","Immediate","System/Inventory Coordinator","Clinic Manager","SYSTEM","Stock <= reorder","IMPORTANT","required on repeat","defined"],
+["INV-006","INVENTORY_IMPLANTS","Stock Control","Purchase request approval","PR approved/rejected per authority matrix","EVENT","PER_PR","Within SLA","Approver","Clinic Head","VERIFICATION","PR submitted","IMPORTANT","","defined"],
+["INV-007","INVENTORY_IMPLANTS","Stock Control","Goods receipt reconciliation","Received quantities matched to PO/PR","EVENT","PER_RECEIPT","At receipt","Inventory Coordinator","Clinic Manager","VERIFICATION","PO exists","IMPORTANT","required on repeat","defined"],
+["INV-008","INVENTORY_IMPLANTS","Stock Control","Wastage/adjustment control","All wastage/adjustments have reason and authorization","EVENT","AS_REQUIRED","At event","Authorized Staff","Clinic Manager","VERIFICATION","Stock transaction","IMPORTANT","required on repeat","defined"],
+["TRN-004","STAFF_CONDUCT","Training & Competency","Restricted work gate","Independent assignment requires minimum competency","DEPENDENCY","PER_ASSIGNMENT","At assignment","System","Manager","SYSTEM","Role competency","PATIENT_SAFETY","required on critical","defined"],
+["CON-002","STAFF_CONDUCT","Conduct","Patient-facing conflict prevention","No staff arguments/unprofessional conduct in patient areas","EVENT","CONTINUOUS","Immediate","All Staff","Manager","CONFIRMATION","Conduct policy","CRITICAL","required on repeat","defined"],
+["TRN-001","STAFF_CONDUCT","Training & Competency","Role competency assignment","Each role has required competency profile","MANUAL","ON_ROLE_CHANGE","At assignment","Manager","Clinical Director","SYSTEM","Role assigned","CRITICAL","","defined"],
+["TRN-003","STAFF_CONDUCT","Training & Competency","Competency assessment","Skill assessed and level recorded with validity","EVENT","PER_ASSESSMENT","Before independent work","Qualified Assessor","Clinical Director/Manager","VERIFICATION","Training complete","CRITICAL","required on repeat","defined"],
+["CON-001","STAFF_CONDUCT","Conduct","Record conduct incident","Material conduct issue recorded factually and confidentially","EVENT","AS_REQUIRED","Promptly","Manager","Clinic Head","ATTACHMENT","","IMPORTANT","required on repeat","defined"],
+["CON-003","STAFF_CONDUCT","Conduct","Conduct follow-up","Assigned corrective/coaching action completed","DEADLINE","PER_INCIDENT","By due date","Employee/Manager","Clinic Head","VERIFICATION","Conduct incident","IMPORTANT","required on repeat","defined"],
+["TRN-002","STAFF_CONDUCT","Training & Competency","Training assignment","Competency gap generates training/reassessment","EVENT","AS_REQUIRED","On gap detection","System/Manager","Trainer","SYSTEM","Gap detected","IMPORTANT","required on repeat","defined"],
+["TRN-005","STAFF_CONDUCT","Training & Competency","Competency expiry monitoring","Expiring credentials generate reassessment alert","TIME","DAILY","Lead-time configured","System","Manager","SYSTEM","Validity date","IMPORTANT","required on repeat","defined"],
+["EMR-001","SAFETY_EMERGENCY","Readiness & Response","Daily emergency quick check","Critical emergency equipment/items ready","TIME","DAILY","Opening","Assigned Assistant","Doctor/Manager","VERIFICATION","Emergency master","PATIENT_SAFETY","required on critical","defined"],
+["EMR-002","SAFETY_EMERGENCY","Readiness & Response","Monthly full emergency audit","Complete emergency inventory/function/expiry audit","TIME","MONTHLY","Scheduled","Clinic Manager","Clinical Director","VERIFICATION","Emergency master","PATIENT_SAFETY","required on critical","defined"],
+["EMR-003","SAFETY_EMERGENCY","Readiness & Response","Emergency event documentation","Every medical emergency creates incident record","EVENT","PER_EVENT","Immediate/after stabilization","Treating Team","Clinical Director","SYSTEM","Emergency event","PATIENT_SAFETY","required on critical","defined"],
+["EMR-004","SAFETY_EMERGENCY","Readiness & Response","Emergency drill","Team drill completed per schedule","TIME","QUARTERLY","Scheduled","Clinic Manager","Clinical Director","ATTACHMENT","","CRITICAL","required on repeat","defined"],
+["AUD-003","QUALITY_CAPA","Audit Program","Infection control audit","Detailed infection-control audit completed","TIME","MONTHLY","Scheduled","Clinical/Quality Lead","Clinical Director","VERIFICATION","","PATIENT_SAFETY","required on critical","defined"],
+["INC-001","QUALITY_CAPA","Incident/CAPA","Report incident","Safety/quality incident recorded promptly","EVENT","PER_INCIDENT","Immediate","Any Authorized User","Manager/Clinical Director","SYSTEM","","PATIENT_SAFETY","required on critical","defined"],
+["INC-002","QUALITY_CAPA","Incident/CAPA","Immediate containment","Immediate risk controlled/documented","STATUS_CHANGE","PER_INCIDENT","Immediate","Incident Owner","Clinical Director/Manager","VERIFICATION","Incident reported","PATIENT_SAFETY","required on critical","defined"],
+["AUD-004","QUALITY_CAPA","Audit Program","Equipment audit","Asset status/PM/calibration reviewed","TIME","MONTHLY","Scheduled","Clinic Manager","Clinic Head","VERIFICATION","","CRITICAL","required on repeat","defined"],
+["AUD-005","QUALITY_CAPA","Audit Program","Inventory audit","Critical stock/expiry/variance reviewed","TIME","MONTHLY","Scheduled","Inventory Coordinator","Clinic Manager","VERIFICATION","","CRITICAL","required on repeat","defined"],
+["AUD-006","QUALITY_CAPA","Audit Program","Audit finding closure","Findings closed by severity-based SLA","DEADLINE","PER_FINDING","SLA-defined","Finding Owner","Auditor/Manager","VERIFICATION","Finding open","CRITICAL","required on repeat","defined"],
+["INC-003","QUALITY_CAPA","Incident/CAPA","Root cause analysis","Root cause category and analysis completed","STATUS_CHANGE","PER_INCIDENT","By SLA","Incident Owner","Quality/Clinic Head","ATTACHMENT","Contained","CRITICAL","required on repeat","defined"],
+["INC-004","QUALITY_CAPA","Incident/CAPA","Create CAPA","Required corrective/preventive actions assigned","DEPENDENCY","PER_INCIDENT","After RCA","Quality/Manager","Clinic Head","SYSTEM","CAPA required","CRITICAL","always","defined"],
+["INC-005","QUALITY_CAPA","Incident/CAPA","Implement CAPA","Actions completed by due date","DEADLINE","PER_CAPA","Due date","CAPA Owner","Quality/Manager","ATTACHMENT","CAPA open","CRITICAL","always","defined"],
+["INC-006","QUALITY_CAPA","Incident/CAPA","Effectiveness check","CAPA effectiveness independently assessed","TIME","PER_CAPA","Configured date","Verifier","Clinic Head","VERIFICATION","Implemented","CRITICAL","always","defined"],
+["INC-007","QUALITY_CAPA","Incident/CAPA","Repeat failure detection","Repeated same failure crosses threshold","THRESHOLD","CONTINUOUS","Configured","System","Quality/Manager","SYSTEM","Failure taxonomy","CRITICAL","required on repeat","defined"],
+["AUD-001","QUALITY_CAPA","Audit Program","Weekly clinic health audit","Weekly cross-domain audit completed","TIME","WEEKLY","Week end","Clinic Manager","Clinic Head","VERIFICATION","","IMPORTANT","required on repeat","defined"],
+["AUD-002","QUALITY_CAPA","Audit Program","Monthly operating review","Monthly KPI/exception/CAPA review completed","TIME","MONTHLY","Month end","Clinic Head","Owner/Director","ATTACHMENT","KPI data","IMPORTANT","","defined"],
+["CLS-006","CLOSING_FACILITY","End-of-Day","Final clinic lock/security","Required floors/rooms secured and closure recorded","TIME","DAILY","Final closing","Authorized Closing Staff","Clinic Manager","SYSTEM","","CRITICAL","required on repeat","defined"],
+["CLS-001","CLOSING_FACILITY","End-of-Day","Patient/appointment closure","All visits/appointments reconciled at day end","TIME","DAILY","Closing","Reception","Clinic Manager","SYSTEM","","IMPORTANT","","defined"],
+["CLS-002","CLOSING_FACILITY","End-of-Day","Lab day-end review","All lab dispatch/receipt/status changes recorded","TIME","DAILY","Closing","Lab Coordinator","Clinic Manager","SYSTEM","","IMPORTANT","","defined"],
+["CLS-003","CLOSING_FACILITY","End-of-Day","Stock/critical consumables closing check","Critical shortages identified before next day","TIME","DAILY","Closing","Inventory/Assistant","Clinic Manager","CONFIRMATION","Tomorrow schedule","IMPORTANT","required on repeat","defined"],
+["CLS-005","CLOSING_FACILITY","End-of-Day","Water pump/tank check","Pump safely switched off when tank full/at closing","TIME","DAILY","Closing","Assigned Staff","Clinic Manager","CONFIRMATION","","IMPORTANT","required on repeat","defined"],
+["CLS-004","CLOSING_FACILITY","End-of-Day","Utilities shutdown","Unused AC/lights/fans/equipment switched off safely","TIME","DAILY","Closing","Assigned Staff","Clinic Manager","CONFIRMATION","","ROUTINE","","defined"],
+];
+
+"use strict";
+// ═══════════════════════════════════════════════════════════════
+// KuBi — application
+// The dictionary above (P_META / P_ORDER / A_ROWS) is embedded so the
+// Parameters, Activities and Reports screens are populated the moment the
+// app opens. Live numbers come from the server and layer on top; without
+// them the structure is still there to read, which is the difference
+// between a system and an empty task list.
+// ═══════════════════════════════════════════════════════════════
+var CFG={url:localStorage.getItem("kubi.url")||"",token:localStorage.getItem("kubi.token")||""};
+var S={session:localStorage.getItem("kubi.session")||"",
+  user:JSON.parse(localStorage.getItem("kubi.user")||"null"),
+  lang:localStorage.getItem("kubi.lang")||"en",
+  view:"dash", badges:{}, cache:{}, period:"today", online:false};
+
+var T={
+en:{mobile:"Mobile number",pin:"PIN",signIn:"Sign in",signOut:"Sign out",server:"Server settings",
+ dash:"Dashboard",reports:"Reports",params:"Parameters",activities:"Activities",
+ exceptions:"Exceptions",today:"Today",myWork:"My work",verify:"To verify",
+ opScore:"Clinic Operational Score",needsAttention:"Needs your attention",
+ dueNow:"Due now",later:"Later today",completed:"Completed",noAttention:"Nothing needs your attention",
+ noAttentionMsg:"Every control is running to standard right now.",
+ allDone:"All done",allDoneMsg:"Everything on your list is complete.",
+ nothingYet:"Nothing scheduled",nothingMsg:"No work has been scheduled for you today.",
+ nothingVerify:"Nothing to check",nothingVerifyMsg:"No completed work is waiting on you.",
+ done:"Done",verified:"Verified",overdue:"Late",exception:"Failed",na:"Not applicable",
+ pending:"To do",by:"By",waitingFor:"Waiting for",markDone:"Mark as done",cantYet:"Cannot do this yet",
+ photoNeeded:"Photo needed",readingNeeded:"Reading needed",needsCheck:"Needs checking",
+ takePhoto:"Take photo",reading:"Reading",note:"Note (optional)",notApplicable:"Not applicable",
+ why:"Why?",cancel:"Cancel",save:"Save",undo:"Undo",verifyIt:"Verify",
+ confirmVerify:"Confirm this was done properly",acknowledge:"Acknowledge",
+ live:"Live",off:"Off",defined:"defined",proposed:"proposed",rollsInto:"Rolls into",
+ controls:"Controls",owner:"Owner",deviations:"deviations",noDeviations:"No deviations",
+ period:"Period",thisWeek:"7 days",thisMonth:"30 days",
+ byParameter:"Compliance by parameter",byPerson:"Compliance by person",
+ exceptionLog:"Exception log",noData:"No data for this period yet",
+ noDataMsg:"Once staff start ticking activities, this fills in automatically.",
+ activity:"Activity",standard:"Standard",trigger:"Trigger",due:"Due",doer:"Doer",
+ checker:"Checker",evidence:"Evidence",risk:"Risk",capa:"CAPA",gate:"Gate",
+ offline:"Not connected",offlineMsg:"Showing the configured system. Connect a server for live numbers.",
+ total:"Total",staffPresent:"Present",openIssues:"Open",search:"Search activities…"},
+hi:{mobile:"मोबाइल नंबर",pin:"पिन",signIn:"साइन इन",signOut:"साइन आउट",server:"सर्वर सेटिंग",
+ dash:"डैशबोर्ड",reports:"रिपोर्ट",params:"पैरामीटर",activities:"गतिविधियाँ",
+ exceptions:"समस्याएँ",today:"आज",myWork:"मेरा काम",verify:"जाँच करें",
+ opScore:"क्लिनिक संचालन स्कोर",needsAttention:"आपके ध्यान की ज़रूरत",
+ dueNow:"अभी करना है",later:"आज बाद में",completed:"पूरा हुआ",noAttention:"कोई समस्या नहीं",
+ noAttentionMsg:"सभी नियंत्रण मानक के अनुसार चल रहे हैं।",
+ allDone:"सब हो गया",allDoneMsg:"आपकी सूची का सारा काम पूरा है।",
+ nothingYet:"कुछ निर्धारित नहीं",nothingMsg:"आज आपके लिए कोई काम निर्धारित नहीं।",
+ nothingVerify:"जाँचने को कुछ नहीं",nothingVerifyMsg:"कोई कार्य आपकी जाँच के लिए लंबित नहीं।",
+ done:"पूरा",verified:"सत्यापित",overdue:"देर",exception:"विफल",na:"लागू नहीं",
+ pending:"करना है",by:"तक",waitingFor:"इंतज़ार",markDone:"पूरा करें",cantYet:"अभी नहीं कर सकते",
+ photoNeeded:"फोटो चाहिए",readingNeeded:"रीडिंग चाहिए",needsCheck:"जाँच चाहिए",
+ takePhoto:"फोटो लें",reading:"रीडिंग",note:"टिप्पणी (वैकल्पिक)",notApplicable:"लागू नहीं",
+ why:"क्यों?",cancel:"रद्द",save:"सेव",undo:"वापस लें",verifyIt:"सत्यापित करें",
+ confirmVerify:"पुष्टि करें कि यह सही से हुआ",acknowledge:"स्वीकार करें",
+ live:"चालू",off:"बंद",defined:"निर्धारित",proposed:"प्रस्तावित",rollsInto:"जुड़ता है",
+ controls:"नियंत्रण",owner:"प्रभारी",deviations:"विचलन",noDeviations:"कोई विचलन नहीं",
+ period:"अवधि",thisWeek:"7 दिन",thisMonth:"30 दिन",
+ byParameter:"पैरामीटर अनुसार अनुपालन",byPerson:"व्यक्ति अनुसार अनुपालन",
+ exceptionLog:"समस्या रिकॉर्ड",noData:"इस अवधि का डेटा नहीं",
+ noDataMsg:"जैसे ही स्टाफ गतिविधियाँ दर्ज करेगा, यह अपने आप भर जाएगा।",
+ activity:"गतिविधि",standard:"मानक",trigger:"ट्रिगर",due:"देय",doer:"करने वाला",
+ checker:"जाँचकर्ता",evidence:"प्रमाण",risk:"जोखिम",capa:"CAPA",gate:"शर्त",
+ offline:"जुड़ा नहीं",offlineMsg:"कॉन्फ़िगर किया सिस्टम दिख रहा है। लाइव आँकड़ों के लिए सर्वर जोड़ें।",
+ total:"कुल",staffPresent:"उपस्थित",openIssues:"खुली",search:"गतिविधि खोजें…"}
+};
+function t(k){return (T[S.lang]&&T[S.lang][k])||T.en[k]||k;}
+function $(id){return document.getElementById(id);}
+function els(s){return Array.prototype.slice.call(document.querySelectorAll(s));}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function toast(m,k){var d=document.createElement("div");d.className="toast"+(k?" "+k:"");
+  d.textContent=m;document.body.appendChild(d);setTimeout(function(){d.remove();},k==="bad"?4200:2200);}
+function todayStr(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+
+  "-"+String(d.getDate()).padStart(2,"0");}
+function daysAgo(n){var d=new Date();d.setDate(d.getDate()-n);return d.getFullYear()+"-"+
+  String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+
+// ── The embedded dictionary, shaped for use ────────────────────
+var AF=["activityId","parameter","subProcess","activity","standard","trigger","frequency",
+        "due","doer","checker","evidence","gate","risk","capa","status"];
+var ACTS=(function(){
+  var byId={},order=[];
+  A_ROWS.forEach(function(r){
+    var o={}; for(var i=0;i<AF.length;i++) o[AF[i]]=r[i];
+    if(byId[o.activityId]){ var s=byId[o.activityId];
+      if(s.parameters.indexOf(o.parameter)<0) s.parameters.push(o.parameter); return; }
+    o.parameters=[o.parameter]; byId[o.activityId]=o; order.push(o.activityId);
+  });
+  return order.map(function(id){return byId[id];});
+})();
+function actsIn(pid){return ACTS.filter(function(a){return a.parameters.indexOf(pid)>=0;});}
+// The eight management scores, derived from each parameter's "Rolls into"
+var SCORE_LINES=(function(){
+  var by={},order=[];
+  P_ORDER.forEach(function(pid){
+    var k=(P_META[pid]||{}).rollsInto||pid;
+    if(!by[k]){by[k]=[];order.push(k);} by[k].push(pid);
+  });
+  return order.map(function(k){
+    return {key:k.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,""),label:k,params:by[k]};
+  });
+})();
+var RISK_ORDER={PATIENT_SAFETY:0,CRITICAL:1,IMPORTANT:2,ROUTINE:3};
+var RISK_CHIP={PATIENT_SAFETY:"c-red",CRITICAL:"c-amber",IMPORTANT:"c-blue",ROUTINE:"c-grey"};
+function riskLabel(r){return String(r||"").replace("_"," ").toLowerCase()
+  .replace(/^./,function(c){return c.toUpperCase();});}
+
+// ═══════════════════════════════════════════════════════════════
+// API — the app degrades to structure-only when unreachable
+// ═══════════════════════════════════════════════════════════════
+function api(action,p){
+  p=p||{};p.action=action;p.token=CFG.token;
+  if(S.session)p.session=S.session;
+  if(!CFG.url)return Promise.reject(new Error("offline"));
+  return fetch(CFG.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify(p),redirect:"follow"})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      S.online=true;
+      if(res&&res.needLogin){signOut(true);throw new Error("Session expired");}
+      if(!res||!res.success)throw new Error((res&&res.error)||"Request failed");
+      return res;});
+}
+function apiSoft(action,p){return api(action,p).catch(function(){S.online=false;return null;});}
+
+// ═══════════════════════════════════════════════════════════════
+// PHOTO
+// ═══════════════════════════════════════════════════════════════
+function capturePhoto(mod,ref){
+  var desktop=window.matchMedia("(pointer:fine)").matches;
+  var cam=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);
+  return ((desktop&&cam)?webcam():filePick())
+    .then(function(d){toast("Uploading…");return api("uploadPhoto",{dataUrl:d,module:mod,refId:ref||""});})
+    .then(function(r){return {photoId:r.photoId,url:r.url};});
+}
+function filePick(){return new Promise(function(res,rej){
+  var i=document.createElement("input");i.type="file";i.accept="image/*";i.capture="environment";
+  i.onchange=function(){var f=i.files&&i.files[0];if(!f)return rej(new Error("No photo"));
+    shrink(f,1000,.62).then(res).catch(rej);};i.click();});}
+function shrink(file,max,q){return new Promise(function(res,rej){
+  var fr=new FileReader();
+  fr.onload=function(){var im=new Image();
+    im.onload=function(){var w=im.width,h=im.height;
+      if(w>h&&w>max){h=Math.round(h*max/w);w=max;}else if(h>max){w=Math.round(w*max/h);h=max;}
+      var c=document.createElement("canvas");c.width=w;c.height=h;
+      c.getContext("2d").drawImage(im,0,0,w,h);res(c.toDataURL("image/jpeg",q));};
+    im.onerror=function(){rej(new Error("Bad image"));};im.src=fr.result;};
+  fr.onerror=function(){rej(new Error("Read failed"));};fr.readAsDataURL(file);});}
+function webcam(){return new Promise(function(res,rej){
+  var sc=document.createElement("div");sc.className="scrim";
+  sc.innerHTML='<div class="sheet" style="max-width:620px"><div class="sheet-h">'+
+    '<h3 class="t-lg">'+esc(t("takePhoto"))+'</h3></div><div class="sheet-b" style="padding:18px">'+
+    '<video autoplay playsinline muted style="width:100%;border-radius:8px;background:#000"></video></div>'+
+    '<div class="sheet-f"><button class="btn" data-x="s">'+esc(t("takePhoto"))+'</button>'+
+    '<button class="btn ghost" data-x="c">'+esc(t("cancel"))+'</button></div></div>';
+  document.body.appendChild(sc);
+  var v=sc.querySelector("video"),st=null;
+  var stop=function(){if(st)st.getTracks().forEach(function(x){x.stop();});sc.remove();};
+  navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280}}})
+    .then(function(s){st=s;v.srcObject=s;})
+    .catch(function(){stop();filePick().then(res).catch(rej);});
+  sc.addEventListener("click",function(e){
+    if(e.target===sc||e.target.dataset.x==="c"){stop();rej(new Error("Cancelled"));}
+    if(e.target.dataset.x==="s"){
+      if(!v.videoWidth)return toast("Camera starting…","bad");
+      var c=document.createElement("canvas"),max=1000,w=v.videoWidth,h=v.videoHeight;
+      if(w>h&&w>max){h=Math.round(h*max/w);w=max;}else if(h>max){w=Math.round(w*max/h);h=max;}
+      c.width=w;c.height=h;c.getContext("2d").drawImage(v,0,0,w,h);
+      var d=c.toDataURL("image/jpeg",.62);stop();res(d);}});});}
+
+// ═══════════════════════════════════════════════════════════════
+// SHEET
+// ═══════════════════════════════════════════════════════════════
+// A sheet covers the whole screen, so there must always be an obvious way
+// out of it. Previously the only exit was a Cancel button at the very
+// bottom — on a long sheet that sits below the fold, leaving the app
+// looking frozen with nothing clickable. Now: a × in the header that is
+// always visible, the Escape key, and the backdrop.
+function sheet(o){
+  // Only ever one sheet. A second opening on top of a first would leave an
+  // orphaned overlay behind when the top one closes.
+  closeSheets();
+  var sc=document.createElement("div");sc.className="scrim";
+  sc.innerHTML='<div class="sheet"><div class="sheet-h" style="display:flex;'+
+      'align-items:flex-start;gap:12px">'+
+    '<div style="flex:1;min-width:0"><h3 class="t-lg">'+esc(o.title)+'</h3>'+
+    (o.sub?'<div class="sub" style="margin-top:2px">'+esc(o.sub)+'</div>':'')+'</div>'+
+    '<button class="icon-btn" data-x="c" aria-label="Close" '+
+      'style="flex:0 0 32px;font-size:17px;line-height:1">&times;</button></div>'+
+    '<div class="sheet-b">'+(o.body||"")+'</div>'+
+    '<div class="sheet-f">'+(o.actions||'<button class="btn ghost" data-x="c">'+esc(t("cancel"))+'</button>')+
+    '</div></div>';
+  sc.addEventListener("click",function(e){
+    var x=e.target.closest?e.target.closest("[data-x]"):null;
+    if(e.target===sc||(x&&x.dataset.x==="c")){sc.remove();return;}
+    if(o.onAction&&x){
+      var r=o.onAction(x.dataset.x,sc);
+      if(r&&r.then)r.then(function(k){if(k!==false)sc.remove();}).catch(function(err){toast(err.message,"bad");});
+      else if(r!==false)sc.remove();}});
+  document.body.appendChild(sc);return sc;
+}
+function closeSheets(){
+  els(".scrim").forEach(function(s){s.remove();});
+}
+// Escape always closes, whatever is open. Without it a sheet whose buttons
+// are off-screen leaves no way back to the app at all.
+document.addEventListener("keydown",function(e){
+  if(e.key==="Escape")closeSheets();
+});
+function sv(sc,n){var e=sc.querySelector('[name="'+n+'"]');return e?e.value.trim():"";}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════════
+function signIn(){
+  var ph=$("lPhone").value.replace(/\D/g,""),pin=$("lPin").value;
+  if(!ph||!pin)return toast("Enter number and PIN","bad");
+  $("bLogin").disabled=true;
+  api("login",{phone:ph,pin:pin}).then(function(r){
+    S.session=r.session;S.user=r.user;
+    localStorage.setItem("kubi.session",r.session);
+    localStorage.setItem("kubi.user",JSON.stringify(r.user));boot();
+  }).catch(function(e){toast(e.message==="offline"?"Server not configured":e.message,"bad");})
+    .finally(function(){$("bLogin").disabled=false;});
+}
+function signOut(quiet){
+  if(!quiet)api("logout",{}).catch(function(){});
+  S.session="";S.user=null;
+  localStorage.removeItem("kubi.session");localStorage.removeItem("kubi.user");
+  $("app").classList.add("hide");$("login").classList.remove("hide");
+}
+function openCfg(){
+  sheet({title:t("server"),sub:"From kubiSetupAll() in Apps Script",
+    body:'<div style="padding:18px"><label>Web app /exec URL</label><input name="u" value="'+esc(CFG.url)+'">'+
+      '<label>OPS_TOKEN</label><input name="k" value="'+esc(CFG.token)+'"></div>',
+    actions:'<button class="btn" data-x="save">'+esc(t("save"))+'</button>'+
+      '<button class="btn ghost" data-x="c">'+esc(t("cancel"))+'</button>',
+    onAction:function(a,sc){if(a!=="save")return;
+      CFG.url=sv(sc,"u");CFG.token=sv(sc,"k");
+      localStorage.setItem("kubi.url",CFG.url);localStorage.setItem("kubi.token",CFG.token);
+      toast("Saved","ok");checkServer();}});
+}
+function checkServer(){
+  if(!CFG.url){$("cfgWarn").classList.remove("hide");$("cfgWarn").textContent="Server not configured";return;}
+  api("ping",{}).then(function(){$("cfgWarn").classList.add("hide");})
+    .catch(function(){$("cfgWarn").classList.remove("hide");$("cfgWarn").textContent="Cannot reach server";});
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NAVIGATION — a different app per role
+// ═══════════════════════════════════════════════════════════════
+var NAV_DOER=[{id:"today",i:"✓",k:"myWork"},{id:"verify",i:"◎",k:"verify",b:"verify"}];
+var NAV_SUPER=[{id:"today",i:"✓",k:"myWork"},{id:"verify",i:"◎",k:"verify",b:"verify"},
+               {id:"exceptions",i:"!",k:"exceptions",b:"exceptions"}];
+var NAV_MGR=[{id:"dash",i:"◧",k:"dash"},{id:"exceptions",i:"!",k:"exceptions",b:"exceptions"},
+             {id:"reports",i:"▤",k:"reports"},{id:"params",i:"⚙",k:"params"},{id:"today",i:"✓",k:"today"}];
+var ROLE_NAV={housekeeping:NAV_DOER,assistant:NAV_DOER,reception:NAV_DOER,
+  assigned_staff:NAV_DOER,assigned_assistant:NAV_DOER,assigned_opening_staff:NAV_DOER,
+  senior_assistant:NAV_SUPER,lab_coordinator:NAV_SUPER,implant_coordinator:NAV_SUPER,
+  inventory_coordinator:NAV_SUPER,equipment_owner:NAV_SUPER,doctor:NAV_SUPER,
+  treating_doctor:NAV_SUPER,trainer:NAV_SUPER,verifier:NAV_SUPER,
+  manager:NAV_MGR,reporting_manager:NAV_MGR,quality_lead:NAV_MGR,auditor:NAV_MGR,mis:NAV_MGR,
+  clinical_lead:NAV_MGR,clinical_director:NAV_MGR,clinic_head:NAV_MGR,owner:NAV_MGR};
+function navFor(){return ROLE_NAV[String(S.user.role).toLowerCase()]||NAV_DOER;}
+function isMgr(){return navFor()===NAV_MGR;}
+function homeFor(){return navFor()[0].id;}
+
+function buildNav(){
+  if(!S.user)return;
+  var items=navFor();
+  $("nav").innerHTML=items.map(function(n){
+    var b=n.b?(S.badges[n.b]||0):0;
+    return '<button data-nav="'+n.id+'" class="'+(S.view===n.id?"on":"")+'">'+
+      (b>0?'<span class="dot-n">'+b+'</span>':'')+'<i>'+n.i+'</i>'+esc(t(n.k))+'</button>';}).join("");
+  $("side").innerHTML=items.map(function(n){
+    var b=n.b?(S.badges[n.b]||0):0;
+    return '<button data-nav="'+n.id+'" class="'+(S.view===n.id?"on":"")+'">'+
+      '<span>'+n.i+'</span>'+esc(t(n.k))+(b>0?'<span class="bdg">'+b+'</span>':'')+'</button>';}).join("");
+}
+function go(v){
+  S.view=v;
+  var it=navFor().filter(function(n){return n.id===v;})[0];
+  $("vTitle").textContent=it?t(it.k):t(v);
+  buildNav();window.scrollTo(0,0);render();
+}
+function render(){
+  if(!S.user)return;
+  ({dash:vDash,reports:vReports,params:vParams,exceptions:vExc,today:vToday,verify:vVerify}[S.view]||vToday)();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SHARED
+// ═══════════════════════════════════════════════════════════════
+function ring(pct,band,size){
+  size=size||110;
+  var r=(size/2)-9,c=2*Math.PI*r,v=(pct==null)?0:pct;
+  var col=band==="green"?"var(--green)":band==="amber"?"var(--amber)":
+          band==="red"?"var(--red)":"var(--line-2)";
+  return '<div class="ring" style="width:'+size+'px;height:'+size+'px">'+
+    '<svg width="'+size+'" height="'+size+'" style="transform:rotate(-90deg)">'+
+    '<circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="var(--line)" stroke-width="9"/>'+
+    '<circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="'+col+'" stroke-width="9"'+
+    ' stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+(c-(c*v/100))+'"/></svg>'+
+    '<div class="v"><b style="color:'+col+'">'+(pct==null?"–":pct+"%")+'</b></div></div>';
+}
+function band(pct,hasRed){
+  if(hasRed)return "red";
+  if(pct==null)return "grey";
+  return pct>=95?"green":pct>=85?"amber":"red";
+}
+function bandCol(b){return b==="green"?"var(--green)":b==="amber"?"var(--amber)":
+  b==="red"?"var(--red)":"var(--ink-4)";}
+function emptyState(title,msg,icon,tone){
+  return '<div class="empty"><div class="ico"'+(tone?' style="background:'+tone+'20;color:'+tone+'"':'')+'>'+
+    (icon||"✓")+'</div><div class="ttl">'+esc(title)+'</div><div class="sub">'+esc(msg)+'</div></div>';
+}
+function offlineBanner(){
+  return S.online?"":'<div class="card"><div class="sec warn">'+esc(t("offline"))+'</div>'+
+    '<div style="padding:12px 16px" class="sub">'+esc(t("offlineMsg"))+'</div></div>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+function vDash(){
+  $("view").innerHTML='<div class="card"><div class="empty"><div class="sub">…</div></div></div>';
+  Promise.all([apiSoft("kubi.scoreboard",{from:todayStr(),to:todayStr()}),
+               apiSoft("v2.today",{date:todayStr()})])
+  .then(function(r){
+    var sb=r[0],td=r[1];
+    if(td){S.badges.exceptions=td.openExceptions||0;S.badges.verify=td.verifyCount||0;buildNav();}
+    var lines=sb?sb.lines:SCORE_LINES.map(function(l){
+      return {key:l.key,label:l.label,pct:null,outcome:"grey",deviationCount:0,deviations:[],
+              done:0,of:0};});
+    S.cache.lines=lines;
+    var score=sb?sb.score:null, out=sb?sb.outcome:"grey";
+    var totals=sb?sb.totals:{deviations:0,red:0,amber:0};
+    var clinicName=(sb&&sb.clinic&&sb.clinic.name)||"K.B. Dental";
+
+    var html=offlineBanner();
+    html+='<div class="card"><div class="hero">'+ring(score,out,116)+
+      '<div style="flex:1;min-width:0">'+
+      '<div class="cap">'+esc(t("opScore"))+'</div>'+
+      '<div class="t-lg" style="margin-top:3px">'+esc(clinicName)+'</div>'+
+      '<div class="sub">'+esc(todayStr())+'</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'+
+        (totals.red?'<span class="chip c-red">'+totals.red+' red</span>':'')+
+        (totals.amber?'<span class="chip c-amber">'+totals.amber+' amber</span>':'')+
+        (totals.deviations?'<span class="chip c-grey">'+totals.deviations+' '+esc(t("deviations"))+'</span>'
+          :'<span class="chip c-green">'+esc(t("noDeviations"))+'</span>')+
+      '</div></div></div>'+
+      '<div class="kpis">'+lines.map(function(l){
+        return '<div class="kpi" data-line="'+esc(l.key)+'">'+
+          '<div class="kt"><b style="color:'+bandCol(l.outcome)+'">'+(l.pct==null?"–":l.pct+"%")+'</b>'+
+          (l.of?'<span class="of num">'+l.done+"/"+l.of+'</span>':'')+'</div>'+
+          '<div class="kl">'+esc(l.label)+'</div>'+
+          '<div class="meter"><i style="width:'+(l.pct==null?0:l.pct)+'%;background:'+
+            bandCol(l.outcome)+'"></i></div>'+
+          (l.deviationCount?'<div class="dev">'+l.deviationCount+' '+esc(t("deviations"))+'</div>':'')+
+        '</div>';}).join("")+'</div></div>';
+
+    // Today's pulse
+    if(td&&td.summary){
+      var s=td.summary;
+      html+='<div class="card"><div class="sec">'+esc(t("today"))+'</div><div class="strip">'+
+        '<div class="st"><b>'+s.done+'/'+(s.total-s.na)+'</b><span>'+esc(t("done"))+'</span></div>'+
+        '<div class="st"><b style="color:'+(s.exception?"var(--red)":"var(--ink)")+'">'+s.exception+
+          '</b><span>'+esc(t("exception"))+'</span></div>'+
+        '<div class="st"><b style="color:'+(s.overdue?"var(--amber)":"var(--ink)")+'">'+s.overdue+
+          '</b><span>'+esc(t("overdue"))+'</span></div>'+
+        '<div class="st"><b>'+(td.verifyCount||0)+'</b><span>'+esc(t("verify"))+'</span></div>'+
+        '<div class="st"><b style="color:'+((td.openExceptions||0)?"var(--red)":"var(--ink)")+'">'+
+          (td.openExceptions||0)+'</b><span>'+esc(t("openIssues"))+'</span></div>'+
+      '</div></div>';
+    }
+
+    // Attention — only the deviations, never the 100 things that went right
+    var attn=[];
+    lines.forEach(function(l){(l.deviations||[]).forEach(function(d){
+      attn.push({line:l.label,d:d});});});
+    attn.sort(function(a,b){var r={red:0,amber:1,grey:2};return r[a.d.severity]-r[b.d.severity];});
+    if(attn.length){
+      html+='<div class="card"><div class="sec bad">'+esc(t("needsAttention"))+
+        '<span class="n num">'+attn.length+'</span></div>'+
+        attn.slice(0,12).map(function(x){
+          return '<div class="row click" data-line="'+esc(lineKeyOf(x.line))+'">'+
+            '<span class="dot d-'+x.d.severity+'"></span>'+
+            '<div class="grow"><div class="rname">'+esc(x.d.label)+'</div>'+
+            '<div class="rmeta">'+esc(x.line)+'</div></div><span class="arw">›</span></div>';
+        }).join("")+'</div>';
+    } else if(sb){
+      html+='<div class="card">'+emptyState(t("noAttention"),t("noAttentionMsg"))+'</div>';
+    }
+
+    // Parameter health — proof that all 16 are governed, live or not
+    html+=paramHealthCard(sb);
+    $("view").innerHTML=html;
+  });
+}
+function lineKeyOf(label){
+  var f=SCORE_LINES.filter(function(l){return l.label===label;})[0];
+  return f?f.key:"";
+}
+function paramHealthCard(sb){
+  var live={};
+  if(sb&&sb.parameters)sb.parameters.forEach(function(p){live[p.paramId]=p;});
+  return '<div class="card"><div class="sec">'+esc(t("params"))+
+    '<span class="n num">'+P_ORDER.length+'</span></div>'+
+    P_ORDER.map(function(pid){
+      var m=P_META[pid],p=live[pid];
+      var n=actsIn(pid).filter(function(a){return a.status==="defined";}).length;
+      var o=p?p.band:"grey";
+      return '<div class="row click" data-param="'+esc(pid)+'">'+
+        '<span class="dot d-'+o+'"></span>'+
+        '<div class="grow"><div class="rname">'+esc(m.name)+'</div>'+
+        '<div class="rmeta"><span>'+n+' '+esc(t("activities")).toLowerCase()+'</span>'+
+        '<span class="chip c-grey">'+esc(m.rollsInto)+'</span></div></div>'+
+        (p&&p.pct!=null?'<b class="num" style="color:'+bandCol(p.band)+'">'+p.pct+'%</b>':
+          '<span class="chip c-grey">'+esc(t("off"))+'</span>')+
+        '<span class="arw">›</span></div>';
+    }).join("")+'</div>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PARAMETERS — every control head, always visible
+// ═══════════════════════════════════════════════════════════════
+function vParams(){
+  var html='<div class="card card-p"><div class="cap">'+esc(t("params"))+'</div>'+
+    '<div class="t-xl num" style="margin-top:3px">'+P_ORDER.length+
+    '<span class="sub" style="font-size:15px;font-weight:400"> · '+
+    ACTS.filter(function(a){return a.status==="defined";}).length+' '+esc(t("defined"))+' · '+
+    ACTS.filter(function(a){return a.status==="proposed";}).length+' '+esc(t("proposed"))+'</span></div>'+
+    '<div class="sub" style="margin-top:8px">Switch a parameter on only once the previous one is '+
+    'being ticked honestly. Everything stays in the dictionary either way.</div></div>';
+
+  apiSoft("v2.parameters",{}).then(function(r){
+    var live={};
+    if(r&&r.parameters)r.parameters.forEach(function(p){live[p.paramId]=p.live;});
+    html+='<div class="card">'+P_ORDER.map(function(pid){
+      var m=P_META[pid];
+      var all=actsIn(pid);
+      var def=all.filter(function(a){return a.status==="defined";}).length;
+      var prop=all.length-def;
+      var isLive=!!live[pid];
+      var ps=all.filter(function(a){return a.risk==="PATIENT_SAFETY";}).length;
+      return '<div class="row">'+
+        '<div class="grow" data-param="'+esc(pid)+'" style="cursor:pointer">'+
+          '<div class="rname">'+esc(m.name)+'</div>'+
+          '<div class="rmeta">'+
+            '<span class="chip c-blue">'+def+' '+esc(t("defined"))+'</span>'+
+            (prop?'<span class="chip c-purple">'+prop+' '+esc(t("proposed"))+'</span>':'')+
+            (ps?'<span class="chip c-red">'+ps+' PS</span>':'')+
+            '<span>'+esc(m.rollsInto)+'</span>'+
+          '</div></div>'+
+        (isMgr()&&S.online?'<button class="sw '+(isLive?"on":"")+'" data-live="'+esc(pid)+'" '+
+          'data-on="'+(isLive?"1":"0")+'"></button>':
+          '<span class="chip '+(isLive?"c-green":"c-grey")+'">'+(isLive?esc(t("live")):esc(t("off")))+'</span>')+
+      '</div>';}).join("")+'</div>';
+    $("view").innerHTML=html;
+  });
+}
+
+// One parameter: what it controls, its KPIs, and every activity in it
+function openParam(pid){
+  var m=P_META[pid];if(!m)return;
+  var all=actsIn(pid).sort(function(a,b){
+    return (RISK_ORDER[a.risk]-RISK_ORDER[b.risk])||a.activityId.localeCompare(b.activityId);});
+  var body='<div style="padding:16px 18px 0">'+
+    '<div class="sub">'+esc(m.control)+'</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'+
+      '<span class="chip c-blue">'+esc(t("rollsInto"))+': '+esc(m.rollsInto)+'</span>'+
+      '<span class="chip c-grey">'+all.length+' '+esc(t("activities")).toLowerCase()+'</span>'+
+    '</div>'+
+    (m.kpis&&m.kpis.length?'<div style="margin-top:10px"><div class="cap-g">KPIs</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">'+
+      m.kpis.map(function(k){return '<span class="chip c-grey">'+esc(k)+'</span>';}).join("")+
+      '</div></div>':'')+
+    '</div><div style="height:14px"></div>'+
+    '<div class="tw"><table><thead><tr>'+
+      '<th>ID</th><th>'+esc(t("activity"))+'</th><th>'+esc(t("standard"))+'</th>'+
+      '<th>'+esc(t("trigger"))+'</th><th>'+esc(t("due"))+'</th><th>'+esc(t("doer"))+'</th>'+
+      '<th>'+esc(t("evidence"))+'</th><th>'+esc(t("risk"))+'</th><th>'+esc(t("capa"))+'</th>'+
+    '</tr></thead><tbody>'+
+    all.map(function(a){
+      return '<tr'+(a.status==="proposed"?' style="opacity:.62"':'')+'>'+
+        '<td class="mono">'+esc(a.activityId)+'</td>'+
+        '<td style="font-weight:600;min-width:150px">'+esc(a.activity)+
+          (a.subProcess?'<div class="sub" style="font-size:11px">'+esc(a.subProcess)+'</div>':'')+
+          (a.status==="proposed"?'<span class="chip c-purple" style="margin-top:4px">'+
+            esc(t("proposed"))+'</span>':'')+'</td>'+
+        '<td class="sub" style="min-width:170px">'+esc(a.standard)+'</td>'+
+        '<td><span class="mono">'+esc(a.trigger)+'</span>'+
+          '<div class="sub" style="font-size:10.5px">'+esc(a.frequency)+'</div></td>'+
+        '<td class="sub">'+esc(a.due)+'</td>'+
+        '<td class="sub">'+esc(a.doer)+
+          (a.checker?'<div style="font-size:11px;color:var(--green)">✓ '+esc(a.checker)+'</div>':'')+'</td>'+
+        '<td class="sub mono">'+esc(a.evidence)+'</td>'+
+        '<td><span class="chip '+(RISK_CHIP[a.risk]||"c-grey")+'">'+esc(riskLabel(a.risk))+'</span></td>'+
+        '<td class="sub">'+esc(a.capa||"—")+'</td>'+
+      '</tr>';}).join("")+
+    '</tbody></table></div>';
+  sheet({title:m.name,sub:all.length+" activities · "+m.rollsInto,body:body});
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REPORTS
+// ═══════════════════════════════════════════════════════════════
+function vReports(){
+  var from=S.period==="today"?todayStr():S.period==="week"?daysAgo(6):daysAgo(29);
+  var html='<div class="seg">'+
+    ['today','week','month'].map(function(p){
+      return '<button data-period="'+p+'" class="'+(S.period===p?"on":"")+'">'+
+        esc(p==="today"?t("today"):p==="week"?t("thisWeek"):t("thisMonth"))+'</button>';}).join("")+
+    '</div>';
+  $("view").innerHTML=html+'<div class="card"><div class="empty"><div class="sub">…</div></div></div>';
+
+  Promise.all([apiSoft("kubi.scoreboard",{from:from,to:todayStr()}),
+               apiSoft("v2.health",{from:from,to:todayStr()}),
+               apiSoft("v2.exceptions",{includeClosed:true})])
+  .then(function(r){
+    var sb=r[0],hl=r[1],ex=r[2];
+    var out=html+offlineBanner();
+
+    // Compliance by parameter
+    var rows=(hl&&hl.parameters)||[];
+    out+='<div class="card"><div class="sec">'+esc(t("byParameter"))+'</div>';
+    if(rows.length){
+      rows.sort(function(a,b){return (a.pct==null?101:a.pct)-(b.pct==null?101:b.pct);});
+      out+=rows.map(function(p){
+        var pct=p.pct==null?0:p.pct;
+        return '<div class="bar-row"><div class="bar-lbl">'+esc(p.name)+'</div>'+
+          '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+
+            bandCol(p.band)+'"></div></div>'+
+          '<div class="bar-val" style="color:'+bandCol(p.band)+'">'+(p.pct==null?"–":p.pct+"%")+'</div></div>';
+      }).join("");
+    } else out+=emptyState(t("noData"),t("noDataMsg"),"▤","#0078B4");
+    out+='</div>';
+
+    // Compliance by person
+    out+='<div class="card"><div class="sec">'+esc(t("byPerson"))+'</div>';
+    var kpi=(hl&&hl.kpi)||[];
+    if(kpi.length){
+      out+=kpi.map(function(k){
+        var pct=k.onTimePct==null?0:k.onTimePct;
+        var b=band(k.onTimePct,false);
+        return '<div class="bar-row"><div class="bar-lbl">'+esc(k.name)+
+          '<div class="sub" style="font-size:10.5px">'+esc(k.role)+'</div></div>'+
+          '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+
+            bandCol(b)+'"></div></div>'+
+          '<div class="bar-val">'+k.tasksDone+'/'+k.tasksAssigned+'</div></div>';}).join("");
+    } else out+=emptyState(t("noData"),t("noDataMsg"),"▤","#0078B4");
+    out+='</div>';
+
+    // Exception log
+    var list=(ex&&ex.exceptions)||[];
+    out+='<div class="card"><div class="sec'+(list.length?" bad":"")+'">'+esc(t("exceptionLog"))+
+      '<span class="n num">'+list.length+'</span></div>';
+    if(list.length){
+      out+='<div class="tw"><table><thead><tr><th>ID</th><th>Activity</th><th>Reason</th>'+
+        '<th>Role</th><th>Level</th><th>Raised</th><th>State</th></tr></thead><tbody>'+
+        list.slice(0,60).map(function(e){
+          return '<tr><td class="mono">'+esc(e.activityId)+'</td>'+
+            '<td style="font-weight:600">'+esc(e.titleEn)+'</td>'+
+            '<td class="sub">'+esc(e.reason)+'</td>'+
+            '<td class="sub">'+esc(e.doerRole)+'</td>'+
+            '<td>'+(e.escLevel?'<span class="chip '+(e.escLevel>=3?"c-red":"c-amber")+'">L'+
+              e.escLevel+'</span>':'—')+'</td>'+
+            '<td class="sub">'+esc(String(e.raisedAt).replace("T"," ").slice(0,16))+'</td>'+
+            '<td><span class="chip '+(e.state==="closed"?"c-green":"c-red")+'">'+
+              esc(e.state||"open")+'</span></td></tr>';}).join("")+'</tbody></table></div>';
+    } else out+=emptyState(t("noDeviations"),t("noAttentionMsg"));
+    out+='</div>';
+    $("view").innerHTML=out;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXCEPTIONS
+// ═══════════════════════════════════════════════════════════════
+function vExc(){
+  apiSoft("v2.exceptions",{}).then(function(r){
+    if(!r)return $("view").innerHTML=offlineBanner()+
+      '<div class="card">'+emptyState(t("offline"),t("offlineMsg"),"!","#D97706")+'</div>';
+    S.badges.exceptions=r.exceptions.length;buildNav();
+    if(!r.exceptions.length)return $("view").innerHTML='<div class="card">'+
+      emptyState(t("noAttention"),t("noAttentionMsg"))+'</div>';
+    var G={PATIENT_SAFETY:[],CRITICAL:[],IMPORTANT:[],ROUTINE:[]};
+    r.exceptions.forEach(function(e){(G[e.priority]||G.ROUTINE).push(e);});
+    $("view").innerHTML=Object.keys(G).filter(function(k){return G[k].length;}).map(function(k){
+      return '<div class="card"><div class="sec'+
+        (k==="PATIENT_SAFETY"||k==="CRITICAL"?" bad":" warn")+'">'+esc(riskLabel(k))+
+        '<span class="n num">'+G[k].length+'</span></div>'+
+        G[k].map(function(e){
+          return '<div class="row"><div class="grow">'+
+            '<div class="rname">'+esc(e.titleEn)+'</div>'+
+            '<div class="sub" style="margin-top:3px">'+esc(e.reason)+'</div>'+
+            '<div class="rmeta"><span class="mono">'+esc(e.activityId)+'</span>'+
+            '<span>'+esc(e.doerRole)+'</span>'+
+            (e.ackBy?'<span class="chip c-grey">ack '+esc(e.ackBy)+'</span>':'')+'</div></div>'+
+            (e.escLevel?'<span class="chip '+(e.escLevel>=3?"c-red":"c-amber")+'">L'+e.escLevel+'</span>':'')+
+            (r.canAck&&!e.ackBy?'<button class="btn ghost sm" data-ack="'+esc(e.excId)+'">'+
+              esc(t("acknowledge"))+'</button>':'')+
+          '</div>';}).join("")+'</div>';}).join("");
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TODAY / VERIFY
+// ═══════════════════════════════════════════════════════════════
+var STATE_CHIP={done:["c-green","done"],verified:["c-blue","verified"],overdue:["c-amber","overdue"],
+  exception:["c-red","exception"],na:["c-grey","na"],due:["c-grey","pending"],
+  notdue:["c-grey","pending"],inprogress:["c-amber","pending"]};
+function taskRow(x){
+  var settled=["done","verified","na"].indexOf(x.state)>=0;
+  var title=(S.lang==="hi"&&x.titleHi)?x.titleHi:x.titleEn;
+  var blocked=!!x.blockedBy;
+  var cls="task"+(x.state==="exception"?" attn":x.state==="overdue"?" late":"")+(settled?" settled":"");
+  var tick=x.state==="verified"?"tick ver":x.state==="na"?"tick na":settled?"tick on":
+           blocked?"tick lock":"tick";
+  var mark=x.state==="verified"?"✓":x.state==="na"?"–":blocked?"🔒":"✓";
+  var sc=STATE_CHIP[x.state]||STATE_CHIP.due;
+  var meta=[];
+  if(!settled)meta.push('<span>'+esc(t("by"))+' <b>'+esc(x.dueTime||"")+'</b></span>');
+  meta.push('<span class="chip '+sc[0]+'">'+esc(t(sc[1]))+'</span>');
+  if(!settled&&x.needsPhoto)meta.push('<span class="chip c-amber">📷 '+esc(t("photoNeeded"))+'</span>');
+  if(!settled&&x.needsValue)meta.push('<span class="chip c-amber">'+esc(t("readingNeeded"))+'</span>');
+  if(x.state==="done"&&x.checkerRole)meta.push('<span class="chip c-amber">'+esc(t("needsCheck"))+'</span>');
+  if(settled&&x.doneByName)meta.push('<span>'+esc(x.doneByName)+'</span>');
+  meta.push('<span class="mono" style="color:var(--ink-4)">'+esc(x.activityId)+'</span>');
+  return '<div class="'+cls+'" data-task="'+esc(x.taskId)+'">'+
+    '<span class="pri pri-'+esc(x.priority)+'"></span>'+
+    '<div class="'+tick+'">'+mark+'</div>'+
+    '<div class="grow"><div class="ttitle">'+esc(title)+'</div>'+
+    '<div class="rmeta">'+meta.join("")+'</div>'+
+    (blocked?'<div class="blocked">🔒 '+esc(t("waitingFor"))+' '+esc(x.blockedBy)+'</div>':'')+
+    '</div></div>';
+}
+// The role briefing: what THIS person needs to know, assembled from the
+// domain tables. A flat task list can say "11 things due"; it cannot say
+// three sterilization batches are unfinished or that Mr Bose's crown has
+// passed QC and nobody has rung him.
+function vToday(){
+  apiSoft("kubi.briefing",{date:todayStr()}).then(function(r){
+    if(!r)return $("view").innerHTML=offlineBanner()+
+      '<div class="card">'+emptyState(t("offline"),t("offlineMsg"),"○","#0078B4")+'</div>';
+    S.cache.brief=r;
+    // Every task item across all sections, so a tap can find its task.
+    S.cache.today={tasks:[]};
+    (r.sections||[]).forEach(function(s){(s.items||[]).forEach(function(i){
+      if(i.kind==="task")S.cache.today.tasks.push({
+        taskId:i.id,activityId:i.activityId,titleEn:i.text,state:i.state,
+        priority:i.priority,blockedBy:i.blockedBy,needsPhoto:i.needsPhoto,
+        needsValue:i.needsValue,checkerRole:i.checkerRole,dueTime:""});});});
+    S.badges.exceptions=r.attention||0;buildNav();
+
+    var s=r.summary||{total:0,done:0,na:0,pct:null};
+    var html="";
+    if(s.total){
+      html+='<div class="card"><div class="card-p" style="display:flex;align-items:center;gap:16px">'+
+        ring(s.pct,band(s.pct,r.attention>0),82)+
+        '<div style="flex:1"><div class="cap">'+esc(r.roleLabel||"")+'</div>'+
+        '<div class="t-xl num" style="margin-top:2px">'+s.done+
+        '<span class="sub" style="font-size:15px;font-weight:400"> / '+(s.total-s.na)+'</span></div>'+
+        (r.attention?'<div style="margin-top:8px"><span class="chip c-red">'+r.attention+
+          ' '+esc(t("needsAttention")).toLowerCase()+'</span></div>':'')+
+        '</div></div></div>';
+    }
+
+    html+=(r.sections||[]).map(function(sec){
+      var tone=sec.tone==="red"?" bad":sec.tone==="amber"?" warn":" ok";
+      if(!sec.count)
+        return '<div class="card"><div class="sec ok">'+esc(sec.label)+
+          '<span class="n num">0</span></div>'+
+          '<div style="padding:14px 16px" class="sub">'+
+          esc(sec.hint||t("allDoneMsg"))+'</div></div>';
+      return '<div class="card"><div class="sec'+tone+'">'+esc(sec.label)+
+        '<span class="n num">'+sec.count+'</span></div>'+
+        (sec.hint?'<div style="padding:9px 16px;border-bottom:1px solid var(--line)" '+
+          'class="sub">'+esc(sec.hint)+'</div>':'')+
+        sec.items.map(briefRow).join("")+
+        (sec.count>sec.items.length?'<div style="padding:10px 16px" class="sub">+'+
+          (sec.count-sec.items.length)+' more</div>':'')+
+      '</div>';}).join("");
+
+    $("view").innerHTML=html||'<div class="card">'+
+      emptyState(t("nothingYet"),t("nothingMsg"),"○","#0078B4")+'</div>';
+  });
+}
+
+// A task can be completed from the briefing; a fact is there to be read.
+function briefRow(i){
+  if(i.kind!=="task"){
+    return '<div class="row"><span class="dot d-'+(i.tone||"grey")+'"></span>'+
+      '<div class="grow"><div class="rname">'+esc(i.text)+'</div>'+
+      (i.detail?'<div class="rmeta">'+esc(i.detail)+'</div>':'')+'</div></div>';
+  }
+  var settled=["done","verified","na"].indexOf(i.state)>=0;
+  var blocked=!!i.blockedBy;
+  var cls="task"+(i.state==="exception"?" attn":i.state==="overdue"?" late":"")+
+          (settled?" settled":"");
+  var tick=i.state==="verified"?"tick ver":i.state==="na"?"tick na":settled?"tick on":
+           blocked?"tick lock":"tick";
+  var mark=i.state==="verified"?"✓":i.state==="na"?"–":blocked?"🔒":"✓";
+  var meta=[];
+  if(i.detail)meta.push('<span>'+esc(i.detail)+'</span>');
+  if(!settled&&i.needsPhoto)meta.push('<span class="chip c-amber">📷 '+esc(t("photoNeeded"))+'</span>');
+  if(!settled&&i.needsValue)meta.push('<span class="chip c-amber">'+esc(t("readingNeeded"))+'</span>');
+  if(i.state==="done"&&i.checkerRole)meta.push('<span class="chip c-amber">'+esc(t("needsCheck"))+'</span>');
+  if(i.activityId)meta.push('<span class="mono" style="color:var(--ink-4)">'+esc(i.activityId)+'</span>');
+  return '<div class="'+cls+'" data-task="'+esc(i.id)+'">'+
+    '<span class="pri pri-'+esc(i.priority||"ROUTINE")+'"></span>'+
+    '<div class="'+tick+'">'+mark+'</div>'+
+    '<div class="grow"><div class="ttitle">'+esc(i.text)+'</div>'+
+    (meta.length?'<div class="rmeta">'+meta.join("")+'</div>':'')+
+    (blocked?'<div class="blocked">🔒 '+esc(t("waitingFor"))+' '+esc(i.blockedBy)+'</div>':'')+
+    '</div></div>';
+}
+function vVerify(){
+  apiSoft("v2.verifyQueue",{}).then(function(r){
+    if(!r)return $("view").innerHTML=offlineBanner();
+    S.cache.verify=r.tasks;S.badges.verify=r.tasks.length;buildNav();
+    if(!r.tasks.length)return $("view").innerHTML='<div class="card">'+
+      emptyState(t("nothingVerify"),t("nothingVerifyMsg"))+'</div>';
+    $("view").innerHTML='<div class="card"><div class="sec">'+esc(t("verify"))+
+      '<span class="n num">'+r.tasks.length+'</span></div>'+
+      r.tasks.map(function(x){
+        return '<div class="task"><span class="pri pri-'+esc(x.priority)+'"></span>'+
+          '<div class="grow"><div class="ttitle">'+esc(x.titleEn)+'</div>'+
+          '<div class="rmeta"><span class="chip c-green">'+esc(t("done"))+'</span>'+
+          '<span>'+esc(x.doneByName)+'</span>'+
+          (x.value?'<span class="chip c-blue">'+esc(x.value)+'</span>':'')+
+          '<span class="mono">'+esc(x.activityId)+'</span></div></div>'+
+          '<button class="btn sm" data-verify="'+esc(x.taskId)+'">'+esc(t("verifyIt"))+'</button></div>';
+      }).join("")+'</div>';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TASK ACTION
+// ═══════════════════════════════════════════════════════════════
+function openTask(taskId){
+  var pool=((S.cache.today&&S.cache.today.tasks)||[]).concat(S.cache.verify||[]);
+  var x=pool.filter(function(y){return y.taskId===taskId;})[0];
+  if(!x)return;
+  var title=(S.lang==="hi"&&x.titleHi)?x.titleHi:x.titleEn;
+  var settled=["done","verified","na"].indexOf(x.state)>=0;
+  if(x.blockedBy)return sheet({title:title,sub:x.activityId,
+    body:'<div style="padding:18px"><div class="blocked">🔒 '+esc(t("waitingFor"))+' <b>'+
+      esc(x.blockedBy)+'</b></div><div class="sub" style="margin-top:12px">'+esc(t("cantYet"))+
+      '.</div></div>'});
+  if(settled){
+    var b='<div style="padding:18px"><div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<span class="chip '+STATE_CHIP[x.state][0]+'">'+esc(t(STATE_CHIP[x.state][1]))+'</span>'+
+      (x.doneByName?'<span class="chip c-grey">'+esc(x.doneByName)+'</span>':'')+'</div>'+
+      (x.value?'<label>'+esc(t("reading"))+'</label><div>'+esc(x.value)+'</div>':'')+
+      (x.naReason?'<label>'+esc(t("why"))+'</label><div>'+esc(x.naReason)+'</div>':'')+'</div>';
+    return sheet({title:title,sub:x.activityId,body:b,
+      actions:'<button class="btn ghost" data-x="undo">'+esc(t("undo"))+'</button>'+
+        '<button class="btn ghost" data-x="c">'+esc(t("cancel"))+'</button>',
+      onAction:function(a){if(a==="undo")return act(taskId,{act:"undo"});}});
+  }
+  var form='<div style="padding:18px">';
+  if(x.needsValue)form+='<label>'+esc(t("reading"))+'</label><input name="value" inputmode="decimal" '+
+    'placeholder="'+esc(x.evidenceNote||"")+'">';
+  form+='<label>'+esc(t("note"))+'</label><textarea name="note" rows="2"></textarea>';
+  if(x.needsPhoto)form+='<div class="chip c-amber" style="margin-top:12px">📷 '+esc(t("photoNeeded"))+'</div>';
+  form+='</div>';
+  sheet({title:title,sub:x.activityId,body:form,
+    actions:'<button class="btn ok big" data-x="done">'+esc(t("markDone"))+'</button>'+
+      '<button class="btn ghost" data-x="na">'+esc(t("notApplicable"))+'</button>'+
+      '<button class="btn ghost" data-x="c">'+esc(t("cancel"))+'</button>',
+    onAction:function(a,sc){
+      if(a==="na"){var why=prompt(t("why"));if(!why)return false;return act(taskId,{act:"na",note:why});}
+      if(a!=="done")return;
+      var p={act:"done",note:sv(sc,"note")};
+      if(x.needsValue){if(!sv(sc,"value")){toast(t("readingNeeded"),"bad");return false;}
+        p.value=sv(sc,"value");}
+      if(x.needsPhoto)return capturePhoto("task",taskId).then(function(ph){
+        p.photoId=ph.photoId;return act(taskId,p);});
+      return act(taskId,p);}});
+}
+function act(taskId,p){
+  p.taskId=taskId;
+  return api("v2.act",p).then(function(r){
+    toast(r.awaitingVerification?t("needsCheck"):t("done"),"ok");render();return r;
+  }).catch(function(e){toast(e.message,"bad");throw e;});
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRILL-DOWN
+// ═══════════════════════════════════════════════════════════════
+function openLine(key){
+  var l=(S.cache.lines||[]).filter(function(x){return x.key===key;})[0];
+  if(!l){
+    var meta=SCORE_LINES.filter(function(x){return x.key===key;})[0];
+    if(!meta)return;
+    l={label:meta.label,pct:null,deviations:[],deviationCount:0,params:meta.params};
+  }
+  if(!l.deviations||!l.deviations.length)
+    return sheet({title:l.label,sub:l.pct==null?"":l.pct+"%",
+      body:emptyState(t("noDeviations"),t("noAttentionMsg"))});
+  var body=l.deviations.map(function(d){
+    return '<div style="padding:14px 18px;border-bottom:1px solid var(--line)">'+
+      '<div style="display:flex;gap:8px;align-items:center;font-weight:700">'+
+      '<span class="dot d-'+d.severity+'"></span><span style="flex:1">'+esc(d.label)+'</span></div>'+
+      (d.refs&&d.refs.length?'<div style="margin-top:8px;display:grid;gap:6px">'+
+        d.refs.map(function(rf){
+          return '<div style="background:var(--blue-wash);border:1px solid var(--line);'+
+            'border-radius:6px;padding:9px 11px;font-size:13px">'+
+            '<b>'+esc(rf.text)+'</b>'+(rf.detail?'<div class="sub" style="font-size:11.5px;'+
+            'margin-top:2px">'+esc(rf.detail)+'</div>':'')+'</div>';}).join("")+'</div>':'')+
+      '</div>';}).join("");
+  sheet({title:l.label,sub:(l.pct==null?"":l.pct+"% · ")+l.deviationCount+" "+t("deviations"),body:body});
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LANGUAGE + EVENTS
+// ═══════════════════════════════════════════════════════════════
+function setLang(l,skipRender){
+  S.lang=l;localStorage.setItem("kubi.lang",l);
+  els("[data-t]").forEach(function(n){n.textContent=t(n.dataset.t);});
+  var b=$("bLang");if(b)b.textContent=(l==="en"?"हिंदी":"English");
+  document.documentElement.lang=l;
+  if(S.user&&!skipRender){buildNav();render();}
+}
+document.addEventListener("click",function(e){
+  var n;
+  if((n=e.target.closest("[data-nav]")))return go(n.dataset.nav);
+  if((n=e.target.closest("[data-task]")))return openTask(n.dataset.task);
+  if((n=e.target.closest("[data-line]")))return openLine(n.dataset.line);
+  if((n=e.target.closest("[data-param]")))return openParam(n.dataset.param);
+  if((n=e.target.closest("[data-lang]")))return setLang(n.dataset.lang);
+  if((n=e.target.closest("[data-period]"))){S.period=n.dataset.period;return vReports();}
+  if((n=e.target.closest("[data-live]"))){
+    var pid=n.dataset.live,on=n.dataset.on!=="1";
+    n.classList.toggle("on",on);n.dataset.on=on?"1":"0";
+    return api("v2.setParamLive",{paramId:pid,live:on})
+      .then(function(){toast(on?t("live"):t("off"),"ok");})
+      .catch(function(err){toast(err.message,"bad");vParams();});
+  }
+  if((n=e.target.closest("[data-verify]"))){
+    var id=n.dataset.verify;
+    return sheet({title:t("confirmVerify"),
+      body:'<div style="padding:18px"><label>'+esc(t("note"))+'</label>'+
+        '<textarea name="note" rows="2"></textarea></div>',
+      actions:'<button class="btn ok" data-x="v">'+esc(t("verifyIt"))+'</button>'+
+        '<button class="btn ghost" data-x="c">'+esc(t("cancel"))+'</button>',
+      onAction:function(a,sc){if(a==="v")return act(id,{act:"verify",note:sv(sc,"note")});}});
+  }
+  if((n=e.target.closest("[data-ack]"))){
+    return api("v2.ackException",{excId:n.dataset.ack})
+      .then(function(){toast("Acknowledged","ok");vExc();})
+      .catch(function(err){toast(err.message,"bad");});
+  }
+  switch(e.target.id){
+    case "bLogin":return signIn();
+    case "bCfg":case "bCfg2":return openCfg();
+    case "bLang":return setLang(S.lang==="en"?"hi":"en");
+    case "bOut":return signOut();
+  }
+});
+$("lPin").addEventListener("keydown",function(e){if(e.key==="Enter")signIn();});
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════
+function boot(){
+  $("login").classList.add("hide");$("app").classList.remove("hide");
+  $("vWho").textContent=S.user.name+" · "+String(S.user.role).replace(/_/g," ");
+  S.cache={};S.badges={};
+  setLang(S.lang,true);go(homeFor());
+}
+setLang(S.lang,true);
+if(S.session&&S.user&&CFG.url){
+  api("me",{}).then(boot).catch(function(){signOut(true);checkServer();});
+}else{checkServer();}
+</script>
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DEMO OVERLAY — no server, no setup.
+// Every screen is populated with one plausible day at K.B. Dental so the
+// design and the flow can be judged before any of it is switched on.
+// Nothing here is written back; the app is running against fixtures.
+// ═══════════════════════════════════════════════════════════════
+(function () {
+  var DEMO_ROLES = [
+    { id: "assistant",   name: "Asha Patel",       label: "Dental Assistant" },
+    { id: "housekeeping",name: "Sita Devi",        label: "Housekeeping" },
+    { id: "reception",   name: "Neha Sharma",      label: "Reception" },
+    { id: "doctor",      name: "Dr Mehta",         label: "Doctor" },
+    { id: "manager",     name: "Ravi Kumar",       label: "Clinic Manager" },
+    { id: "owner",       name: "Dr Viveyk Mittel", label: "Owner" }
+  ];
+
+  var T = function (id, title, act, state, pri, detail, extra) {
+    var o = { id: id, kind: "task", text: title, detail: detail || "", state: state,
+              priority: pri, activityId: act };
+    for (var k in (extra || {})) o[k] = extra[k];
+    return o;
+  };
+  var F = function (id, text, detail, tone) {
+    return { id: id, text: text, detail: detail || "", tone: tone || "" };
+  };
+
+  var BRIEF = {
+    assistant: { roleLabel: "Dental Assistant", summary: { total: 11, done: 4, na: 0, pct: 36 },
+      attention: 3, sections: [
+      { key: "readiness", label: "Room & opening readiness", count: 2, tone: "amber",
+        hint: "Before the first patient", items: [
+        T("t1","Treatment room readiness","OPN-002","due","CRITICAL","by 10:00",
+          { needsPhoto: true, checkerRole: "senior_assistant" }),
+        T("t2","Chairside setup","CLN-005","due","CRITICAL","Mr Shah · by 10:30")] },
+      { key: "patients", label: "Patients to prepare", count: 3, tone: "amber",
+        hint: "Chairside setup and scans", items: [
+        F("V1","Mr Shah · OP-2","Implant · Dr Mehta","amber"),
+        F("V2","Mrs Rao · OP-1","RCT · Dr Mehta"),
+        F("V3","Mr Nair · OP-3","Crown delivery · Dr Mehta")] },
+      { key: "sterilization", label: "Sterilization pending", count: 3, tone: "red",
+        hint: "No used instruments may remain overnight", items: [
+        F("B01","B01 · OP-2 tray","next: packing","amber"),
+        F("B02","B02 · OP-1 tray","next: ultrasonic","amber"),
+        F("B03","B03 · Surgical kit","awaiting release signature — operator cannot release own batch","red")] },
+      { key: "lab", label: "Lab cases to dispatch", count: 1, tone: "amber", items: [
+        F("L1","Ms Iyer · Crown","Rajesh Dental · due 08 Aug")] },
+      { key: "closing", label: "Closing", count: 2, tone: "amber",
+        hint: "The day cannot close with these open", items: [
+        T("t3","Instruments collected","STER-006","notdue","PATIENT_SAFETY","by 20:00"),
+        T("t4","Autoclave cycle","STER-004","overdue","PATIENT_SAFETY","by 20:30",
+          { needsValue: true, blockedBy: "STER-003" })] }] },
+
+    housekeeping: { roleLabel: "Housekeeping", summary: { total: 9, done: 6, na: 0, pct: 67 },
+      attention: 0, sections: [
+      { key: "readiness", label: "Room & opening readiness", count: 1, tone: "amber",
+        hint: "Before the first patient", items: [
+        T("h1","Treatment-room cleaning","HK-001","due","CRITICAL","by 09:55", { needsPhoto: true })] },
+      { key: "other", label: "Everything else", count: 3, tone: "amber", items: [
+        T("h2","Toilets","HK-009","due","IMPORTANT","by 11:00", { needsPhoto: true }),
+        T("h3","Soap and hand wash","HK-010","due","CRITICAL","by 11:00"),
+        T("h4","Water the plants","HK-014","notdue","ROUTINE","by 11:00")] }] },
+
+    reception: { roleLabel: "Reception", summary: { total: 12, done: 7, na: 1, pct: 64 },
+      attention: 2, sections: [
+      { key: "appointments", label: "Today's patients", count: 4, tone: "amber", items: [
+        F("V1","Mr Shah","Implant · Dr Mehta · waited 31m","red"),
+        F("V2","Mrs Rao","RCT · Dr Mehta · waited 8m"),
+        F("V3","Mr Nair","Crown delivery · Dr Mehta"),
+        F("V4","Ms Kapoor","Consultation · 16:30")] },
+      { key: "unconfirmed", label: "Appointment control", count: 2, tone: "amber", items: [
+        T("r1","Retry no-response confirmations","APT-002","overdue","IMPORTANT","2 patients · by 14:00"),
+        T("r2","Review reminders and recalls","APT-003","due","ROUTINE","by 13:00")] },
+      { key: "followups", label: "Follow-ups due", count: 2, tone: "amber", items: [
+        F("F1","Mr Iyer · Implant","due 31 Jul · 1 attempt · CLINICAL REVIEW","red"),
+        F("F2","Mrs Rao · Surgery","due today · 0 attempts")] },
+      { key: "labready", label: "Lab ready — patient needs an appointment", count: 2, tone: "red",
+        hint: "QC has passed; the patient is waiting", items: [
+        F("L2","Mr Bose · Crown","98765 43210","red"),
+        F("L5","Mrs Das · Bridge","98766 12345","red")] },
+      { key: "complaints", label: "Complaints open", count: 1, tone: "red", items: [
+        F("C1","Mr Shah","Waited 40 minutes past appointment time","amber")] },
+      { key: "reviews", label: "Reviews & experience", count: 1, tone: "amber", items: [
+        T("r3","Google review request","FUP-005","due","ROUTINE","2 eligible patients")] }] },
+
+    doctor: { roleLabel: "Doctor", summary: { total: 9, done: 3, na: 0, pct: 33 },
+      attention: 4, sections: [
+      { key: "patients", label: "My patients today", count: 3, tone: "amber", items: [
+        F("V1","Mr Shah","Implant · OP-2","amber"),
+        F("V2","Mrs Rao","RCT · OP-1"),
+        F("V3","Mr Nair","Crown delivery · OP-3")] },
+      { key: "alerts", label: "Medical alerts", count: 1, tone: "red",
+        hint: "Read before treating", items: [
+        F("V1","Mr Shah","On warfarin — bleeding risk","red")] },
+      { key: "consent", label: "Consent outstanding", count: 1, tone: "red",
+        hint: "No procedure may start without it", items: [
+        T("d1","Verify procedure consent","CLN-002","due","PATIENT_SAFETY","Mr Shah · Implant")] },
+      { key: "documentation", label: "Clinical documentation", count: 2, tone: "amber",
+        hint: "Notes, scans and records", items: [
+        T("d2","Clinical notes completion","CLN-011","due","CRITICAL","Mrs Rao · by 18:00"),
+        T("d3","Post-treatment scan/photo","CLN-009","due","CRITICAL","Mr Nair", { needsPhoto: true })] },
+      { key: "labqc", label: "Lab QC waiting on me", count: 1, tone: "amber",
+        hint: "A case cannot be booked until this passes", items: [
+        F("L3","Mrs Das · Bridge","Rajesh Dental · received 31 Jul","amber")] },
+      { key: "review", label: "Follow-ups needing me", count: 1, tone: "red", items: [
+        F("F1","Mr Iyer","pain severe · swelling excessive · bleeding no","red")] }] },
+
+    manager: { roleLabel: "Clinic Manager", summary: { total: 8, done: 3, na: 0, pct: 38 },
+      attention: 8, sections: [
+      { key: "attendance", label: "Attendance", count: 1, tone: "amber", hint: "6 checked in today",
+        items: [F("A1","Asha Patel","09:52 · 7 min late","amber")] },
+      { key: "opening", label: "Opening status", count: 1, tone: "amber", hint: "12 of 13 complete",
+        items: [F("t9","Emergency readiness quick check","assistant · overdue","amber")] },
+      { key: "compliance", label: "Compliance failures", count: 2, tone: "red",
+        hint: "Patient-safety and critical exceptions", items: [
+        F("E1","Autoclave cycle","Not completed by due time · assistant · L3","red"),
+        F("E2","Verify procedure consent","Mr Shah · doctor · L2","red")] },
+      { key: "equipment", label: "Equipment", count: 1, tone: "red", items: [
+        F("AS1","Dental chair 2","OUT OF SERVICE · Suction failure","red")] },
+      { key: "inventory", label: "Inventory shortages", count: 2, tone: "red", items: [
+        F("I1","Latex gloves M","2 box (min 5)","amber"),
+        F("I2","Composite A2","0 syringe — OUT OF STOCK","red")] },
+      { key: "delays", label: "Patients waiting", count: 1, tone: "amber", items: [
+        F("V1","Mr Shah","31 minutes","red")] },
+      { key: "lab", label: "Lab delays", count: 3, tone: "red", items: [
+        F("L4","Mr Roy · Crown","Prime Lab · due 28 Jul","red"),
+        F("L6","Mrs Rao · Bridge","Rajesh Dental · due 29 Jul","red"),
+        F("L7","Mr Nair · Crown","Prime Lab · due 27 Jul","red")] },
+      { key: "complaints", label: "Complaints", count: 1, tone: "amber", items: [
+        F("C1","Mr Shah","Waited 40 minutes past appointment time","amber")] },
+      { key: "unassigned", label: "Nobody assigned", count: 2, tone: "red",
+        hint: "These will not get done", items: [
+        F("t11","Implant stock readiness","no implant_coordinator available","red"),
+        F("t12","Monthly emergency stock audit","no qualified assessor available","red")] }] }
+  };
+  BRIEF.owner = BRIEF.manager;
+
+  var DEV = {
+    lab_efficiency: [
+      { label: "3 lab cases overdue", count: 3, severity: "red", refs: [
+        { text: "Mr Roy · Crown · Prime Lab", detail: "due 28 Jul" },
+        { text: "Mrs Rao · Bridge · Rajesh Dental", detail: "due 29 Jul" },
+        { text: "Mr Nair · Crown · Prime Lab", detail: "due 27 Jul" }] },
+      { label: "1 crown received but QC pending", count: 1, severity: "amber", refs: [
+        { text: "Mrs Das · Bridge", detail: "received 31 Jul" }] },
+      { label: "2 patients awaiting appointment", count: 2, severity: "amber", refs: [
+        { text: "Mr Bose · Crown", detail: "98765 43210" },
+        { text: "Mrs Das · Bridge", detail: "98766 12345" }] },
+      { label: "1 remake", count: 1, severity: "red", refs: [
+        { text: "Mr Roy · Rajesh Dental", detail: "High occlusion" }] }],
+    infection_control_score: [
+      { label: "1 autoclave cycle FAILED", count: 1, severity: "red", refs: [
+        { text: "B260803-02 · OP-2 tray", detail: "cycle C-92 · 118°C · Asha Patel" }] },
+      { label: "1 batch awaiting release signature", count: 1, severity: "amber", refs: [
+        { text: "B260803-01 · Surgical kit", detail: "operator cannot release own batch" }] }],
+    clinical_documentation_score: [
+      { label: "1 × Consent outstanding", count: 1, severity: "red", refs: [
+        { text: "Mr Shah · Implant", detail: "Dr Mehta · seated 10:20" }] }],
+    inventory_readiness: [
+      { label: "1 item out of stock", count: 1, severity: "red", refs: [
+        { text: "Composite A2", detail: "zero stock" }] },
+      { label: "1 item below minimum", count: 1, severity: "amber", refs: [
+        { text: "Latex gloves M", detail: "2 box (min 5)" }] }],
+    clinic_readiness_score: [
+      { label: "1 asset out of service", count: 1, severity: "red", refs: [
+        { text: "Dental chair 2", detail: "2F · Suction failure" }] }]
+  };
+
+  var LINES = [
+    ["team_compliance_score","Team Compliance Score",96,"green",24,25],
+    ["clinic_readiness_score","Clinic Readiness Score",92,"amber",11,12],
+    ["infection_control_score","Infection Control Score",82,"red",9,11],
+    ["appointment_efficiency","Appointment Efficiency",94,"amber",17,18],
+    ["patient_care_compliance","Patient Care Compliance",96,"green",25,26],
+    ["clinical_documentation_score","Clinical Documentation Score",88,"amber",9,11],
+    ["lab_efficiency","Lab Efficiency",76,"red",5,7],
+    ["inventory_readiness","Inventory Readiness",86,"amber",12,14],
+    ["closing_facility","Closing & Facility",100,"green",6,6]
+  ].map(function (l) {
+    var d = DEV[l[0]] || [];
+    return { key: l[0], label: l[1], pct: l[2], outcome: l[3], done: l[4], of: l[5],
+             deviations: d, deviationCount: d.reduce(function (n, x) { return n + x.count; }, 0) };
+  });
+
+  var EXCEPTIONS = [
+    { excId:"E1", titleEn:"Autoclave cycle", activityId:"STER-004", priority:"PATIENT_SAFETY",
+      reason:"Not completed by due time", doerRole:"assistant", escLevel:3,
+      raisedAt:"2026-08-03T20:45:00", ackBy:"" },
+    { excId:"E2", titleEn:"Verify procedure consent", activityId:"CLN-002", priority:"PATIENT_SAFETY",
+      reason:"Blocked — medical history not current", doerRole:"doctor", escLevel:2,
+      raisedAt:"2026-08-03T10:35:00", ackBy:"" },
+    { excId:"E3", titleEn:"Monitor expected return", activityId:"LAB-003", priority:"CRITICAL",
+      reason:"3 cases past expected return date", doerRole:"lab_coordinator", escLevel:2,
+      raisedAt:"2026-08-03T10:30:00", ackBy:"Ravi Kumar" },
+    { excId:"E4", titleEn:"Low-stock reorder", activityId:"INV-004", priority:"IMPORTANT",
+      reason:"Composite A2 at zero", doerRole:"inventory_coordinator", escLevel:1,
+      raisedAt:"2026-08-03T09:15:00", ackBy:"" },
+    { excId:"E5", titleEn:"Water the plants", activityId:"HK-014", priority:"ROUTINE",
+      reason:"Not completed by due time", doerRole:"housekeeping", escLevel:1,
+      raisedAt:"2026-08-03T14:05:00", ackBy:"" }
+  ];
+
+  var DATA = {
+    "ping": { version: "demo", headerDriven: true },
+    "me": {},
+    "kubi.scoreboard": {
+      clinic: { clinicId: "KB01", name: "K.B. Dental — Main" },
+      score: 91, outcome: "red", totals: { deviations: 12, red: 4, amber: 3 },
+      lines: LINES,
+      parameters: [
+        { paramId:"ATTENDANCE_LEAVE", name:"Attendance & Leave", pct:96, band:"green" },
+        { paramId:"OPENING_READINESS", name:"Opening Readiness", pct:92, band:"amber" },
+        { paramId:"INFECTION_CONTROL", name:"Infection Control & Sterilization", pct:82, band:"red" },
+        { paramId:"APPOINTMENT_CONTROL", name:"Appointment Control", pct:94, band:"amber" },
+        { paramId:"CLOSING_FACILITY", name:"Closing & Facility", pct:100, band:"green" }]
+    },
+    "v2.today": { openExceptions: 5, verifyCount: 2,
+      summary: { total: 34, done: 27, verified: 4, na: 2, due: 3, overdue: 2, exception: 2,
+                 onTime: 25, pct: 84 }, tasks: [] },
+    "v2.exceptions": { canAck: true, exceptions: EXCEPTIONS },
+    "v2.verifyQueue": { tasks: [
+      { taskId:"v1", activityId:"STER-004", titleEn:"Autoclave cycle", state:"done",
+        priority:"PATIENT_SAFETY", doneByName:"Asha Patel", value:"134°C / 18 min · pass" },
+      { taskId:"v2", activityId:"OPN-005", titleEn:"Emergency readiness quick check", state:"done",
+        priority:"PATIENT_SAFETY", doneByName:"Priya Nair", value:"" }] },
+    "v2.parameters": { canEdit: true, parameters: [
+      { paramId:"ATTENDANCE_LEAVE", live:true }, { paramId:"OPENING_READINESS", live:true },
+      { paramId:"INFECTION_CONTROL", live:true }, { paramId:"APPOINTMENT_CONTROL", live:true },
+      { paramId:"CLOSING_FACILITY", live:true }, { paramId:"CLEANLINESS", live:true }] },
+    "v2.health": {
+      parameters: [
+        { paramId:"LABORATORY", name:"Laboratory Case Management", pct:76, band:"red" },
+        { paramId:"INFECTION_CONTROL", name:"Infection Control & Sterilization", pct:82, band:"red" },
+        { paramId:"CLINICAL_DOCUMENTATION", name:"Clinical Documentation", pct:88, band:"amber" },
+        { paramId:"OPENING_READINESS", name:"Opening Readiness", pct:92, band:"amber" },
+        { paramId:"APPOINTMENT_CONTROL", name:"Appointment Control", pct:94, band:"amber" },
+        { paramId:"ATTENDANCE_LEAVE", name:"Attendance & Leave", pct:96, band:"green" },
+        { paramId:"CLOSING_FACILITY", name:"Closing & Facility", pct:100, band:"green" }],
+      kpi: [
+        { name:"Asha Patel", role:"assistant", tasksDone:14, tasksAssigned:16, onTimePct:88 },
+        { name:"Sita Devi", role:"housekeeping", tasksDone:11, tasksAssigned:12, onTimePct:92 },
+        { name:"Neha Sharma", role:"reception", tasksDone:9, tasksAssigned:11, onTimePct:82 },
+        { name:"Dr Mehta", role:"doctor", tasksDone:6, tasksAssigned:9, onTimePct:67 },
+        { name:"Priya Nair", role:"senior_assistant", tasksDone:8, tasksAssigned:8, onTimePct:100 }]
+    }
+  };
+
+  var realApi = window.api;
+  window.api = function (action, p) {
+    S.online = true;
+    // The demo has no login, but if the sign-in screen is ever reached the
+    // form must still work rather than throwing. Returning a bare
+    // {success:true} left the app with no user and boot() failed on the
+    // next line — which looked exactly like "sign in is broken".
+    if (action === "login") {
+      var who = DEMO_ROLES[DEMO_ROLES.length - 1];
+      return Promise.resolve({ success: true, session: "demo",
+        user: { staffId: "DEMO", name: who.name, role: who.id, lang: S.lang } });
+    }
+    if (action === "logout") return Promise.resolve({ success: true });
+    if (action === "kubi.briefing") {
+      var b = BRIEF[String(S.user && S.user.role)] || BRIEF.assistant;
+      return Promise.resolve(Object.assign({ success: true, date: "2026-08-03",
+        role: S.user.role, clinic: { clinicId:"KB01", name:"K.B. Dental — Main" } }, b));
+    }
+    if (action === "v2.act")
+      return Promise.resolve({ success: true, demo: true, awaitingVerification: false });
+    var d = DATA[action];
+    return Promise.resolve(Object.assign({ success: true }, d || {}));
+  };
+
+  // Role switcher. It lives at the TOP: below 920px the sidebar disappears
+  // and the bottom tab bar becomes the only navigation, so anything fixed
+  // to the bottom sits on top of it and silently blocks every tab.
+  var BAR_H = 42;
+  function mountSwitcher() {
+    if (document.getElementById("demoBar")) return;
+    var bar = document.createElement("div");
+    bar.id = "demoBar";
+    bar.style.cssText = "position:fixed;top:0;left:0;right:0;height:" + BAR_H + "px;" +
+      "z-index:60;background:#12232B;color:#fff;padding:0 10px;display:flex;gap:6px;" +
+      "align-items:center;overflow-x:auto;font-size:11px;white-space:nowrap";
+    bar.innerHTML = '<b style="letter-spacing:.06em;text-transform:uppercase;font-size:9.5px;' +
+      'opacity:.7;flex:0 0 auto">Demo — view as</b>' +
+      DEMO_ROLES.map(function (r) {
+        return '<button data-demo="' + r.id + '" style="flex:0 0 auto;border:0;border-radius:20px;' +
+          'padding:5px 11px;font:inherit;font-size:11px;font-weight:700;cursor:pointer;' +
+          'background:rgba(255,255,255,.15);color:#fff">' + r.label + '</button>';
+      }).join("");
+    document.body.appendChild(bar);
+
+    // Make room for it, and push the sticky header and sidebar down so the
+    // bar never covers them either.
+    document.body.style.paddingTop = BAR_H + "px";
+    var hdr = document.querySelector("header");
+    if (hdr) hdr.style.top = BAR_H + "px";
+    var side = document.querySelector("aside");
+    if (side) { side.style.top = BAR_H + "px"; side.style.height = "calc(100vh - " + BAR_H + "px)"; }
+
+    bar.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-demo]");
+      if (!b) return;
+      var r = DEMO_ROLES.filter(function (x) { return x.id === b.dataset.demo; })[0];
+      S.user = { staffId: "DEMO", name: r.name, role: r.id, lang: S.lang };
+      localStorage.setItem("kubi.user", JSON.stringify(S.user));
+      boot(); paint();
+    });
+    paint();
+  }
+  function paint() {
+    var bar = document.getElementById("demoBar");
+    if (!bar) return;
+    Array.prototype.forEach.call(bar.querySelectorAll("[data-demo]"), function (b) {
+      var on = S.user && b.dataset.demo === S.user.role;
+      b.style.background = on ? "#0090CC" : "rgba(255,255,255,.15)";
+    });
+  }
+
+  // Straight into the app — a demo should never ask anyone to sign in.
+  function enter() {
+    S.session = "demo";
+    S.user = { staffId: "DEMO", name: "Dr Viveyk Mittel", role: "owner", lang: S.lang };
+    S.online = true;
+    try { boot(); } catch (x) {}
+    mountSwitcher();
+  }
+  enter();
+  // Belt and braces: if anything left the sign-in screen showing, go in
+  // anyway rather than stranding the reader on a form that does nothing.
+  setTimeout(function () {
+    var login = document.getElementById("login");
+    if (login && !login.classList.contains("hide")) enter();
+  }, 400);
+  var _go = window.go;
+  window.go = function (v) { _go(v); paint(); };
+})();
+
+</script>
+</body></html>
