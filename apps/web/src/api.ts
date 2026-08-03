@@ -425,6 +425,56 @@ export interface CommandCentre {
   health: Array<{ name: string; light: string }>;
 }
 
+/**
+ * The briefing — the one idea worth keeping from prototype #1.
+ *
+ * A flat task list can say "eleven things due". A briefing can say that three
+ * sterilisation batches are unfinished, that Mr Bose's crown passed its check
+ * and nobody has rung him, and that Mrs Rao is on warfarin. Those are not
+ * tasks; they are things this person needs to know before they start. A screen
+ * that can only render tasks silently drops them.
+ *
+ * So a section holds two kinds of item. A `task` is actionable and opens. A
+ * `fact` is read-only and does not pretend to be a button.
+ */
+export interface BriefingItem {
+  id: string;
+  kind: 'task' | 'fact';
+  text: string;
+  detail: string | null;
+  /** Tasks only. Null on a fact. */
+  taskId: string | null;
+  /** PATIENT_SAFETY | CRITICAL | IMPORTANT | ROUTINE. Drives the rail colour. */
+  priority: string | null;
+  /** Facts only: GREEN | AMBER | RED, or null for a neutral note. */
+  tone: string | null;
+  /** What this is waiting on. Shown as a lock rather than a dead button. */
+  blockedBy: string | null;
+  /** The activity this traces back to. Constitution rule 5. */
+  activityCode: string | null;
+}
+
+export interface BriefingSection {
+  key: string;
+  label: string;
+  /** GREEN | AMBER | RED. */
+  tone: string;
+  /** One line explaining why this section exists at all. */
+  hint: string | null;
+  items: BriefingItem[];
+  /** Shown when a section is legitimately empty — not an error state. */
+  emptyText: string;
+}
+
+export interface Briefing {
+  /** The one question this dashboard answers, shown as the subtitle. */
+  question: string;
+  roleLabel: string;
+  /** Null when this role has no countable work — a doctor is not a task list. */
+  work: { total: number; done: number } | null;
+  sections: BriefingSection[];
+}
+
 export interface OwnerBusiness {
   clinicName: string;
   known: Array<{ name: string; value: string | null; available: boolean; module: string | null }>;
@@ -523,6 +573,9 @@ export const api = {
   labQc: (id: string, result: 'PASS' | 'FAIL', note?: string) =>
     post<DemoLabCase>(`/api/v1/lab-cases/${id}/qc`, { result, ...(note ? { note } : {}) }),
   bookDelivery: (id: string) => post<DemoLabCase>(`/api/v1/lab-cases/${id}/book`, {}),
+
+  /** One endpoint, every role. The sections differ; the shape never does. */
+  briefing: () => call<Briefing>('/api/v1/briefing'),
 
   commandCentre: () => call<CommandCentre>('/api/v1/command-centre'),
   ownerBusiness: () => call<OwnerBusiness>('/api/v1/owner-business'),

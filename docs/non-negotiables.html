@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KuBi — Engineering Constitution</title>
+<style>
+:root{--ink:#101a22;--ink-soft:#5a6875;--ink-faint:#8b97a3;--line:#e4e9ee;--page:#f2f5f7;
+--card:#fff;--accent:#0d6e5e;--accent-soft:#e8f3f0;--safety:#b0202a;--radius:14px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:17px/1.55 system-ui,-apple-system,
+"Segoe UI",Roboto,"Helvetica Neue",sans-serif;letter-spacing:-.006em;
+-webkit-text-size-adjust:100%;font-variant-numeric:tabular-nums}
+main{max-width:860px;margin:0 auto;padding:34px 20px 90px}
+h1{font-size:31px;font-weight:750;letter-spacing:-.024em;margin:0 0 6px}
+h2{font-size:23px;font-weight:700;letter-spacing:-.018em;margin:40px 0 10px;
+padding-top:16px;border-top:1px solid var(--line)}
+h3{font-size:18px;font-weight:700;margin:26px 0 6px}
+h4{font-size:16px;font-weight:650;margin:20px 0 4px;color:var(--ink-soft)}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 15px;padding-left:22px}
+li{margin:0 0 6px}
+hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+a{color:var(--accent)}
+code{background:var(--accent-soft);color:#0a5648;border-radius:5px;padding:1px 5px;
+font:.86em/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+padding:14px 16px;overflow-x:auto;margin:0 0 16px}
+pre code{background:0;color:inherit;padding:0;font-size:13.5px;line-height:1.5}
+.tw{overflow-x:auto;background:var(--card);border:1px solid var(--line);
+border-radius:var(--radius);margin:0 0 18px;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:650;color:var(--ink-soft);font-size:12.5px;text-transform:uppercase;
+letter-spacing:.04em;white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+strong{font-weight:650}
+@media (prefers-color-scheme:dark){
+:root{--ink:#e8edf1;--ink-soft:#a3b0bb;--ink-faint:#7d8a95;--line:#26333c;--page:#0d1418;
+--card:#141e24;--accent:#4fbfa8;--accent-soft:#12302b}
+code{color:#7fd7c4}
+}
+</style></head><body><main>
+<h1>KuBi — Engineering Constitution</h1>
+<p>Ten rules. Not guidelines, not preferences, not &quot;unless we're in a hurry&quot;.</p>
+<p>A rule here is one that has already cost us something, or would cost us everything. Each says what it means, how it is <strong>enforced</strong> — because a rule enforced only by remembering is a rule you have already broken — and, where there is one, the failure that put it here.</p>
+<p>Changing a rule requires the owner's assent and a dated amendment. Working around one silently is the only thing on this page that counts as misconduct.</p>
+<p>Adopted 3 August 2026.</p>
+<hr>
+<h2>1. Never fake data</h2>
+<p>No invented figure, ever, anywhere a person might read it as real. Not as a placeholder, not as a &quot;reasonable default&quot;, not to make a screen look finished in a review.</p>
+<p>Where KuBi cannot source something, it says so and names what would answer it. A blank prompts a question; an invented number ends one.</p>
+<p><strong>Enforced by:</strong> all demo and seed records carry a <code>SYNTHETIC </code> prefix on any human-readable label. The owner dashboard renders nine unanswerable metrics as <code>—</code> with the missing module named, rather than as plausible figures.</p>
+<p><strong>Why it is here:</strong> it would have been trivial to show the owner a revenue number. Nobody would have caught it, and every decision made on it afterwards would have been wrong.</p>
+<h2>2. UNKNOWN is never PASS</h2>
+<p>Control evaluation is five-valued: <code>PASS</code>, <code>FAIL</code>, <code>NOT_APPLICABLE</code>, <code>UNKNOWN</code>, <code>NOT_CONFIGURED</code>. Absence of information is <code>UNKNOWN</code> and renders as <code>UNKNOWN</code>. <code>NOT_APPLICABLE</code> requires a positive rule — it is never the opinion of the person doing the work on a busy afternoon.</p>
+<p><code>UNKNOWN</code> and <code>NOT_CONFIGURED</code> are distinct and stay distinct: one is a data problem, the other an evaluator nobody has built.</p>
+<p><strong>Enforced by:</strong> <code>tests/safety-gates/</code>, the <code>ENFORCEMENT_MATRIX</code>, and ADR-013. A safety-gate failure blocks release.</p>
+<h2>3. No placeholder screens</h2>
+<p>A screen either works or does not exist. A registered dashboard that is not <code>LIVE</code> has no render function — not an empty one, not a &quot;coming soon&quot; one.</p>
+<p><strong>Enforced by:</strong> <code>registerDashboard()</code> throws if a non-<code>LIVE</code> dashboard carries a render function, and throws if a <code>LIVE</code> one does not. Startup, not runtime.</p>
+<h2>4. One source of truth</h2>
+<p>The activity matrix is authored once. The seed, the client dictionary, the parameter screens and the reports are all <strong>generated</strong> from it. Nothing is hand-copied.</p>
+<p><strong>Enforced by:</strong> generation at build time from <code>docs/requirements/master-activity-matrix-v2.tsv</code>. A hand-maintained copy is rejected in review.</p>
+<p><strong>Why it is here:</strong> prototype #1 embedded 119 activities by hand. They were our own 101 frozen rows plus the 18 open proposals, flattened together and reworded, with the frozen/proposed distinction lost. One source maintained in two places had already drifted before anybody noticed.</p>
+<h2>5. Every task traces to a standard</h2>
+<p>No task exists without an activity; no activity without a published clause with provenance, a doer, a risk class and a due rule. An activity whose due rule nobody has decided ships <strong>disabled</strong> — never guessed.</p>
+<p><strong>Enforced by:</strong> the seed loader throws on a <code>DECISION_REQUIRED</code> row carrying a value. 71 activities are currently seeded <code>DISABLED</code> with <code>provenance: 'UNRESOLVED'</code> rather than given a plausible schedule.</p>
+<h2>6. No production secrets in development</h2>
+<p>No production data or credentials in any non-production environment, ever. No exceptions for &quot;just to test the import&quot;, and no bearer tokens pasted into <code>localStorage</code>.</p>
+<p><strong>Enforced by:</strong> synthetic fixtures only; the demo backend has no credential path. This is also why prototype #1's &quot;paste your <code>/exec</code> URL and <code>OPS_TOKEN</code>&quot; settings sheet was dropped rather than ported.</p>
+<h2>7. Every deployment must be reversible</h2>
+<p>A migration that cannot be rolled back is a decision that cannot be unmade. Data-destructive migrations are refused; <code>delete</code> is not used — master data is archived, clinical and transactional data cancelled or superseded.</p>
+<p><strong>Enforced by:</strong> the no-<code>delete</code> rule in review; forward-only migrations that add before they remove.</p>
+<p><strong>Why it is here:</strong> migrations are <strong>not</strong> atomic in this database. A failed run was observed leaving its added column behind. Statement ordering is the only thing keeping a table from being left unforced — see migration 0012.</p>
+<h2>8. Every new dashboard must be registry-driven</h2>
+<p>A dashboard is a registration: an id, a question, an audience, a phase, a status. The shell contains no role names and no <code>if (isOwner)</code>. If adding a dashboard requires editing <code>app.tsx</code>, the contract has failed and <strong>the contract is what gets fixed</strong> — not the shell.</p>
+<p>Every dashboard states the one question it answers, in the words the person would use. A screen answering two questions is two screens; one answering none is a report.</p>
+<p><strong>Enforced by:</strong> <code>apps/web/src/app/registry.ts</code> and <code>tests/ui/dashboard-registry.test.tsx</code>. Duplicate ids are refused at startup.</p>
+<h2>9. Every feature must map back to the Product Vision</h2>
+<p>A feature cites the principle it serves. One that cannot be traced to <em>&quot;runs your clinic to a standard, and proves it&quot;</em> is somebody's good idea and not this product's.</p>
+<p>A proposal that breaks a vision principle names it and argues for amending the vision <strong>first</strong>. It does not proceed on the quiet.</p>
+<p><strong>Enforced by:</strong> review. <code>docs/product-vision.md</code> is the reference point; <code>docs/requirements/conformance.md</code> maps requirement to code.</p>
+<h2>10. No feature without an owner, and no gap without a reason</h2>
+<p>Every domain, dashboard and open decision has a named owner and a stated status. Anything unbuilt says what it is waiting for, in the product — not only in a roadmap.</p>
+<p><strong>Enforced by:</strong> <code>registerDashboard()</code> throws if a non-<code>LIVE</code> dashboard does not say what it is blocked by. Registers carry provenance; <code>DECISION_REQUIRED</code> rows carry no value.</p>
+<p><strong>Why it is here:</strong> Patient Experience went unnoticed through an entire design pass. Its KPIs were already in the frozen matrix — complaint capture, acknowledgement time, resolution time, closure — while the objects they measure did not exist. <strong>The standard was written and the thing it measures was never built</strong>, and nothing in the system was obliged to say so.</p>
+<hr>
+<h2>Amendments</h2>
+<div class="tw"><table><thead><tr><th>Date</th><th>Rule</th><th>Change</th><th>Approved by</th></tr></thead><tbody><tr><td>2026-08-03</td><td>—</td><td>Adopted, ten rules</td><td>Owner</td></tr></tbody></table></div>
+</main></body></html>

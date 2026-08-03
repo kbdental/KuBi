@@ -380,6 +380,14 @@ export const RoleCode = {
   RECEPTION: 'RECEPTION',
   SENIOR_ASSISTANT: 'SENIOR_ASSISTANT',
   DENTAL_ASSISTANT: 'DENTAL_ASSISTANT',
+  /**
+   * The person who runs the instrument loop: dirty → ultrasonic → packing →
+   * autoclave → release. Distinct from an assistant even where one person does
+   * both jobs, because the release signature is a separation-of-duties gate —
+   * an operator may not release their own batch — and that rule needs a role
+   * to hang on rather than a name.
+   */
+  STERILIZATION_TECHNICIAN: 'STERILIZATION_TECHNICIAN',
   INVENTORY_COORDINATOR: 'INVENTORY_COORDINATOR',
   LAB_COORDINATOR: 'LAB_COORDINATOR',
   QUALITY_COMPLIANCE: 'QUALITY_COMPLIANCE',

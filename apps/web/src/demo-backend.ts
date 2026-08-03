@@ -24,7 +24,8 @@
 
 type Role =
   | 'OWNER_DIRECTOR'
-  | 'DENTAL_ASSISTANT' | 'CLINIC_MANAGER' | 'SENIOR_ASSISTANT' | 'RECEPTION';
+  | 'DENTAL_ASSISTANT' | 'CLINIC_MANAGER' | 'SENIOR_ASSISTANT' | 'RECEPTION'
+  | 'TREATING_DOCTOR' | 'LAB_COORDINATOR' | 'STERILIZATION_TECHNICIAN';
 
 interface Person {
   key: string;
@@ -43,6 +44,12 @@ export const PEOPLE: Person[] = [
   // describes in most detail -- "you should not see 150 tasks" -- could not be
   // reached by anybody.
   { key: 'deepak', email: 'deepak@synthetic.test', employeeId: 'e-deepak', displayLabel: 'SYNTHETIC Deepak V.', roles: ['OWNER_DIRECTOR'] },
+  // Phase 1 builds the clinical workflow: doctor, assistant, lab, reception,
+  // sterilisation. Three of those five had no person to sign in as, so the
+  // screens could not be reached at all.
+  { key: 'mehta', email: 'mehta@synthetic.test', employeeId: 'e-mehta', displayLabel: 'SYNTHETIC Dr Mehta', roles: ['TREATING_DOCTOR'] },
+  { key: 'suresh', email: 'suresh@synthetic.test', employeeId: 'e-suresh', displayLabel: 'SYNTHETIC Suresh B.', roles: ['LAB_COORDINATOR'] },
+  { key: 'lakshmi', email: 'lakshmi@synthetic.test', employeeId: 'e-lakshmi', displayLabel: 'SYNTHETIC Lakshmi N.', roles: ['STERILIZATION_TECHNICIAN'] },
 ];
 
 export const DEMO_PASSWORD = 'SyntheticDemo123!';
@@ -925,6 +932,50 @@ function operationalHealth() {
   };
 }
 
+/**
+ * Briefing helpers.
+ *
+ * A section with no items is still rendered — it says "opening is done" rather
+ * than vanishing. A section that disappears when it is satisfied teaches
+ * people that its absence means nothing to do, which is indistinguishable from
+ * it being broken.
+ */
+interface BriefItem {
+  id: string; kind: 'task' | 'fact'; text: string; detail: string | null;
+  taskId: string | null; priority: string | null; tone: string | null;
+  blockedBy: string | null; activityCode: string | null;
+}
+
+function section(
+  key: string, label: string, tone: string, hint: string | null,
+  emptyText: string, items: BriefItem[],
+) {
+  return { key, label, tone, hint, emptyText, items };
+}
+
+function briefing(
+  roleLabel: string, question: string,
+  work: { total: number; done: number } | null,
+  sections: ReturnType<typeof section>[],
+) {
+  return { roleLabel, question, work, sections };
+}
+
+/**
+ * A task's risk class, from the parameter it belongs to. The real service
+ * reads this off the activity; the demo derives it so the rails match what the
+ * frozen matrix says rather than being decorative.
+ */
+function priorityOf(t: Task): string {
+  if (t.parameter === 'SAFETY_EMERGENCY' || t.parameter === 'INFECTION_CONTROL') {
+    return 'PATIENT_SAFETY';
+  }
+  if (t.parameter === 'OPENING_READINESS' || t.parameter === 'ROOM_CHAIR_READINESS') {
+    return 'CRITICAL';
+  }
+  return t.checkerRoles.length > 0 ? 'IMPORTANT' : 'ROUTINE';
+}
+
 function nextVisit(): Visit | null {
   const upcoming = db.visits
     .filter((v) => ['BOOKED', 'ARRIVED', 'IN_CHAIR'].includes(v.status))
@@ -1734,6 +1785,193 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
    * no percentages except the one progress figure that is genuinely a fraction
    * of work done.
    */
+  // ---- BRIEFING: one endpoint, five roles ----
+  //
+  // Mirrors what the real service will do: each domain contributes sections
+  // for the role asking. Nothing here invents a figure — every section reads
+  // the same db the other screens read, so the briefing and the operations
+  // screen can never disagree about how many batches are unfinished.
+
+  if (path === '/api/v1/briefing' && method === 'GET') {
+    const fact = (
+      id: string, text: string, detail: string | null = null, tone: string | null = null,
+    ): BriefItem => ({
+      id, kind: 'fact', text, detail, tone,
+      taskId: null, priority: null, blockedBy: null, activityCode: null,
+    });
+    const task = (t: Task): BriefItem => ({
+      id: t.id, kind: 'task', text: t.title,
+      detail: t.status === 'IN_PROGRESS' ? 'started' : null,
+      taskId: t.id, priority: priorityOf(t), tone: null,
+      blockedBy: t.blockedBy, activityCode: t.code,
+    });
+    const mine = db.tasks.filter((t) => t.assignee === me.employeeId);
+    const openTasks = mine.filter((t) => t.status === 'DUE' || t.status === 'IN_PROGRESS');
+
+    // ---- Doctor ----
+    if (me.roles.includes('TREATING_DOCTOR')) {
+      const seated = db.visits.filter((v) => v.status === 'IN_CHAIR');
+      const booked = db.visits.filter((v) => v.status !== 'CANCELLED' && v.status !== 'COMPLETED');
+      const alerts = db.patientProcedures.filter((p) => p.alerts.length > 0);
+      const notReady = db.patientProcedures.filter(
+        (p) => p.status === 'PLANNED' && p.requirements.some((r) => r.result !== 'PASS'),
+      );
+      const qcWaiting = db.labCases.filter((l) => l.qcResult === null && l.status === 'QC_PENDING');
+      const redFlags = db.followups.filter((f) => f.outcome === 'RED_FLAG');
+
+      return json(briefing('Doctor', 'Which patient needs me?', null, [
+        section('chair', 'In the chair now', seated.length ? 'RED' : 'GREEN',
+          null, 'Nobody is seated right now.',
+          seated.map((v) => fact(v.id, v.patientLabel, `${v.visitType} · ${v.chairLabel}`, 'AMBER'))),
+        section('alerts', 'Medical alerts', alerts.length ? 'RED' : 'GREEN',
+          'Read before treating.', 'No alerts on today’s patients.',
+          alerts.map((p) => fact(p.id, p.patientLabel, p.alerts.join(' · '), 'RED'))),
+        section('consent', 'Not ready to start', notReady.length ? 'RED' : 'GREEN',
+          'A procedure cannot begin until every requirement passes.',
+          'Every planned procedure is ready.',
+          notReady.map((p) => fact(
+            p.id, `${p.patientLabel} · ${p.procedureName}`,
+            p.requirements.filter((r) => r.result !== 'PASS').map((r) => r.label).join(' · '),
+            'RED',
+          ))),
+        section('labqc', 'Lab work waiting on my check', qcWaiting.length ? 'AMBER' : 'GREEN',
+          'A case cannot be booked for delivery until this passes.',
+          'No cases waiting on a check.',
+          qcWaiting.map((l) => fact(l.id, `${l.patientLabel} · ${l.workType}`,
+            `${l.reference} · ${l.vendor}`, 'AMBER'))),
+        section('followups', 'Follow-ups needing me', redFlags.length ? 'RED' : 'GREEN',
+          null, 'No follow-up has raised a flag.',
+          redFlags.map((f) => fact(f.id, f.patientLabel,
+            f.redFlagReason ?? f.procedureName, 'RED'))),
+        section('today', 'Booked today', 'GREEN', null, 'Nobody booked.',
+          booked.map((v) => fact(v.id, v.patientLabel,
+            `${v.visitType} · ${v.chairLabel}`, null))),
+      ]));
+    }
+
+    // ---- Lab coordinator ----
+    if (me.roles.includes('LAB_COORDINATOR')) {
+      const overdue = db.labCases.filter((l) => l.overdue);
+      const awaitingQc = db.labCases.filter((l) => l.qcResult === null && l.status === 'QC_PENDING');
+      const ready = db.labCases.filter((l) => l.deliveryReady);
+      const remakes = db.labCases.filter((l) => l.status === 'REMAKE');
+      const atVendor = db.labCases.filter((l) => l.status === 'IN_PROGRESS_VENDOR' && !l.overdue);
+
+      return json(briefing('Laboratory', 'What is due back, and what is stuck?', null, [
+        section('overdue', 'Past due from the lab', overdue.length ? 'RED' : 'GREEN',
+          'Every one of these has a patient waiting on it.',
+          'Nothing is overdue.',
+          overdue.map((l) => fact(l.id, `${l.patientLabel} · ${l.workType}`,
+            `${l.reference} · ${l.vendor} · expected ${l.expectedLabel}`, 'RED'))),
+        section('qc', 'Arrived, waiting for a check', awaitingQc.length ? 'AMBER' : 'GREEN',
+          'These cannot be booked until a clinician passes them.',
+          'Nothing waiting on a check.',
+          awaitingQc.map((l) => fact(l.id, `${l.patientLabel} · ${l.workType}`,
+            `${l.reference} · arrived ${l.expectedLabel}`, 'AMBER'))),
+        section('remake', 'Being remade', remakes.length ? 'RED' : 'GREEN',
+          'A remake has a patient who was promised a date that has passed.',
+          'No remakes.',
+          remakes.map((l) => fact(l.id, `${l.patientLabel} · ${l.workType}`,
+            `${l.reference} · remake ${l.remakeCount} · ${l.nextStep ?? ''}`, 'RED'))),
+        section('ready', 'Passed and ready to book', 'GREEN',
+          'Reception can give these a delivery appointment.',
+          'Nothing ready to book.',
+          ready.map((l) => fact(l.id, `${l.patientLabel} · ${l.workType}`,
+            l.reference, 'GREEN'))),
+        section('vendor', 'With the laboratory', 'GREEN', null, 'Nothing out at a lab.',
+          atVendor.map((l) => fact(l.id, `${l.patientLabel} · ${l.workType}`,
+            `${l.vendor} · due ${l.expectedLabel}`, null))),
+      ]));
+    }
+
+    // ---- Sterilisation technician ----
+    if (me.roles.includes('STERILIZATION_TECHNICIAN')) {
+      const quarantined = db.batches.filter((b) => b.stage === 'QUARANTINED');
+      // An operator may not release their own batch. That is the whole reason
+      // this role exists separately, so the screen says it rather than just
+      // hiding the button.
+      const awaitingRelease = db.batches.filter(
+        (b) => b.stage === 'AUTOCLAVED' && b.cycleResult === 'PASS',
+      );
+      // Excludes the ones waiting on a signature. A batch that is stalled on a
+      // person is not "in the loop" — listing it in both places reads as two
+      // batches, and the whole job here is knowing how many trays are really
+      // outstanding.
+      const inFlight = db.batches.filter(
+        (b) => b.stage !== 'RELEASED' && b.stage !== 'QUARANTINED'
+          && !awaitingRelease.includes(b),
+      );
+      const released = db.batches.filter((b) => b.stage === 'RELEASED');
+      const packs = released.reduce((n, b) => n + b.packCount, 0);
+
+      return json(briefing(
+        'Sterilisation', 'What is in the loop, and what is stuck?',
+        { total: db.batches.length, done: released.length },
+        [
+          section('quarantine', 'Quarantined', quarantined.length ? 'RED' : 'GREEN',
+            'A failed or inconclusive cycle. Nothing in here may be used.',
+            'Nothing quarantined.',
+            quarantined.map((b) => fact(b.id, b.batchRef,
+              `${b.packCount} packs · cycle ${b.cycleResult ?? 'no result'} · ${b.operator}`, 'RED'))),
+          section('release', 'Waiting on a release signature',
+            awaitingRelease.length ? 'AMBER' : 'GREEN',
+            'The operator cannot release their own batch — someone else must sign.',
+            'Nothing waiting to be released.',
+            awaitingRelease.map((b) => fact(b.id, b.batchRef,
+              `${b.packCount} packs · run by ${b.operator}`, 'AMBER'))),
+          section('inflight', 'In the loop', inFlight.length ? 'AMBER' : 'GREEN',
+            'Dirty → ultrasonic → packing → autoclave → release. No used instrument may stay overnight.',
+            'The loop is empty.',
+            inFlight.map((b) => fact(b.id, b.batchRef,
+              `${b.stage.toLowerCase()} · ${b.packCount} packs · ${b.operator}`, 'AMBER'))),
+          section('available', 'Sterile packs available', packs > 0 ? 'GREEN' : 'RED',
+            null, 'No released packs — the clinic cannot treat.',
+            released.map((b) => fact(b.id, b.batchRef, `${b.packCount} packs`, 'GREEN'))),
+          section('mywork', 'My tasks', openTasks.length ? 'AMBER' : 'GREEN',
+            null, 'Nothing outstanding.', openTasks.map(task)),
+        ],
+      ));
+    }
+
+    // ---- Assistant (dental and senior) ----
+    const before = openTasks.filter((t) => t.process === 'Opening Readiness');
+    const closing = openTasks.filter((t) => t.process === 'Closing Readiness');
+    const other = openTasks.filter(
+      (t) => t.process !== 'Opening Readiness' && t.process !== 'Closing Readiness',
+    );
+    const toPrepare = db.visits.filter((v) => v.status === 'BOOKED' || v.status === 'ARRIVED');
+    const sterPending = db.batches.filter((b) => b.stage !== 'RELEASED');
+    const toDispatch = db.labCases.filter((l) => l.status === 'QC_PENDING');
+
+    return json(briefing(
+      me.roles.includes('SENIOR_ASSISTANT') ? 'Senior assistant' : 'Assistant',
+      'What do I do now?',
+      { total: mine.length, done: mine.filter((t) => t.status === 'VERIFIED' || t.status === 'COMPLETED').length },
+      [
+        section('opening', 'Before the first patient', before.length ? 'AMBER' : 'GREEN',
+          null, 'Opening is done.', before.map(task)),
+        section('patients', 'Patients to prepare', toPrepare.length ? 'AMBER' : 'GREEN',
+          'Chairside setup and scans.', 'Nobody left to prepare.',
+          toPrepare.map((v) => fact(v.id, v.patientLabel,
+            `${v.visitType} · ${v.chairLabel}`, v.status === 'ARRIVED' ? 'AMBER' : null))),
+        section('ster', 'Sterilisation pending', sterPending.length ? 'RED' : 'GREEN',
+          'No used instrument may remain overnight.', 'The loop is clear.',
+          sterPending.map((b) => fact(b.id, b.batchRef,
+            `${b.stage.toLowerCase()} · ${b.packCount} packs`,
+            b.stage === 'QUARANTINED' ? 'RED' : 'AMBER'))),
+        section('lab', 'Lab cases to dispatch', toDispatch.length ? 'AMBER' : 'GREEN',
+          null, 'Nothing to send.',
+          toDispatch.map((l) => fact(l.id, `${l.patientLabel} · ${l.workType}`,
+            `${l.reference} · ${l.vendor}`, 'AMBER'))),
+        section('other', 'Everything else', other.length ? 'AMBER' : 'GREEN',
+          null, 'Nothing outstanding.', other.map(task)),
+        section('closing', 'Closing', closing.length ? 'AMBER' : 'GREEN',
+          'The day cannot close with these open.', 'Closing is clear.',
+          closing.map(task)),
+      ],
+    ));
+  }
+
   if (path === '/api/v1/command-centre' && method === 'GET') {
     if (!MAY_SEE_CLINIC.some((r) => me.roles.includes(r))) return json({ error: 'Forbidden' }, 403);
 

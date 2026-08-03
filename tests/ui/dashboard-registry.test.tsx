@@ -90,11 +90,24 @@ describe('routing by role', () => {
 describe('the registry as a record of what is missing', () => {
   beforeEach(() => { resetRegistry(); registerAllDashboards(); });
 
-  it('registers fifteen dashboards, not six', () => {
-    // The owner's instruction: "don't architect yourself into six." Fourteen
-    // at the first review, plus Learning at the second — which is the point:
-    // the fifteenth cost one registration and no edit to the shell.
-    expect(allDashboards()).toHaveLength(15);
+  it('registers far more than it builds, and knows the difference', () => {
+    // The owner's instruction: "don't architect yourself into six." An exact
+    // total is churn — what matters is that the registry keeps growing without
+    // the shell changing, and that it never loses track of which are real.
+    const all = allDashboards();
+    const built = all.filter((d) => d.status === DashboardStatus.LIVE);
+    expect(all.length).toBeGreaterThanOrEqual(15);
+    expect(built.length).toBeLessThan(all.length);
+  });
+
+  it('builds exactly the clinical workflow in phase 1, and nothing else', () => {
+    // Doctor, assistant, lab, reception, sterilisation — the five the owner
+    // scoped — plus the owner's and manager's, which were already live.
+    const built = allDashboards()
+      .filter((d) => d.status === DashboardStatus.LIVE).map((d) => d.id).sort();
+    expect(built).toEqual([
+      'ASSISTANT', 'COMMAND', 'DESK', 'DOCTOR', 'LAB', 'OWNER', 'STERILIZATION',
+    ]);
   });
 
   it('keeps Rider registered rather than removed', () => {

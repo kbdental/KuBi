@@ -13,6 +13,7 @@
 import { CommandCentre } from '../screens/command-centre.js';
 import { OwnerBusiness } from '../screens/owner-business.js';
 import { ReceptionBoard } from '../screens/reception-board.js';
+import { BriefingScreen } from '../screens/briefing.js';
 import { registerDashboard, DashboardStatus } from './registry.js';
 
 export function registerAllDashboards(): void {
@@ -60,9 +61,9 @@ export function registerAllDashboards(): void {
     render: (ctx) => <ReceptionBoard onOpenClinic={() => ctx.go('CLINIC')} />,
   });
 
-  // ── Phase 1 · next to build ───────────────────────────────────────────
-  // All three have their data already. Prototype #1's briefing model is the
-  // shape; what is missing is the section endpoint, not the domain.
+  // All four render the same BriefingScreen. Only the sections differ, which
+  // is the domain contract doing its job — a dashboard names what it wants and
+  // does not own a layout.
 
   registerDashboard({
     id: 'DOCTOR',
@@ -70,20 +71,20 @@ export function registerAllDashboards(): void {
     label: 'My patients',
     roles: ['TREATING_DOCTOR', 'CLINICAL_DIRECTOR'],
     phase: 1,
-    status: DashboardStatus.PLANNED,
-    blockedBy: 'Briefing sections endpoint. Data exists: readiness, consent, '
-      + 'documentation, lab QC and follow-ups are all built.',
+    status: DashboardStatus.LIVE,
+    home: true,
+    render: (ctx) => <BriefingScreen onOpenTask={ctx.openTask} onRefresh={ctx.reload} />,
   });
 
   registerDashboard({
     id: 'ASSISTANT',
     question: 'What do I do now?',
     label: 'My work',
-    roles: ['DENTAL_ASSISTANT', 'SENIOR_ASSISTANT', 'HOUSEKEEPING'],
+    roles: ['DENTAL_ASSISTANT', 'SENIOR_ASSISTANT'],
     phase: 1,
-    status: DashboardStatus.PLANNED,
-    blockedBy: 'Briefing sections endpoint. Data exists: opening, chairside, '
-      + 'sterilisation, lab dispatch and closing.',
+    status: DashboardStatus.LIVE,
+    home: true,
+    render: (ctx) => <BriefingScreen onOpenTask={ctx.openTask} onRefresh={ctx.reload} />,
   });
 
   registerDashboard({
@@ -92,9 +93,23 @@ export function registerAllDashboards(): void {
     label: 'Lab',
     roles: ['LAB_COORDINATOR'],
     phase: 1,
-    status: DashboardStatus.PLANNED,
-    blockedBy: 'Briefing sections endpoint. Lab case data and the delivery '
-      + 'gate are built.',
+    status: DashboardStatus.LIVE,
+    home: true,
+    render: (ctx) => <BriefingScreen onOpenTask={ctx.openTask} onRefresh={ctx.reload} />,
+  });
+
+  registerDashboard({
+    id: 'STERILIZATION',
+    question: 'What is in the loop, and what is stuck?',
+    label: 'Sterilisation',
+    // A role of its own even where one person also assists, because "an
+    // operator may not release their own batch" is a separation-of-duties gate
+    // and it needs a role to hang on rather than a name.
+    roles: ['STERILIZATION_TECHNICIAN'],
+    phase: 1,
+    status: DashboardStatus.LIVE,
+    home: true,
+    render: (ctx) => <BriefingScreen onOpenTask={ctx.openTask} onRefresh={ctx.reload} />,
   });
 
   // ── Phase 2 · during the pilot ────────────────────────────────────────

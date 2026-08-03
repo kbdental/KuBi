@@ -46,6 +46,21 @@ export const PERSONAS: Persona[] = [
     key: 'kavita', name: 'Kavita R.', role: 'Reception',
     sees: 'Today’s list, confirmations and follow-up calls.',
   },
+  // Phase 1 is the clinical workflow, so the three people who run the rest of
+  // it need a way in. Without a persona their dashboards exist and cannot be
+  // opened, which is the same as not existing.
+  {
+    key: 'mehta', name: 'Dr Mehta', role: 'Doctor',
+    sees: 'Who is in the chair, who is not ready, and what is waiting on a check.',
+  },
+  {
+    key: 'suresh', name: 'Suresh B.', role: 'Lab coordinator',
+    sees: 'What is late, what arrived, and what may be booked.',
+  },
+  {
+    key: 'lakshmi', name: 'Lakshmi N.', role: 'Sterilisation',
+    sees: 'The instrument loop, and what nobody may release yet.',
+  },
 ];
 
 const initials = (name: string) =>

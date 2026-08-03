@@ -67,8 +67,39 @@ describe('Authority separation (owner controls 6 and 8)', () => {
       ['EXTERNAL', 'FUNCTIONAL_ASSIGNMENT', 'RECORD_RELATION', 'ROLE', 'SYSTEM'].sort(),
     );
   });
-  it('declares the 13 canonical roles from FRS §3', () => {
-    expect(Object.keys(RoleCode)).toHaveLength(13);
+  /**
+   * The FRS §3 canon, verbatim. A role vanishing from here is a silent
+   * requirements regression, which a bare length check would not have caught.
+   */
+  const FRS_ROLES = [
+    'OWNER_DIRECTOR', 'CLINIC_HEAD', 'CLINICAL_DIRECTOR', 'TREATING_DOCTOR',
+    'CLINIC_MANAGER', 'RECEPTION', 'SENIOR_ASSISTANT', 'DENTAL_ASSISTANT',
+    'INVENTORY_COORDINATOR', 'LAB_COORDINATOR', 'QUALITY_COMPLIANCE',
+    'HOUSEKEEPING', 'SYSTEM_ADMINISTRATOR',
+  ];
+
+  /**
+   * Roles added beyond the FRS, each a deliberate, dated decision. Adding a
+   * row here is the amendment; adding a role without one fails the test below.
+   *
+   * STERILIZATION_TECHNICIAN — owner scope, 3 August 2026. Phase 1 builds the
+   * clinical workflow and named sterilisation as one of its five dashboards.
+   * The role is not cosmetic: "an operator may not release their own batch" is
+   * a separation-of-duties gate, and a gate needs a role to hang on rather
+   * than a person's name. Pending: FRS §3 amendment.
+   */
+  const ADDED_BEYOND_FRS = ['STERILIZATION_TECHNICIAN'];
+
+  it('still declares all 13 canonical roles from FRS §3', () => {
+    expect(Object.keys(RoleCode)).toEqual(expect.arrayContaining(FRS_ROLES));
+  });
+
+  it('adds no role beyond the FRS without a recorded decision', () => {
+    // Non-negotiable 4: never silently resolve an open requirements question.
+    // A new role that nobody decided on would otherwise arrive as a passing
+    // test and a bumped number.
+    const extra = Object.keys(RoleCode).filter((r) => !FRS_ROLES.includes(r));
+    expect(extra.sort()).toEqual([...ADDED_BEYOND_FRS].sort());
   });
 });
 
