@@ -85,7 +85,7 @@ function Demo() {
   if (!ready) return null;
 
   if (!who) {
-    return <Entry onPick={(key) => { signInAs(key); setWho(key); }} />;
+    return <Entry onEnter={(key) => { signInAs(key); setWho(key); }} />;
   }
 
   const current = WHO[who]!;

@@ -65,15 +65,25 @@ for (const s of SIZES) {
 
   await page.goto(pathToFileURL(FILE).href);
 
-  // The app opens on the entry screen now, so check that first and then go in
-  // as the assistant -- which is where every check below assumes it starts.
-  await page.waitForSelector('.entry');
-  await sideways('the entry screen');
-  const tooSmall = await page.$$eval('.persona', (els) =>
-    els.filter((e) => e.getBoundingClientRect().height < 44).length);
-  if (tooSmall > 0) problems.push(`${s.name}: ${tooSmall} persona buttons under 44px tall`);
+  // The app opens on the front door: clinic status and one button. No role
+  // picking -- a cockpit does not ask whether you are the captain.
+  await page.waitForSelector('.gate');
+  await sideways('the front door');
+  const enterBox = await page.$eval('.gate-enter', (e) => e.getBoundingClientRect().height);
+  if (enterBox < 44) problems.push(`${s.name}: the enter button is ${enterBox}px tall`);
+  // The front door must answer its one question before anything else.
+  const gateAsks = await page.$eval('.gate', (el) => el.textContent ?? '');
+  if (/choose your role|select role/i.test(gateAsks)) {
+    problems.push(`${s.name}: the front door still asks who you are`);
+  }
 
-  await page.click('.persona:has-text("Priya")');
+  await page.click('.gate-enter');
+  await page.waitForSelector('.demo-bar');
+  await page.waitForTimeout(400);
+  // Then become the assistant, which is where every check below starts.
+  await page.click('.who-button');
+  await page.waitForTimeout(250);
+  await page.click('.who-option:has-text("Priya")');
   await page.waitForSelector('.demo-bar');
   await page.waitForTimeout(700);
 

@@ -475,6 +475,19 @@ export interface Briefing {
   sections: BriefingSection[];
 }
 
+/** Layer 5 — one parameter's health, with the direction that matters more. */
+export interface ParameterHealthRow {
+  parameter: string;
+  /** Null means nothing to measure. Never rendered as 0. */
+  score: number | null;
+  trend: string;
+  days: number | null;
+  /** Mean evidence confidence behind the score. */
+  confidence: number | null;
+  /** Upstream parameters currently failing. A parameter cannot outrank these. */
+  blockedBy: string[];
+}
+
 export interface OwnerBusiness {
   clinicName: string;
   known: Array<{ name: string; value: string | null; available: boolean; module: string | null }>;
@@ -576,6 +589,8 @@ export const api = {
 
   /** One endpoint, every role. The sections differ; the shape never does. */
   briefing: () => call<Briefing>('/api/v1/briefing'),
+
+  parameterHealth: () => call<ParameterHealthRow[]>('/api/v1/parameter-health'),
 
   commandCentre: () => call<CommandCentre>('/api/v1/command-centre'),
   ownerBusiness: () => call<OwnerBusiness>('/api/v1/owner-business'),

@@ -1174,97 +1174,161 @@ label.field-label {
 
 /* ---- The way in -------------------------------------------------------- */
 
-.entry {
+/* ---- The front door -----------------------------------------------------
+   Mission control, not a role picker. One question — how is the clinic right
+   now — and one action. Calm, dark, and still: nothing on this screen moves,
+   because the point is to be read in two seconds from a doorway. */
+
+.gate {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 40px 20px;
+  padding: 40px 22px;
+  color: #e9f1ef;
   background:
-    radial-gradient(1100px 520px at 50% -8%, rgba(13, 110, 94, .07), transparent 62%),
-    var(--bg);
+    radial-gradient(900px 560px at 50% -10%, rgba(26, 138, 118, .22), transparent 64%),
+    linear-gradient(178deg, #0a1a1a 0%, #071414 60%, #050f10 100%);
 }
-.entry-inner { width: 100%; max-width: 720px; }
+.gate-inner { width: 100%; max-width: 440px; text-align: center; }
 
-.entry-head { text-align: center; margin-bottom: 34px; }
-.entry-mark {
-  font-weight: 800;
-  letter-spacing: -.02em;
-  font-size: 22px;
-  color: var(--ok);
-  margin-bottom: 20px;
+.gate-head { margin-bottom: 34px; }
+.gate-clinic {
+  font-size: 11.5px; font-weight: 650; letter-spacing: .18em; text-transform: uppercase;
+  color: rgba(233, 241, 239, .42);
 }
-.entry-head h1 {
-  font-size: clamp(25px, 4.4vw, 36px);
-  line-height: 1.18;
-  letter-spacing: -.022em;
-  margin: 0 0 14px;
-  /* Deliberately narrower than the card grid below. A headline set to the full
-     width of a 720px column reads as a paragraph, not a statement. */
-  max-width: 17ch;
-  margin-inline: auto;
-}
-.entry-head p {
-  color: var(--ink-soft);
-  margin: 0 auto;
-  max-width: 52ch;
-  font-size: 15.5px;
-  line-height: 1.6;
-}
-
-.entry-ask {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--ink-soft);
-  text-align: center;
-  margin: 0 0 14px;
-}
-
-.entry-people { display: grid; gap: 8px; }
-
-.persona {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  width: 100%;
-  text-align: left;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  background: #fff;
-  cursor: pointer;
-  font: inherit;
-  transition: border-color .12s ease, transform .12s ease;
-}
-.persona:hover { border-color: var(--ok); transform: translateY(-1px); }
-.persona:focus-visible { outline: 2px solid var(--ok); outline-offset: 2px; }
-
-.persona-av {
-  flex: 0 0 auto;
-  width: 42px; height: 42px;
-  border-radius: 50%;
-  display: grid; place-items: center;
-  background: var(--ok);
+.gate-greet {
+  margin-top: 16px;
+  font-size: clamp(25px, 5vw, 31px); font-weight: 600; letter-spacing: -.024em;
   color: #fff;
-  font-weight: 700;
-  font-size: 14px;
-  letter-spacing: .01em;
 }
-.persona-main { display: grid; gap: 1px; min-width: 0; }
-.persona-name { font-weight: 650; font-size: 15.5px; }
-.persona-role { font-size: 12.5px; color: var(--ok); font-weight: 600; }
-/* What this person's app actually opens onto. The point of the screen is that
-   these differ — an owner sees eight numbers, an assistant sees three jobs. */
-.persona-sees { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+.gate-when { margin-top: 5px; font-size: 14.5px; color: rgba(233, 241, 239, .5); }
 
-.entry-foot {
-  margin: 26px auto 0;
-  max-width: 52ch;
-  text-align: center;
-  font-size: 12.5px;
-  color: var(--ink-soft);
-  line-height: 1.55;
+.gate-status {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 9px 18px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; letter-spacing: .11em;
+  border: 1px solid transparent;
 }
+.gate-status.is-open {
+  color: #6ee7c4; background: rgba(45, 190, 155, .11); border-color: rgba(45, 190, 155, .28);
+}
+.gate-status.is-not {
+  color: #ffb4a8; background: rgba(224, 90, 74, .12); border-color: rgba(224, 90, 74, .3);
+}
+.gate-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.gate-status-why {
+  letter-spacing: 0; font-weight: 500; text-transform: none;
+  opacity: .78; font-size: 12.5px;
+}
+
+/* The number, given the room it needs to be the thing you see. */
+.gate-health {
+  margin: 34px 0 4px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.gate-health b {
+  font-size: clamp(66px, 15vw, 88px); font-weight: 250; letter-spacing: -.045em; color: #fff;
+}
+.gate-health span { font-size: 26px; font-weight: 300; color: rgba(233, 241, 239, .4); margin-left: 2px; }
+.gate-nil { font-size: 21px; font-weight: 300; color: rgba(233, 241, 239, .45); }
+.gate-health-label {
+  margin-top: 12px;
+  font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase;
+  color: rgba(233, 241, 239, .38);
+}
+
+.gate-vitals {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 4px; margin: 34px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, .09);
+  border-bottom: 1px solid rgba(255, 255, 255, .09);
+  padding: 20px 0;
+}
+.gate-vitals div { display: grid; gap: 5px; }
+.gate-vitals dt {
+  font-size: 25px; font-weight: 350; letter-spacing: -.03em; color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.gate-vitals dd {
+  margin: 0; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: rgba(233, 241, 239, .38);
+}
+.gate-vitals .is-critical dt { color: #ff8f7e; }
+.gate-vitals .is-important dt { color: #f5c469; }
+
+.gate-next { margin: 18px 0 0; font-size: 14.5px; color: rgba(233, 241, 239, .58); }
+.gate-next b { color: #fff; font-weight: 600; }
+
+.gate-enter {
+  display: block; width: 100%;
+  margin: 30px 0 0; padding: 17px 20px;
+  border: 0; border-radius: 13px;
+  background: #14a184; color: #04221c;
+  font: inherit; font-size: 15.5px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .14s ease, transform .14s ease;
+}
+.gate-enter:hover { background: #17b795; transform: translateY(-1px); }
+.gate-enter:focus-visible { outline: 2px solid #6ee7c4; outline-offset: 3px; }
+
+.gate-foot {
+  margin: 18px 0 0; font-size: 12.5px; line-height: 1.55;
+  color: rgba(233, 241, 239, .45);
+}
+.gate-synth {
+  margin: 26px 0 0; font-size: 11.5px;
+  color: rgba(233, 241, 239, .3);
+}
+
+@media (width < 420px) {
+  .gate-vitals { grid-template-columns: repeat(2, 1fr); gap: 18px 4px; }
+}
+
+/* ---- Clinic operating standards ----------------------------------------- */
+.std-gap {
+  background: var(--warn-tint); border: 1px solid var(--warn-line);
+  border-radius: var(--radius-sm); padding: 12px 15px;
+  font-size: 14px; line-height: 1.55; color: var(--ink); margin: 0 0 24px;
+}
+.std-class { margin-bottom: 26px; }
+.std-class-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  font-size: 13px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ink-soft); margin: 0 0 9px;
+  padding-bottom: 7px; border-bottom: 1px solid var(--line);
+}
+.std-class-weight { color: var(--ink); font-size: 15px; letter-spacing: 0; }
+.std-empty { color: var(--ink-faint); font-size: 14px; margin: 0; }
+.std-rows { display: grid; gap: 7px; }
+
+.std-row {
+  display: flex; gap: 16px; align-items: flex-start; justify-content: space-between;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 13px 15px;
+}
+.std-main { min-width: 0; flex: 1; }
+.std-name { font-weight: 600; font-size: 15.5px; }
+.std-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 3px; font-size: 12.5px; }
+.std-weight { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.std-owner { color: var(--ok); font-weight: 600; text-transform: capitalize; }
+.std-unowned { color: var(--warn); font-weight: 600; }
+.std-dep { margin-top: 5px; font-size: 12.5px; color: var(--ink-faint); }
+.std-feeds { color: var(--ink-faint); opacity: .8; }
+.std-blocked { margin-top: 5px; font-size: 12.5px; color: var(--safety); font-weight: 550; }
+
+.std-health { text-align: right; flex: 0 0 auto; min-width: 104px; }
+.std-score { font-size: 23px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.std-pct { font-size: 14px; font-weight: 400; color: var(--ink-faint); }
+.std-nil { font-size: 13px; font-weight: 400; color: var(--ink-faint); }
+.std-improving { color: var(--ok); }
+.std-stable { color: var(--ink); }
+.std-declining { color: var(--warn); }
+.std-needs_intervention { color: var(--safety); }
+.std-unknown { color: var(--ink-faint); }
+.std-trend { font-size: 12px; color: var(--ink-soft); margin-top: 1px; }
+.std-conf { font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
 
 /* ---- Owner MIS --------------------------------------------------------- */
 

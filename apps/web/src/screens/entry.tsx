@@ -1,21 +1,26 @@
 /**
- * The way in.
+ * The front door.
  *
- * The demo used to open straight into a dental assistant's task list at 08:52,
- * mid-morning, with no explanation. That is abrupt for the same reason walking
- * into a stranger's shift is abrupt: you arrive already behind, with no idea
- * what you are looking at or why this person's list is the one in front of you.
+ * Rebuilt twice. The first version was a marketing splash; the second was a
+ * better-looking role picker, which was the same mistake in a nicer suit. The
+ * owner's correction is the right one and it is not about styling:
  *
- * So this says what KuBi is in one sentence, and then asks whose day you want
- * to see. That is not decoration — the whole product is role-specific by
- * design ("do not show everybody the entire clinic"), and choosing a person is
- * how you find that out. An owner sees eight numbers; an assistant sees the
- * next three things she has to do. Landing as one of them without being told
- * makes the app look thinner than it is.
+ *   A pilot opening a cockpit is not asked whether he is the captain or the
+ *   first officer. The system knows. It shows aircraft status.
  *
- * Everything on this screen is synthetic and says so, because a screenshot of
- * it must never be mistakeable for a real clinic.
+ * So this screen answers exactly one question — **how is my clinic right
+ * now** — and offers exactly one action. Who you are is settled afterwards,
+ * from the menu at the top right, the way Teams and Slack and Notion do it.
+ * Never at the front door.
+ *
+ * What was deliberately removed: "choose your role", the avatar circles, the
+ * persona cards, the multiple entry points, and the demo-simulator feeling
+ * that came with them.
+ *
+ * Everything here is read from the same state the command centre reads, so
+ * the front door cannot say READY while the clinic says otherwise.
  */
+import { clinicPulse } from '../demo-backend.js';
 
 export interface Persona {
   key: string;
@@ -25,14 +30,18 @@ export interface Persona {
   sees: string;
 }
 
+/**
+ * Still needed — by the person menu at the top right, not by this screen.
+ * The first entry is who KuBi opens as: the system already knows who you are.
+ */
 export const PERSONAS: Persona[] = [
-  {
-    key: 'deepak', name: 'Deepak V.', role: 'Owner',
-    sees: 'Eight numbers and what needs him. No task list.',
-  },
   {
     key: 'rahul', name: 'Rahul M.', role: 'Clinic manager',
     sees: 'The whole clinic — readiness, patients, exceptions, quality.',
+  },
+  {
+    key: 'deepak', name: 'Deepak V.', role: 'Owner',
+    sees: 'Eight numbers and what needs him. No task list.',
   },
   {
     key: 'priya', name: 'Priya S.', role: 'Dental assistant',
@@ -46,9 +55,6 @@ export const PERSONAS: Persona[] = [
     key: 'kavita', name: 'Kavita R.', role: 'Reception',
     sees: 'Today’s list, confirmations and follow-up calls.',
   },
-  // Phase 1 is the clinical workflow, so the three people who run the rest of
-  // it need a way in. Without a persona their dashboards exist and cannot be
-  // opened, which is the same as not existing.
   {
     key: 'mehta', name: 'Dr Mehta', role: 'Doctor',
     sees: 'Who is in the chair, who is not ready, and what is waiting on a check.',
@@ -63,40 +69,77 @@ export const PERSONAS: Persona[] = [
   },
 ];
 
-const initials = (name: string) =>
-  name.replace(/[^A-Za-z ]/g, '').split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2);
+/** Who KuBi opens as. Changed from the menu, never chosen at the door. */
+export const DEFAULT_PERSONA = PERSONAS[0]!;
 
-export function Entry({ onPick }: { onPick: (key: string) => void }) {
+const greeting = (h: number) =>
+  (h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening');
+
+export function Entry({ onEnter }: { onEnter: (key: string) => void }) {
+  const p = clinicPulse();
+  const now = new Date();
+  const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const day = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+
   return (
-    <div className="entry">
-      <div className="entry-inner">
-        <header className="entry-head">
-          <div className="entry-mark">KuBi</div>
-          <h1>A clinic that runs itself, and tells you when it doesn’t.</h1>
-          <p>
-            KuBi turns a clinic’s standards into work that appears on its own, is assigned
-            to somebody, has to be proved, gets checked by a second person, and escalates
-            when it doesn’t happen. What it shows you depends entirely on who you are.
-          </p>
+    <div className="gate">
+      <div className="gate-inner">
+
+        <header className="gate-head">
+          <div className="gate-clinic">{p.clinicName.replace('SYNTHETIC ', '')}</div>
+          <div className="gate-greet">
+            {greeting(now.getHours())}, {DEFAULT_PERSONA.name.replace(/ \w\.$/, '')}
+          </div>
+          <div className="gate-when">{day} · {time}</div>
         </header>
 
-        <h2 className="entry-ask">Whose day would you like to see?</h2>
-        <div className="entry-people">
-          {PERSONAS.map((p) => (
-            <button key={p.key} className="persona" type="button" onClick={() => onPick(p.key)}>
-              <span className="persona-av">{initials(p.name)}</span>
-              <span className="persona-main">
-                <span className="persona-name">{p.name}</span>
-                <span className="persona-role">{p.role}</span>
-                <span className="persona-sees">{p.sees}</span>
-              </span>
-            </button>
-          ))}
+        {/* The one question this screen answers. */}
+        <div className={`gate-status ${p.open ? 'is-open' : 'is-not'}`}>
+          <span className="gate-dot" aria-hidden="true" />
+          {p.open ? 'CLINIC OPEN' : 'NOT YET READY'}
+          {!p.open && p.openingTotal > 0 && (
+            <span className="gate-status-why">
+              opening {p.openingDone} of {p.openingTotal}
+            </span>
+          )}
         </div>
 
-        <p className="entry-foot">
-          Every patient, employee and record here is synthetic. You can switch person at any
-          time from the menu at the top right, and wind the day forward to closing.
+        <div className="gate-health">
+          {/* Null is "nothing to measure", never a reassuring zero. */}
+          {p.health === null
+            ? <span className="gate-nil">no work scheduled</span>
+            : <><b>{p.health}</b><span>%</span></>}
+          <div className="gate-health-label">today’s health</div>
+        </div>
+
+        <dl className="gate-vitals">
+          <div><dt>{p.patients}</dt><dd>patients</dd></div>
+          <div><dt>{p.inChair}</dt><dd>in chair</dd></div>
+          <div className={p.critical > 0 ? 'is-critical' : ''}>
+            <dt>{p.critical}</dt><dd>critical</dd>
+          </div>
+          <div className={p.important > 0 ? 'is-important' : ''}>
+            <dt>{p.important}</dt><dd>important</dd>
+          </div>
+        </dl>
+
+        {p.firstPatientInMinutes !== null && p.firstPatientInMinutes > 0 && (
+          <p className="gate-next">
+            First patient in <b>{p.firstPatientInMinutes} minutes</b>
+          </p>
+        )}
+
+        <button className="gate-enter" type="button" onClick={() => onEnter(DEFAULT_PERSONA.key)}>
+          Enter clinic
+        </button>
+
+        <p className="gate-foot">
+          Signing in as {DEFAULT_PERSONA.name} · {DEFAULT_PERSONA.role}.
+          Change person from the menu at the top right.
+        </p>
+
+        <p className="gate-synth">
+          Demonstration build — every patient, employee and record is synthetic.
         </p>
       </div>
     </div>

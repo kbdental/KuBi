@@ -15,6 +15,7 @@ import { Operations } from './screens/operations.js';
 import { Patients } from './screens/patients.js';
 import { Quality } from './screens/quality.js';
 import { Checks } from './screens/checks.js';
+import { Standards } from './screens/standards.js';
 import { Clinic } from './screens/clinic.js';
 import {
   IconToday, IconClinic, IconAttention, IconChecks,
@@ -227,6 +228,9 @@ export function App() {
           {/* The IMPROVE stage. Clinic-wide, like Overview: an assistant has a
               day, a manager has a clinic — and learning is a clinic's job. */}
           {data.overview && <Tab id="QUALITY" label="Quality" now={here} go={setChosen} />}
+          {/* The published standard — primary, not buried in settings. It is
+              the thing no competitor has, and burying it hides it. */}
+          {data.overview && <Tab id="STANDARDS" label="Standards" now={here} go={setChosen} />}
           <Tab id="ME" label="Me" now={here} go={setChosen} />
         </div>
         <div className="nav-who">
@@ -268,6 +272,7 @@ export function App() {
       {here === 'OPERATIONS' && <Operations onChanged={reload} />}
       {here === 'QUALITY' && <Quality onChanged={reload} />}
       {here === 'CHECKS' && <Checks items={data.checks} onDone={reload} />}
+      {here === 'STANDARDS' && <Standards />}
       {here === 'ME' && (
         <MeScreen me={data.me} onSignedOut={() => { setData(null); setChosen('TODAY'); }} />
       )}
@@ -290,6 +295,7 @@ const TAB_ICON: Record<string, (p: { filled: boolean }) => ReactElement> = {
   PATIENTS: ({ filled }) => <IconPatients filled={filled} />,
   OPERATIONS: ({ filled }) => <IconOperations filled={filled} />,
   QUALITY: ({ filled }) => <IconQuality filled={filled} />,
+  STANDARDS: ({ filled }) => <IconChecks filled={filled} />,
   CHECKS: ({ filled }) => <IconChecks filled={filled} />,
   ME: ({ filled }) => <IconMe filled={filled} />,
 };

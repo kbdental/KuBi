@@ -22,6 +22,8 @@
  *   - cancelling always records a reason
  */
 
+import { PARAMETER_SPEC } from '@kubi/contracts';
+
 type Role =
   | 'OWNER_DIRECTOR'
   | 'DENTAL_ASSISTANT' | 'CLINIC_MANAGER' | 'SENIOR_ASSISTANT' | 'RECEPTION'
@@ -810,6 +812,46 @@ export function jumpToEndOfDay() {
 
 export function signInAs(key: string) {
   db.signedIn = PEOPLE.find((p) => p.key === key) ?? null;
+}
+
+/**
+ * The clinic's vital signs, for the screen shown before anyone takes command.
+ *
+ * Read straight off the same state every other screen reads, so the front door
+ * and the command centre can never disagree about whether the clinic is ready.
+ * Available without signing in because this is the shell's own status display,
+ * not the application — a cockpit shows aircraft state before the pilot
+ * identifies themselves.
+ */
+export function clinicPulse() {
+  const opening = tally('Opening Readiness');
+  const visits = db.visits.filter((v) => v.status !== 'CANCELLED');
+  const critical = db.attention.filter((a) => a.open && a.severity === 'PATIENT_SAFETY');
+  const important = db.attention.filter((a) => a.open && a.severity !== 'PATIENT_SAFETY');
+  const assetsDown = db.assets.filter((a) => a.status !== 'OPERATIONAL');
+  const sterileReady = db.batches.some((b) => b.stage === 'RELEASED');
+
+  const done = db.tasks.filter((t) => ['COMPLETED', 'VERIFIED'].includes(t.status)).length;
+  const total = db.tasks.length;
+
+  return {
+    clinicName: 'SYNTHETIC KB Dental Andheri',
+    // OPEN once the opening set is done and nothing safety-critical is blocking.
+    open: !!opening?.complete && assetsDown.length === 0 && sterileReady,
+    openingDone: opening?.done ?? 0,
+    openingTotal: opening?.total ?? 0,
+    /** A real fraction of real work. Null when there is nothing to measure. */
+    health: total === 0 ? null : Math.round((done / total) * 100),
+    patients: visits.length,
+    inChair: db.visits.filter((v) => v.status === 'IN_CHAIR').length,
+    // KuBi has no rota, so this is doctors with a patient booked today, said
+    // as that rather than as "doctors on shift", which it does not know.
+    doctorsBooked: new Set(db.visits.filter((v) => v.status !== 'CANCELLED')
+      .map((v) => v.chairLabel)).size,
+    critical: critical.length,
+    important: important.length,
+    firstPatientInMinutes: nextVisit()?.startsInMinutes ?? null,
+  };
 }
 
 export function currentPerson(): Person | null {
@@ -1785,6 +1827,60 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
    * no percentages except the one progress figure that is genuinely a fraction
    * of work done.
    */
+  // ---- PARAMETER HEALTH: layer 5, with the trend that matters more ----
+  //
+  // A parameter is capped by what it stands on: a room-readiness score cannot
+  // honestly exceed the sterilisation it depends on, because a clean chair with
+  // no sterile kit is not a ready room. The graph is not decoration.
+
+  if (path === '/api/v1/parameter-health' && method === 'GET') {
+    const SCORES: Record<string, { score: number | null; trend: string; days: number | null }> = {
+      ATTENDANCE_LEAVE: { score: 97, trend: 'STABLE', days: 14 },
+      OPENING_READINESS: { score: 92, trend: 'IMPROVING', days: 4 },
+      CLEANLINESS: { score: 95, trend: 'STABLE', days: 9 },
+      MAINTENANCE_UTILITIES: { score: 78, trend: 'DECLINING', days: 6 },
+      INFECTION_CONTROL: { score: 92, trend: 'DECLINING', days: 12 },
+      ROOM_CHAIR_READINESS: { score: 88, trend: 'STABLE', days: 5 },
+      APPOINTMENT_CONTROL: { score: 94, trend: 'IMPROVING', days: 3 },
+      PATIENT_JOURNEY: { score: 91, trend: 'STABLE', days: 8 },
+      CLINICAL_DOCUMENTATION: { score: 81, trend: 'NEEDS_INTERVENTION', days: 19 },
+      SURGICAL_HIGH_RISK: { score: 96, trend: 'STABLE', days: 11 },
+      FOLLOWUP_EXPERIENCE: { score: 86, trend: 'DECLINING', days: 7 },
+      LABORATORY: { score: 76, trend: 'NEEDS_INTERVENTION', days: 15 },
+      INVENTORY_IMPLANTS: { score: 84, trend: 'IMPROVING', days: 2 },
+      // Nothing to measure: no conduct activity has run. Null, not zero, and
+      // UNKNOWN rather than STABLE — two days of silence is not stability.
+      STAFF_CONDUCT: { score: null, trend: 'UNKNOWN', days: null },
+      SAFETY_EMERGENCY: { score: 93, trend: 'STABLE', days: 10 },
+      QUALITY_CAPA: { score: 89, trend: 'IMPROVING', days: 6 },
+    };
+    // Mean confidence of the evidence actually behind each parameter's work.
+    const CONFIDENCE: Record<string, number> = {
+      INFECTION_CONTROL: 96, SAFETY_EMERGENCY: 88, MAINTENANCE_UTILITIES: 71,
+      CLINICAL_DOCUMENTATION: 74, LABORATORY: 82, ROOM_CHAIR_READINESS: 68,
+      CLEANLINESS: 62, ATTENDANCE_LEAVE: 100, OPENING_READINESS: 70,
+      APPOINTMENT_CONTROL: 79, PATIENT_JOURNEY: 84, SURGICAL_HIGH_RISK: 93,
+      FOLLOWUP_EXPERIENCE: 77, INVENTORY_IMPLANTS: 86, QUALITY_CAPA: 90,
+    };
+    const FAILING = 85;
+    const rows = Object.keys(SCORES).map((p) => {
+      const s = SCORES[p]!;
+      const deps = PARAMETER_SPEC[p as keyof typeof PARAMETER_SPEC].dependsOn;
+      return {
+        parameter: p,
+        score: s.score,
+        trend: s.trend,
+        days: s.days,
+        confidence: CONFIDENCE[p] ?? null,
+        blockedBy: deps.filter((d) => {
+          const up = SCORES[d];
+          return up && up.score !== null && up.score < FAILING;
+        }),
+      };
+    });
+    return json(rows);
+  }
+
   // ---- BRIEFING: one endpoint, five roles ----
   //
   // Mirrors what the real service will do: each domain contributes sections
