@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api, type AttentionRow } from '../api.js';
 import { IconGo } from '../icons.js';
+import { Notifications } from './notifications.js';
 
 /**
  * ATTENTION — the things that need a person, worst first.
@@ -43,6 +44,9 @@ export function Attention({
   onOpenTask?: ((instanceId: string) => void) | undefined;
 }) {
   const [open, setOpen] = useState<AttentionRow | null>(null);
+  // Attention is "what must be resolved"; notifications are "what somebody
+  // must be told". One question, two views — not two destinations.
+  const [view, setView] = useState<'ATTENTION' | 'NOTIFICATIONS'>('ATTENTION');
 
   if (open) {
     return <Resolve item={open} onCancel={() => setOpen(null)} onResolved={onResolved} />;
@@ -51,6 +55,27 @@ export function Attention({
   return (
     <div className="screen">
       <h1 className="screen-title">Attention</h1>
+
+      <div className="std-switch">
+        <button
+          className={`std-tab ${view === 'ATTENTION' ? 'is-on' : ''}`}
+          type="button"
+          onClick={() => setView('ATTENTION')}
+        >
+          To resolve
+        </button>
+        <button
+          className={`std-tab ${view === 'NOTIFICATIONS' ? 'is-on' : ''}`}
+          type="button"
+          onClick={() => setView('NOTIFICATIONS')}
+        >
+          Notifications
+        </button>
+      </div>
+
+      {view === 'NOTIFICATIONS' && <Notifications />}
+
+      {view === 'ATTENTION' && <>
       <p className="screen-sub">
         {items.length === 0 ? 'Nothing needs you right now.' : 'Most serious first.'}
       </p>
@@ -93,6 +118,7 @@ export function Attention({
           </button>
           );
       })}
+      </>}
     </div>
   );
 }

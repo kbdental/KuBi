@@ -16,6 +16,7 @@
  * the close button explains what is missing rather than failing when pressed.
  */
 import { useEffect, useState } from 'react';
+import { AuditTrail } from './audit.js';
 import { api, type Incident, type CapaAction } from '../api';
 
 const STAGE_LABELS = ['Reported', 'Contained', 'Investigated', 'Actions planned', 'Verifying', 'Closed'];
@@ -47,6 +48,9 @@ const SEVERITY: Record<string, { label: string; className: string }> = {
 };
 
 export function Quality({ onChanged }: { onChanged?: () => void }) {
+  // Quality is how the clinic learns; the audit trail is the evidence it
+  // learns from. One destination, two views.
+  const [view, setView] = useState<'INCIDENTS' | 'AUDIT'>('INCIDENTS');
   const [items, setItems] = useState<Incident[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +72,27 @@ export function Quality({ onChanged }: { onChanged?: () => void }) {
   return (
     <div className="screen">
       <h1 className="screen-title">Quality</h1>
+
+      <div className="std-switch">
+        <button
+          className={`std-tab ${view === 'INCIDENTS' ? 'is-on' : ''}`}
+          type="button"
+          onClick={() => setView('INCIDENTS')}
+        >
+          Incidents &amp; CAPA
+        </button>
+        <button
+          className={`std-tab ${view === 'AUDIT' ? 'is-on' : ''}`}
+          type="button"
+          onClick={() => setView('AUDIT')}
+        >
+          Audit trail
+        </button>
+      </div>
+
+      {view === 'AUDIT' && <AuditTrail />}
+
+      {view === 'INCIDENTS' && <>
       <p className="screen-sub">
         What went wrong, why it went wrong, and what stops it happening again.
       </p>
@@ -121,6 +146,7 @@ export function Quality({ onChanged }: { onChanged?: () => void }) {
           ))}
         </details>
       )}
+      </>}
     </div>
   );
 }

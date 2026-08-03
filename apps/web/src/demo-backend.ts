@@ -25,6 +25,8 @@
 import {
   PARAMETER_SPEC, TaskOrigin, Engine, ladder, ORIGIN_LABEL,
   SCORE_SPEC, SCORE_ORDER, outcomeOf, operationalScore, rollUp, rungAt,
+  RULES, TriggerEvent, ActionKind, fire, notificationsFor, AuditAction,
+  type Notification, type AuditEntry,
   STERILIZATION_SAME_DAY,
   type ManagementScore,
   type Responsibility, type EscalationRung,
@@ -126,14 +128,27 @@ interface Task {
  * in. Record the clinical event and the system raises the work it implies, to
  * the right person, at the right time.
  */
-const CASCADE_SPAWN = [
-  { when: 'Today', role: 'Doctor', title: 'Post-op instructions issued', due: 'Before discharge', parameter: 'Surgical & high-risk' },
-  { when: 'Today', role: 'Doctor', title: 'Prescription verification', due: 'Before discharge', parameter: 'Patient journey' },
-  { when: 'Today', role: 'Reception', title: 'Next appointment booked', due: 'Before discharge', parameter: 'Appointment control' },
-  { when: 'Today', role: 'Housekeeping', title: 'Deep clean surgical room', due: 'After procedure', parameter: 'Cleanliness' },
-  { when: 'Tomorrow', role: 'Doctor', title: 'Surgery follow-up call', due: 'Tomorrow', parameter: 'Follow-up & experience' },
-  { when: 'Later', role: 'Doctor', title: 'Clinical documentation check', due: 'Within 24h', parameter: 'Clinical documentation' },
-];
+/**
+ * The cascade, now produced by the automation engine rather than typed out.
+ *
+ * This was a hardcoded list sitting next to a real rule engine — which meant
+ * the screen demonstrating "nobody types these in" was itself typed in. Firing
+ * R-PROC-01 for real means the demo cannot drift from the rule, and changing
+ * the rule changes the demo.
+ */
+const CASCADE_SPAWN = fire(RULES, TriggerEvent.PROCEDURE_COMPLETED)
+  .flatMap((outcome) => outcome.actions)
+  .filter((a) => a.kind === ActionKind.RAISE)
+  .map((a) => ({
+    // "Tomorrow" and "Within 24h" are the matrix's own words; the grouping is
+    // derived from them rather than stored a second time.
+    when: /tomorrow/i.test(a.due ?? '') ? 'Tomorrow'
+      : /24h|later|within/i.test(a.due ?? '') ? 'Later' : 'Today',
+    role: a.to,
+    title: a.say,
+    due: a.due ?? 'Today',
+    activityId: a.activityId ?? null,
+  }));
 
 /**
  * Confirmation state, per the §6 example. Kept beside the visits rather than
@@ -146,6 +161,24 @@ const SPECIAL_INSTRUCTIONS: Record<string, string> = {
   v2: 'Nil by mouth from 06:00 — surgery',
   v4: 'Bring previous OPG',
 };
+
+/**
+ * Append to the audit trail.
+ *
+ * Every state change goes through here, including the refusals — a trail that
+ * records only what succeeded cannot answer the question an auditor actually
+ * asks, which is what the system stopped and why.
+ */
+function audit(
+  action: AuditAction, activityId: string, subject: string, by: string,
+  extra: Partial<AuditEntry> = {},
+): void {
+  db.audit.push({
+    id: `au-${db.nextAuditId++}`,
+    at: new Date().toISOString(),
+    action, activityId, subject, by, ...extra,
+  });
+}
 
 function workSpecFor(t: Task): {
   origin: TaskOrigin; engine: Engine; trigger: string;
@@ -829,6 +862,12 @@ function freshState() {
     tasks, visits, attention, incidents, patientProcedures, followups,
     assets, stock, implants, batches, labCases,
     nextIncidentNumber: 8,
+    /**
+     * The audit trail. Append-only by construction — nothing in this file
+     * updates or removes an entry, and the contracts layer offers no way to.
+     */
+    audit: [] as AuditEntry[],
+    nextAuditId: 1,
     /** Engine B demo state — has the clinical event been recorded yet. */
     cascadeFired: false,
     /**
@@ -1503,7 +1542,11 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
       return json({ error: 'This task is assigned to someone else.' }, 403);
     }
 
-    if (action === 'start') { t.status = 'IN_PROGRESS'; return json({ status: t.status }); }
+    if (action === 'start') {
+      t.status = 'IN_PROGRESS';
+      audit(AuditAction.STARTED, t.code, t.title, me.displayLabel);
+      return json({ status: t.status });
+    }
 
     if (action === 'report-problem') {
       const item = t.items.find((i) => i.id === body.itemId);
@@ -1533,26 +1576,49 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
             detail: `${t.cantConfirm}. Whoever is doing it cannot finish until someone with the authority says it is safe.`,
             owner: 'e-rahul', dueAt: null, instanceId: t.id, needsAuthorisation: true,
           });
+          audit(AuditAction.BLOCKED, t.code, t.title, 'Compliance engine', {
+            deviation: t.cantConfirm,
+          });
           return json({
             error: `${t.cantConfirm}. A manager has been asked to look at it — you don't need to chase them.`,
             canOverride: false,
           }, 409);
         }
         if (!String(body.overrideReason ?? '').trim()) {
+          audit(AuditAction.OVERRIDE_REQUESTED, t.code, t.title, me.displayLabel, {
+            deviation: t.cantConfirm,
+          });
           return json({
             error: `${t.cantConfirm}. Report a problem, or record why it is safe to go ahead.`,
             canOverride: true,
           }, 409);
         }
+        audit(AuditAction.OVERRIDE_GRANTED, t.code, t.title, me.displayLabel, {
+          deviation: `${t.cantConfirm} — allowed: ${String(body.overrideReason).trim()}`,
+        });
       }
 
       t.status = 'COMPLETED';
       t.completedBy = me.employeeId;
+      // What was recorded, not merely that something was.
+      const recorded = t.items
+        .map((i) => {
+          const r = t.responses[i.id];
+          return r?.value != null ? `${i.label} ${r.value}${i.unit ?? ''}` : null;
+        })
+        .filter(Boolean).join(' · ');
+      audit(AuditAction.COMPLETED, t.code, t.title, me.displayLabel, {
+        evidence: t.items.some((i) => i.requiresValue) ? 'VALUE' : 'CONFIRMATION',
+        ...(recorded ? { evidenceValue: recorded } : {}),
+      });
 
       const outOfRange: Array<{ label: string; value: number; unit: string | null }> = [];
       const ac = t.responses['i-401'];
       if (ac?.value != null && (ac.value < 20 || ac.value > 26)) {
         outOfRange.push({ label: 'Air conditioning set', value: ac.value, unit: '°C' });
+        audit(AuditAction.DEVIATION_RAISED, t.code, t.title, 'Exception engine', {
+          deviation: `Air conditioning ${ac.value}°C, outside 20–26°C`,
+        });
         raise({
           code: 'OPN.THRESHOLD', headline: `Air conditioning set is outside the normal range (${ac.value}°C)`,
           severity: 'IMPORTANT', detail: null, owner: 'e-rahul',
@@ -1562,6 +1628,11 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
 
       if (t.selfVerifyAllowed) {
         t.status = 'VERIFIED';
+        // Self-verification is recorded as exactly that. `independentlyVerified`
+        // will correctly report false for it later.
+        audit(AuditAction.VERIFIED, t.code, t.title, me.displayLabel, {
+          verifiedBy: me.displayLabel,
+        });
         return json({ status: 'VERIFIED', selfVerified: true, waitingForCheck: false, outOfRange });
       }
       return json({ status: 'COMPLETED', selfVerified: false, waitingForCheck: true, outOfRange });
@@ -1948,6 +2019,61 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
    * no percentages except the one progress figure that is genuinely a fraction
    * of work done.
    */
+  // ---- NOTIFICATIONS: derived from state, never stored ----
+  //
+  // A stored notification outlives the condition that caused it, and then
+  // somebody is chasing a stock item that arrived yesterday. So this reads the
+  // same db every screen reads and derives the set fresh.
+
+  if (path === '/api/v1/notifications' && method === 'GET') {
+    const now = Date.now();
+    const overdue = db.tasks
+      .filter((t) => (t.status === 'DUE' || t.status === 'IN_PROGRESS') && startOf(t) < now)
+      .map((t) => ({
+        id: t.id, title: t.title,
+        minutesLate: Math.round((now - startOf(t)) / 60000),
+        doer: 'Dental Assistant', activityId: t.code,
+      }));
+
+    const all = notificationsFor({
+      overdueTasks: overdue,
+      lowStock: db.stock.filter((x) => x.state !== 'OK')
+        // `available` excludes expired stock — the number that decides whether a
+        // reorder is genuinely needed, not what is sitting on the shelf.
+        .map((x) => ({ name: x.name, quantity: x.available, minimum: x.minimumQty })),
+      serviceDue: db.assets
+        .filter((a) => a.nextServiceInDays !== null && a.nextServiceInDays <= 7)
+        .map((a) => ({ id: a.id, name: a.name, dueLabel: `in ${a.nextServiceInDays} days` })),
+      followupsDue: db.followups
+        .map((f) => ({ id: f.id, patientLabel: f.patientLabel, overdue: f.overdue })),
+      consentMissing: db.patientProcedures
+        .filter((pp) => pp.status === 'PLANNED'
+          && pp.requirements.some((r) => /consent/i.test(r.label) && r.result !== 'PASS'))
+        .map((pp) => ({ id: pp.id, patientLabel: pp.patientLabel, procedure: pp.procedureName })),
+      labDelayed: db.labCases.filter((l) => l.overdue).map((l) => ({
+        id: l.id, reference: l.reference, patientLabel: l.patientLabel, daysLate: 3,
+      })),
+      waitingPatients: db.visits.filter((v) => v.status === 'ARRIVED' && v.arrivedAt)
+        .map((v) => ({
+          id: v.id, patientLabel: v.patientLabel,
+          waitingMinutes: Math.round((now - v.arrivedAt!) / 60000),
+        })),
+      emergencies: db.attention.filter((a) => a.open && a.severity === 'PATIENT_SAFETY')
+        .map((a) => ({ id: a.id, headline: a.headline })),
+      // The clinic's own number, not a hardcoded 15 in a component.
+      waitingThresholdMinutes: 15,
+    });
+    return json(all satisfies Notification[]);
+  }
+
+  // ---- AUDIT TRAIL: append-only, including the refusals ----
+
+  if (path === '/api/v1/audit' && method === 'GET') {
+    if (!MAY_SEE_CLINIC.some((r) => me.roles.includes(r))) return json({ error: 'Forbidden' }, 403);
+    // Newest first to read, but the stored order is never disturbed.
+    return json([...db.audit].reverse());
+  }
+
   // ---- ENGINES: the six, the cascade, and one activity fully modelled ----
   //
   // From prototype B, which showed these and A did not. Three things on one

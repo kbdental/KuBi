@@ -2089,3 +2089,46 @@ label.field-label {
   margin: 14px 0 0; padding: 10px 12px; border-radius: var(--radius-sm);
   background: var(--card); border: 1px solid var(--line); font-size: 14px;
 }
+
+/* ---- Notifications ------------------------------------------------------ */
+.nt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.nt-row {
+  background: var(--card); border: 1px solid var(--line);
+  border-left-width: 3px; border-radius: var(--radius-sm); padding: 12px 15px;
+}
+.nt-emergency { border-left-color: var(--safety); background: var(--safety-tint); }
+.nt-critical { border-left-color: var(--safety); }
+.nt-important { border-left-color: var(--warn); }
+.nt-routine { border-left-color: var(--line); }
+.nt-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 3px; }
+.nt-kind {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.nt-to {
+  background: var(--line-soft); color: var(--ink-soft);
+  border-radius: 999px; padding: 1px 9px; font-size: 11.5px; font-weight: 600;
+}
+.nt-headline { font-weight: 600; font-size: 15.5px; }
+
+/* ---- Audit trail -------------------------------------------------------- */
+.au-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.au-row {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 12px 15px;
+}
+.au-refusal { border-color: var(--safety-line); background: var(--safety-tint); }
+.au-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 3px; }
+.au-action {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.au-refusal .au-action { color: var(--safety); }
+.au-at { margin-left: auto; font-size: 12px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.au-subject { font-weight: 600; font-size: 15px; }
+.au-evidence {
+  margin-top: 6px; padding: 7px 10px; border-radius: var(--radius-sm);
+  background: var(--line-soft); font-size: 13.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.au-deviation { margin-top: 6px; font-size: 13.5px; color: var(--safety); font-weight: 550; }

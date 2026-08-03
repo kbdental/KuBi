@@ -602,6 +602,34 @@ export interface GateView {
   missingCount: number;
 }
 
+/** Derived from current state, never stored. */
+export interface NotificationRow {
+  id: string;
+  kind: string;
+  severity: string;
+  headline: string;
+  detail: string | null;
+  to: string;
+  activityId: string | null;
+}
+
+/** One entry in the append-only audit trail. */
+export interface AuditRow {
+  id: string;
+  at: string;
+  action: string;
+  activityId: string;
+  subject: string;
+  by: string;
+  verifiedBy?: string;
+  evidence?: string;
+  evidenceValue?: string;
+  deviation?: string;
+  capaRef?: string;
+  /** Set when this entry corrects an earlier one. Both are kept. */
+  supersedes?: string;
+}
+
 export interface OwnerBusiness {
   clinicName: string;
   known: Array<{ name: string; value: string | null; available: boolean; module: string | null }>;
@@ -713,6 +741,8 @@ export const api = {
   engines: () => call<EnginesView>('/api/v1/engines'),
   fireCascade: (fired: boolean) => post<{ fired: boolean }>('/api/v1/engines/cascade', { fired }),
   gate: () => call<GateView>('/api/v1/gate'),
+  notifications: () => call<NotificationRow[]>('/api/v1/notifications'),
+  audit: () => call<AuditRow[]>('/api/v1/audit'),
   toggleGateCheck: (id: string) => post<{ ok: boolean }>(`/api/v1/gate/${id}`, {}),
 
   commandCentre: () => call<CommandCentre>('/api/v1/command-centre'),
