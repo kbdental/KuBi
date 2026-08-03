@@ -18,6 +18,7 @@ import { ConfirmationsBoard } from './screens/confirmations.js';
 import { Gate } from './screens/gate.js';
 import { Clinic } from './screens/clinic.js';
 import { Patient360 } from './screens/patient-360.js';
+import { CommandPalette, useCommandKey } from './screens/command-palette.js';
 import {
   IconToday, IconClinic, IconAttention, IconChecks,
   IconQuality, IconPatients, IconOperations, IconMe, IconOverview,
@@ -81,6 +82,9 @@ export function App() {
   // several places rather than living behind one tab.
   const [openPatient, setOpenPatient] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
+  // Ctrl-K from anywhere. The fastest way to use KuBi, and the only thing on
+  // the review list that removes navigation rather than adding to it.
+  const [palette, setPalette] = useState(false);
 
   const refresh = useCallback(async () => {
     // The schedule is not fatal: someone who cannot see it still has a Today.
@@ -106,6 +110,8 @@ export function App() {
     });
   }, [refresh]);
 
+  useCommandKey(() => setPalette(true));
+
   if (checking) return <div className="empty">One moment…</div>;
 
   if (!data) {
@@ -119,9 +125,19 @@ export function App() {
     );
   }
 
+  const paletteEl = (
+    <CommandPalette
+      open={palette}
+      onClose={() => setPalette(false)}
+      onGo={(place) => { setOpenTask(null); setOpenPatient(null); setChosen(place); }}
+      onOpenPatient={(label) => { setOpenTask(null); setOpenPatient(label); }}
+    />
+  );
+
   if (openTask) {
     return (
       <div className="app">
+        {paletteEl}
         <main className="main">
           <TaskSheetScreen
             sheet={openTask}
@@ -136,6 +152,7 @@ export function App() {
   if (openPatient) {
     return (
       <div className="app">
+        {paletteEl}
         <main className="main">
           <Patient360 patientLabel={openPatient} onBack={() => setOpenPatient(null)} />
         </main>
@@ -196,6 +213,7 @@ export function App() {
 
   return (
     <div className="app">
+      {paletteEl}
       <nav className="nav">
         <div className="nav-brand">
           <span className="nav-mark">KuBi</span>
@@ -247,6 +265,10 @@ export function App() {
           {data.overview && <Tab id="STANDARDS" label="Standards" now={here} go={setChosen} />}
           <Tab id="ME" label="Me" now={here} go={setChosen} />
         </div>
+        <button className="nav-search" type="button" onClick={() => setPalette(true)}>
+          <span>Search</span>
+          <kbd>⌘K</kbd>
+        </button>
         <div className="nav-who">
           <span className="nav-who-name">{data.me.displayLabel}</span>
         </div>

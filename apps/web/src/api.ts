@@ -681,6 +681,18 @@ export interface Patient360 {
   notHeld: Array<{ what: string; needs: string }>;
 }
 
+/** One thing the search found. Every hit goes somewhere — never a dead end. */
+export interface SearchHit {
+  kind: string;
+  label: string;
+  detail: string | null;
+  /** A destination id, when the hit is a place. */
+  go: string | null;
+  /** A patient label, when the hit opens a record. */
+  patient: string | null;
+  score: number;
+}
+
 export interface OwnerBusiness {
   clinicName: string;
   known: Array<{ name: string; value: string | null; available: boolean; module: string | null }>;
@@ -794,6 +806,7 @@ export const api = {
   gate: () => call<GateView>('/api/v1/gate'),
   notifications: () => call<NotificationRow[]>('/api/v1/notifications'),
   audit: () => call<AuditRow[]>('/api/v1/audit'),
+  search: (q: string) => call<SearchHit[]>(`/api/v1/search?q=${encodeURIComponent(q)}`),
   patient: (label: string) =>
     call<Patient360>(`/api/v1/patients/${encodeURIComponent(label)}`),
   toggleGateCheck: (id: string) => post<{ ok: boolean }>(`/api/v1/gate/${id}`, {}),

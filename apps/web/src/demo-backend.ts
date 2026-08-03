@@ -27,7 +27,7 @@ import {
   SCORE_SPEC, SCORE_ORDER, outcomeOf, operationalScore, rollUp, rungAt,
   RULES, TriggerEvent, ActionKind, fire, notificationsFor, AuditAction,
   type Notification, type AuditEntry,
-  STERILIZATION_SAME_DAY,
+  STERILIZATION_SAME_DAY, ACTIVITY_LIBRARY,
   type ManagementScore,
   type Responsibility, type EscalationRung,
 } from '@kubi/contracts';
@@ -2041,6 +2041,78 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
    * no percentages except the one progress figure that is genuinely a fraction
    * of work done.
    */
+  // ---- UNIVERSAL SEARCH: the fastest way to use KuBi ----
+  //
+  // The problem this solves is not "finding things". It is that a clinic with
+  // thirty operational concepts cannot be learned by exploring menus, and a
+  // new assistant should not have to. One box, everything in it, no navigation.
+  //
+  // Searches what the app already holds. Nothing here is a new store.
+
+  if (path === '/api/v1/search' && method === 'GET') {
+    // `path` has already had its query stripped a few lines above, so the
+    // term has to come off the raw url. Parsing `path` found no `q` and the
+    // palette silently returned nothing for every search.
+    const q = decodeURIComponent((/[?&]q=([^&]*)/.exec(url)?.[1] ?? '')).trim().toLowerCase();
+    if (q.length < 2) return json([]);
+
+    const hits: Array<{
+      kind: string; label: string; detail: string | null;
+      go: string | null; patient: string | null; score: number;
+    }> = [];
+
+    // A prefix match beats a match buried mid-string: somebody typing "ster"
+    // means sterilisation, not "instruments to be sterilised" three words in.
+    const rank = (text: string) => {
+      const t = text.toLowerCase();
+      if (!t.includes(q)) return 0;
+      return t.startsWith(q) ? 3 : t.split(/\s+/).some((w) => w.startsWith(q)) ? 2 : 1;
+    };
+    const add = (
+      kind: string, label: string, detail: string | null,
+      go: string | null, patient: string | null = null, extra = '',
+    ) => {
+      const score = Math.max(rank(label), rank(extra));
+      if (score > 0) hits.push({ kind, label, detail, go, patient, score });
+    };
+
+    for (const v of db.visits) {
+      add('Patient', v.patientLabel, `${v.visitType} · ${v.chairLabel}`, null, v.patientLabel, v.patientUhid);
+    }
+    for (const l of db.labCases) {
+      add('Lab case', l.reference, `${l.patientLabel} · ${l.workType}`, null, l.patientLabel, `${l.workType} ${l.vendor}`);
+    }
+    for (const a of db.assets) {
+      add('Equipment', a.name, `${a.status.toLowerCase().replace(/_/g, ' ')}`, 'CLINIC', null, a.category);
+    }
+    for (const st of db.stock) {
+      add('Stock', st.name, `${st.available} ${st.unit} available`, 'CLINIC', null, st.code);
+    }
+    for (const t of db.tasks) {
+      add('Task', t.title, t.standard, 'TODAY', null, t.code);
+    }
+    for (const at of db.attention.filter((x) => x.open)) {
+      add('Problem', at.headline, at.detail, 'ATTENTION');
+    }
+    for (const person of PEOPLE) {
+      add('Person', person.displayLabel, person.roles.join(', ').toLowerCase().replace(/_/g, ' '), null);
+    }
+    // The 101 activities — an SOP nobody can find is an SOP nobody follows.
+    for (const a of ACTIVITY_LIBRARY) {
+      add('Standard', a.activity, `${a.id} · ${a.fn}`, 'STANDARDS', null, `${a.id} ${a.kpi ?? ''}`);
+    }
+    for (const [id, label] of [
+      ['TODAY', 'My tasks'], ['CLINIC', 'Clinic'], ['PATIENTS', 'Patients'],
+      ['ATTENTION', 'Attention'], ['QUALITY', 'Quality'], ['STANDARDS', 'Standards'],
+    ] as const) {
+      add('Go to', label, null, id);
+    }
+
+    hits.sort((a, b) => b.score - a.score || a.label.localeCompare(b.label));
+    // Enough to be useful, few enough to read without scrolling.
+    return json(hits.slice(0, 20));
+  }
+
   // ---- PATIENT 360, organised by the journey rather than by module ----
   //
   // Sixteen equal sections would be the module-first mistake in one screen.
