@@ -23,6 +23,23 @@ import { api, type Briefing as Data, type BriefingItem } from '../api.js';
 
 /** Same lookup the Attention screen uses. Not a second set of class names. */
 const TONE: Record<string, string> = { GREEN: 'ok', AMBER: 'important', RED: 'critical' };
+/**
+ * Why each item exists, in one word.
+ *
+ * Until now every real item was RECURRING, and the other four object types
+ * lived only on demonstration screens — so "not everything is a checklist" was
+ * true of the architecture and invisible in anybody's actual day. A person
+ * looking at their list should be able to see that this line came from a
+ * clinical event and that one is a gate refusing to let a procedure start.
+ */
+const ORIGIN: Record<string, { label: string; cls: string }> = {
+  RECURRING: { label: 'Scheduled', cls: 'or-time' },
+  PATIENT_EVENT: { label: 'Patient event', cls: 'or-event' },
+  CONDITION: { label: 'Condition', cls: 'or-cond' },
+  GATE: { label: 'Gate', cls: 'or-gate' },
+  EXCEPTION: { label: 'Overdue', cls: 'or-exc' },
+};
+
 const RAIL: Record<string, string> = {
   PATIENT_SAFETY: 'pri-safety', CRITICAL: 'pri-critical',
   IMPORTANT: 'pri-important', ROUTINE: 'pri-routine',
@@ -91,6 +108,13 @@ export function BriefingScreen({
   );
 }
 
+/** One word saying which engine raised this. */
+function Origin({ origin }: { origin: string }) {
+  const o = ORIGIN[origin];
+  if (!o) return null;
+  return <span className={`bf-origin ${o.cls}`}>{o.label}</span>;
+}
+
 function Item({
   item, onOpenTask,
 }: {
@@ -115,6 +139,7 @@ function Item({
       <li className={`bf-item ${item.tone ? `bf-fact-${TONE[item.tone] ?? 'ok'}` : ''}`}>
         <div className="bf-text">{item.text}</div>
         {item.detail && <div className="row-note">{item.detail}</div>}
+        <Origin origin={item.origin} />
       </li>
     );
   }
@@ -126,6 +151,7 @@ function Item({
         {item.detail && <span className="row-note">{item.detail}</span>}
         {/* Every task traces to a standard. Constitution rule 5, on screen. */}
         {item.activityCode && <span className="bf-code">{item.activityCode}</span>}
+        <Origin origin={item.origin} />
       </button>
     </li>
   );

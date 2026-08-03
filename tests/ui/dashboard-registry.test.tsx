@@ -66,9 +66,10 @@ describe('routing by role', () => {
   });
 
   it('returns null rather than guessing for a role with no live dashboard', () => {
-    // Housekeeping is real and has no dashboard yet. The shell shows their
-    // task list; it must not land them on somebody else's screen.
-    expect(homeFor(['HOUSEKEEPING'])).toBeNull();
+    // A role with no dashboard must land on its own task list, never on
+    // somebody else's screen. Housekeeping used to be the example here and now
+    // has one of its own — INVENTORY_COORDINATOR is the current case.
+    expect(homeFor(['INVENTORY_COORDINATOR'])).toBeNull();
     expect(homeFor([])).toBeNull();
   });
 
@@ -106,7 +107,8 @@ describe('the registry as a record of what is missing', () => {
     const built = allDashboards()
       .filter((d) => d.status === DashboardStatus.LIVE).map((d) => d.id).sort();
     expect(built).toEqual([
-      'ASSISTANT', 'COMMAND', 'DESK', 'DOCTOR', 'LAB', 'OWNER', 'STERILIZATION',
+      'ASSISTANT', 'COMMAND', 'DESK', 'DOCTOR', 'HOUSEKEEPING', 'LAB', 'OWNER',
+      'STERILIZATION',
     ]);
   });
 

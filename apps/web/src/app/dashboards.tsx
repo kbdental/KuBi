@@ -112,6 +112,17 @@ export function registerAllDashboards(): void {
     render: (ctx) => <BriefingScreen onOpenTask={ctx.openTask} onRefresh={ctx.reload} />,
   });
 
+  registerDashboard({
+    id: 'HOUSEKEEPING',
+    question: 'What needs cleaning, and when?',
+    label: 'My rounds',
+    roles: ['HOUSEKEEPING'],
+    phase: 1,
+    status: DashboardStatus.LIVE,
+    home: true,
+    render: (ctx) => <BriefingScreen onOpenTask={ctx.openTask} onRefresh={ctx.reload} />,
+  });
+
   // ── Phase 2 · during the pilot ────────────────────────────────────────
 
   registerDashboard({

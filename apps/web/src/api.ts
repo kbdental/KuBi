@@ -467,6 +467,8 @@ export interface CommandCentre {
 export interface BriefingItem {
   id: string;
   kind: 'task' | 'fact';
+  /** Which of the five object types raised this: RECURRING, PATIENT_EVENT, CONDITION, GATE, EXCEPTION. */
+  origin: string;
   text: string;
   detail: string | null;
   /** Tasks only. Null on a fact. */

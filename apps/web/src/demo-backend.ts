@@ -33,7 +33,7 @@ import {
 type Role =
   | 'OWNER_DIRECTOR'
   | 'DENTAL_ASSISTANT' | 'CLINIC_MANAGER' | 'SENIOR_ASSISTANT' | 'RECEPTION'
-  | 'TREATING_DOCTOR' | 'LAB_COORDINATOR' | 'STERILIZATION_TECHNICIAN';
+  | 'TREATING_DOCTOR' | 'LAB_COORDINATOR' | 'STERILIZATION_TECHNICIAN' | 'HOUSEKEEPING';
 
 interface Person {
   key: string;
@@ -57,6 +57,7 @@ export const PEOPLE: Person[] = [
   // screens could not be reached at all.
   { key: 'mehta', email: 'mehta@synthetic.test', employeeId: 'e-mehta', displayLabel: 'SYNTHETIC Dr Mehta', roles: ['TREATING_DOCTOR'] },
   { key: 'suresh', email: 'suresh@synthetic.test', employeeId: 'e-suresh', displayLabel: 'SYNTHETIC Suresh B.', roles: ['LAB_COORDINATOR'] },
+  { key: 'ramesh', email: 'ramesh@synthetic.test', employeeId: 'e-ramesh', displayLabel: 'SYNTHETIC Ramesh P.', roles: ['HOUSEKEEPING'] },
   { key: 'lakshmi', email: 'lakshmi@synthetic.test', employeeId: 'e-lakshmi', displayLabel: 'SYNTHETIC Lakshmi N.', roles: ['STERILIZATION_TECHNICIAN'] },
 ];
 
@@ -1085,6 +1086,8 @@ function operationalHealth() {
  */
 interface BriefItem {
   id: string; kind: 'task' | 'fact'; text: string; detail: string | null;
+  /** Which of the five object types raised this. */
+  origin: TaskOrigin;
   taskId: string | null; priority: string | null; tone: string | null;
   blockedBy: string | null; activityCode: string | null;
 }
@@ -2351,18 +2354,32 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
   // screen can never disagree about how many batches are unfinished.
 
   if (path === '/api/v1/briefing' && method === 'GET') {
+    // Every item says which engine raised it. The five object types are only
+    // real if they show up in somebody's actual day — up to now they existed
+    // in the model and on demonstration screens, and every real item was
+    // RECURRING.
     const fact = (
       id: string, text: string, detail: string | null = null, tone: string | null = null,
+      origin: TaskOrigin = TaskOrigin.CONDITION,
     ): BriefItem => ({
-      id, kind: 'fact', text, detail, tone,
+      id, kind: 'fact', text, detail, tone, origin,
       taskId: null, priority: null, blockedBy: null, activityCode: null,
     });
-    const task = (t: Task): BriefItem => ({
+    const task = (t: Task, origin: TaskOrigin = TaskOrigin.RECURRING): BriefItem => ({
       id: t.id, kind: 'task', text: t.title,
       detail: t.status === 'IN_PROGRESS' ? 'started' : null,
-      taskId: t.id, priority: priorityOf(t), tone: null,
+      taskId: t.id, priority: priorityOf(t), tone: null, origin,
       blockedBy: t.blockedBy, activityCode: t.code,
     });
+    // Work raised by the cascade, for whichever role it belongs to.
+    const spawned = (roleName: string): BriefItem[] => (db.cascadeFired
+      ? CASCADE_SPAWN.filter((c) => c.role === roleName).map((c, i) => ({
+        id: `cas-${roleName}-${i}`, kind: 'fact' as const, text: c.title,
+        detail: `${c.due} · raised by surgery completed`, tone: 'AMBER',
+        origin: TaskOrigin.PATIENT_EVENT,
+        taskId: null, priority: null, blockedBy: null, activityCode: null,
+      }))
+      : []);
     const mine = db.tasks.filter((t) => t.assignee === me.employeeId);
     const openTasks = mine.filter((t) => t.status === 'DUE' || t.status === 'IN_PROGRESS');
 
@@ -2390,7 +2407,7 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
           notReady.map((p) => fact(
             p.id, `${p.patientLabel} · ${p.procedureName}`,
             p.requirements.filter((r) => r.result !== 'PASS').map((r) => r.label).join(' · '),
-            'RED',
+            'RED', TaskOrigin.GATE,
           ))),
         section('labqc', 'Lab work waiting on my check', qcWaiting.length ? 'AMBER' : 'GREEN',
           'A case cannot be booked for delivery until this passes.',
@@ -2400,7 +2417,11 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         section('followups', 'Follow-ups needing me', redFlags.length ? 'RED' : 'GREEN',
           null, 'No follow-up has raised a flag.',
           redFlags.map((f) => fact(f.id, f.patientLabel,
-            f.redFlagReason ?? f.procedureName, 'RED'))),
+            f.redFlagReason ?? f.procedureName, 'RED', TaskOrigin.PATIENT_EVENT))),
+        section('spawned', 'Raised by a clinical event',
+          spawned('Doctor').length ? 'AMBER' : 'GREEN',
+          'Nobody typed these in — recording the surgery raised them.',
+          'No clinical event has raised work for you.', spawned('Doctor')),
         section('today', 'Booked today', 'GREEN', null, 'Nobody booked.',
           booked.map((v) => fact(v.id, v.patientLabel,
             `${v.visitType} · ${v.chairLabel}`, null))),
@@ -2486,9 +2507,38 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
             null, 'No released packs — the clinic cannot treat.',
             released.map((b) => fact(b.id, b.batchRef, `${b.packCount} packs`, 'GREEN'))),
           section('mywork', 'My tasks', openTasks.length ? 'AMBER' : 'GREEN',
-            null, 'Nothing outstanding.', openTasks.map(task)),
+            null, 'Nothing outstanding.', openTasks.map((t) => task(t))),
         ],
       ));
+    }
+
+    // ---- Housekeeping ----
+    if (me.roles.includes('HOUSEKEEPING')) {
+      const rooms = db.visits.filter((v) => v.status === 'COMPLETED');
+      return json(briefing('Housekeeping', 'What needs cleaning, and when?', null, [
+        section('opening', 'Before the first patient', 'AMBER',
+          'Rooms, chairs, washrooms.', 'Opening clean is done.',
+          [
+            fact('hk1', 'Treatment rooms and chairs cleaned', 'by 09:30', 'GREEN', TaskOrigin.RECURRING),
+            fact('hk2', 'Washrooms cleaned and stocked', 'by 09:30', 'GREEN', TaskOrigin.RECURRING),
+          ]),
+        section('midday', 'During the day', 'AMBER',
+          null, 'Nothing outstanding.',
+          [fact('hk3', 'High-touch surface round', 'by 14:00', 'AMBER', TaskOrigin.RECURRING)]),
+        section('turnaround', 'Rooms to turn around',
+          rooms.length ? 'AMBER' : 'GREEN',
+          'A chair cannot take the next patient until it is done.',
+          'Every room is ready.',
+          rooms.map((v) => fact(v.id, v.chairLabel,
+            `after ${v.patientLabel}`, 'AMBER', TaskOrigin.CONDITION))),
+        section('spawned', 'Raised by a clinical event',
+          spawned('Housekeeping').length ? 'AMBER' : 'GREEN',
+          'Nobody typed these in.', 'No clinical event has raised work for you.',
+          spawned('Housekeeping')),
+        section('closing', 'Closing', 'AMBER',
+          'The day cannot close with these open.', 'Closing is clear.',
+          [fact('hk4', 'Biomedical waste segregated and handed over', 'at closing', 'AMBER', TaskOrigin.RECURRING)]),
+      ]));
     }
 
     // ---- Assistant (dental and senior) ----
@@ -2507,7 +2557,7 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
       { total: mine.length, done: mine.filter((t) => t.status === 'VERIFIED' || t.status === 'COMPLETED').length },
       [
         section('opening', 'Before the first patient', before.length ? 'AMBER' : 'GREEN',
-          null, 'Opening is done.', before.map(task)),
+          null, 'Opening is done.', before.map((t) => task(t))),
         section('patients', 'Patients to prepare', toPrepare.length ? 'AMBER' : 'GREEN',
           'Chairside setup and scans.', 'Nobody left to prepare.',
           toPrepare.map((v) => fact(v.id, v.patientLabel,
@@ -2522,10 +2572,14 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
           toDispatch.map((l) => fact(l.id, `${l.patientLabel} · ${l.workType}`,
             `${l.reference} · ${l.vendor}`, 'AMBER'))),
         section('other', 'Everything else', other.length ? 'AMBER' : 'GREEN',
-          null, 'Nothing outstanding.', other.map(task)),
+          null, 'Nothing outstanding.', other.map((t) => task(t))),
         section('closing', 'Closing', closing.length ? 'AMBER' : 'GREEN',
           'The day cannot close with these open.', 'Closing is clear.',
-          closing.map(task)),
+          closing.map((t) => task(t))),
+        section('spawned', 'Raised by a clinical event',
+          spawned('Housekeeping').length ? 'AMBER' : 'GREEN',
+          'Nobody typed these in.', 'No clinical event has raised work for you.',
+          spawned('Housekeeping')),
       ],
     ));
   }

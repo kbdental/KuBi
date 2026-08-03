@@ -64,6 +64,10 @@ export const PERSONAS: Persona[] = [
     sees: 'What is late, what arrived, and what may be booked.',
   },
   {
+    key: 'ramesh', name: 'Ramesh P.', role: 'Housekeeping',
+    sees: 'His rounds, and the rooms waiting to be turned around.',
+  },
+  {
     key: 'lakshmi', name: 'Lakshmi N.', role: 'Sterilisation',
     sees: 'The instrument loop, and what nobody may release yet.',
   },

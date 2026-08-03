@@ -2019,3 +2019,17 @@ label.field-label {
 .gt-verdict p { margin: 8px 0 0; font-size: 14.5px; line-height: 1.5; }
 .gt-verdict.is-ready { background: var(--accent-soft); color: var(--accent); }
 .gt-verdict.is-not { background: var(--safety-tint); color: var(--safety); }
+
+/* Which engine raised this line. The five object types, visible in real work
+   rather than only on a demonstration screen. */
+.bf-origin {
+  display: inline-block; margin-top: 6px;
+  border-radius: 999px; padding: 1px 9px;
+  font-size: 11px; font-weight: 650; letter-spacing: .02em;
+}
+.or-time { background: var(--line-soft); color: var(--ink-faint); }
+.or-event { background: #eef2ff; color: #4338ca; }
+.or-cond { background: var(--warn-tint); color: var(--warn); }
+.or-gate { background: var(--safety-tint); color: var(--safety); }
+.or-exc { background: var(--safety); color: #fff; }
+@media (prefers-color-scheme: dark) { .or-event { background: #232a4d; color: #a5b4fc; } }
