@@ -1725,6 +1725,210 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     });
   }
 
+  /**
+   * The Manager's command centre — six questions, in the order they are asked.
+   *
+   * Deliberately NOT the old overview. That screen answered "how is the clinic
+   * scoring", which is a reporting question; these answer "can we work, and
+   * what is stopping us", which is an operating one. No trends, no sparklines,
+   * no percentages except the one progress figure that is genuinely a fraction
+   * of work done.
+   */
+  if (path === '/api/v1/command-centre' && method === 'GET') {
+    if (!MAY_SEE_CLINIC.some((r) => me.roles.includes(r))) return json({ error: 'Forbidden' }, 403);
+
+    const opening = tally('Opening Readiness');
+    const roomsReady = db.assets.filter((a) => a.category === 'DENTAL_CHAIR' && a.status === 'OPERATIONAL').length;
+    const roomsTotal = db.assets.filter((a) => a.category === 'DENTAL_CHAIR').length;
+    const sterileReady = db.batches.some((b) => b.stage === 'RELEASED');
+
+    // Critical means "stops us treating someone", not "is red on a chart".
+    const blockers: Array<{ id: string; label: string }> = [];
+    if (opening && !opening.complete) {
+      blockers.push({ id: 'opening', label: `Opening ${opening.done} of ${opening.total} done` });
+    }
+    for (const a of db.assets.filter((x) => x.status !== 'OPERATIONAL')) {
+      blockers.push({ id: a.id, label: `${a.name} out of service` });
+    }
+    if (!sterileReady) blockers.push({ id: 'ster', label: 'No sterile packs released' });
+
+    const ready = blockers.length === 0;
+
+    // The five that matter most, most serious first. A sixth card is a list,
+    // and a list is what this screen exists to replace.
+    const cards = [
+      ...db.attention.filter((a) => a.open && a.severity === 'PATIENT_SAFETY'),
+      ...db.attention.filter((a) => a.open && a.severity === 'CRITICAL'),
+      ...db.attention.filter((a) => a.open && a.severity === 'IMPORTANT'),
+    ].slice(0, 5).map((a) => ({ id: a.id, headline: a.headline, severity: a.severity }));
+
+    const all = db.tasks;
+    const done = all.filter((t) => t.status === 'COMPLETED' || t.status === 'VERIFIED').length;
+    const running = all.filter((t) => t.status === 'IN_PROGRESS').length;
+
+    const visits = db.visits.filter((v) => v.status !== 'CANCELLED');
+    const nextV = nextVisit();
+
+    return json({
+      ready,
+      blockers,
+      readiness: {
+        opening: opening ? (opening.complete ? 'Complete' : `${opening.done} of ${opening.total}`) : null,
+        rooms: roomsTotal > 0 ? `${roomsReady} / ${roomsTotal}` : null,
+        sterilization: sterileReady ? 'Ready' : 'Not ready',
+        // Attendance is not built, so this says so rather than showing a tick
+        // nobody earned.
+        doctors: null,
+        reception: opening?.complete ? 'Ready' : 'Not ready',
+        patientsToday: visits.length,
+        firstPatientInMinutes: nextV ? nextV.startsInMinutes : null,
+      },
+      cards,
+      work: {
+        total: all.length,
+        done,
+        running,
+        pending: all.length - done - running,
+      },
+      patients: {
+        appointments: visits.length,
+        waiting: visits.filter((v) => v.status === 'ARRIVED').length,
+        inChair: visits.filter((v) => v.status === 'IN_CHAIR').length,
+        surgery: db.patientProcedures.filter((p) => p.category === 'IMPLANT_SURGERY').length,
+        followupsDue: db.followups.filter((f) => f.outcome === 'PENDING').length,
+      },
+      // One light per person. Not a percentage — a manager glancing at this
+      // wants to know who is here, not how the team scored.
+      team: PEOPLE.filter((p) => p.roles[0] !== 'OWNER_DIRECTOR').map((p) => ({
+        name: p.displayLabel.replace('SYNTHETIC ', ''),
+        role: p.roles[0]!.toLowerCase().replace(/_/g, ' '),
+        // Attendance is not built. AMBER means "we do not know", never green.
+        light: 'AMBER' as const,
+        note: 'Attendance not recorded — no check-in module yet',
+      })),
+      health: [
+        { name: 'Opening', light: opening?.complete ? 'GREEN' : 'RED' },
+        { name: 'Inventory', light: db.stock.some((x) => x.state === 'SHORTAGE') ? 'RED'
+          : db.stock.some((x) => x.state === 'REORDER') ? 'AMBER' : 'GREEN' },
+        { name: 'Lab', light: db.labCases.some((l) => l.overdue) ? 'RED'
+          : db.labCases.some((l) => !l.deliveryReady) ? 'AMBER' : 'GREEN' },
+        { name: 'Compliance', light: db.patientProcedures.some((p) =>
+          p.requirements.some((r) => r.result === 'FAIL' && r.enforcement === 'BLOCK_HARD')) ? 'RED' : 'GREEN' },
+        { name: 'Maintenance', light: db.assets.some((a) => a.status !== 'OPERATIONAL') ? 'RED'
+          : db.assets.some((a) => a.nextServiceInDays !== null && a.nextServiceInDays <= 7) ? 'AMBER' : 'GREEN' },
+        { name: 'Safety', light: db.attention.some((a) => a.open && a.severity === 'PATIENT_SAFETY') ? 'RED' : 'GREEN' },
+      ],
+    });
+  }
+
+  /**
+   * The OWNER's dashboard, which is a different app from the manager's.
+   *
+   * The owner asked for business: revenue, collections, pending payments,
+   * chair utilisation, treatment acceptance, reviews, doctor productivity,
+   * profit, lab revenue, clinic score, attendance, satisfaction.
+   *
+   * KuBi holds none of the money. There is no billing, no payments ledger, no
+   * CRM and no review integration, so nine of those twelve cannot be answered
+   * at all. They are returned with `available: false` and the module that
+   * would supply them, rather than a plausible figure.
+   *
+   * This is the whole discipline of the product applied to its own dashboard:
+   * a number nobody can source is worse than a blank, because a blank prompts
+   * a question and an invented figure ends one.
+   */
+  if (path === '/api/v1/owner-business' && method === 'GET') {
+    if (!MAY_SEE_CLINIC.some((r) => me.roles.includes(r))) return json({ error: 'Forbidden' }, 403);
+
+    const visits = db.visits.filter((v) => v.status !== 'CANCELLED');
+    const seen = db.visits.filter((v) => v.status === 'COMPLETED').length;
+    const chairs = db.assets.filter((a) => a.category === 'DENTAL_CHAIR');
+    const chairsUp = chairs.filter((a) => a.status === 'OPERATIONAL').length;
+
+    const opening = tally('Opening Readiness');
+    const openingOk = opening ? opening.complete : false;
+    const lights = [
+      openingOk,
+      !db.stock.some((x) => x.state === 'SHORTAGE'),
+      !db.labCases.some((l) => l.overdue),
+      !db.assets.some((a) => a.status !== 'OPERATIONAL'),
+      !db.attention.some((a) => a.open && a.severity === 'PATIENT_SAFETY'),
+    ];
+    const clinicScore = Math.round((lights.filter(Boolean).length / lights.length) * 100);
+
+    const need = (name: string, module: string) =>
+      ({ name, value: null as string | null, available: false, module });
+
+    return json({
+      clinicName: 'SYNTHETIC KB Dental Andheri',
+      // What KuBi actually knows.
+      known: [
+        { name: 'Clinic score', value: `${clinicScore}%`, available: true, module: null },
+        { name: 'Patients today', value: String(visits.length), available: true, module: null },
+        { name: 'Seen so far', value: String(seen), available: true, module: null },
+        {
+          name: 'Chairs available',
+          value: `${chairsUp} of ${chairs.length}`,
+          available: true, module: null,
+        },
+      ],
+      // What it cannot, and what would be needed.
+      missing: [
+        need('Today’s revenue', 'Billing'),
+        need('Collections', 'Billing'),
+        need('Pending payments', 'Billing'),
+        need('Profit', 'Billing and costs'),
+        need('Lab revenue', 'Billing'),
+        need('Chair utilisation', 'Appointment durations vs chair hours'),
+        need('Treatment acceptance', 'Treatment plans with accept/decline'),
+        need('Google reviews', 'Review integration'),
+        need('Doctor productivity', 'Billing, plus a doctor role'),
+        need('Staff attendance', 'Check-in'),
+        need('Patient satisfaction', 'Feedback capture'),
+      ],
+      critical: db.attention.filter((a) => a.open && a.severity === 'PATIENT_SAFETY')
+        .map((a) => ({ id: a.id, headline: a.headline })),
+      attention: db.attention.filter((a) => a.open && a.severity !== 'PATIENT_SAFETY')
+        .map((a) => ({ id: a.id, headline: a.headline })),
+    });
+  }
+
+  /**
+   * Reception's board. Patients, not statistics.
+   */
+  if (path === '/api/v1/reception-board' && method === 'GET') {
+    const visits = db.visits.filter((v) => v.status !== 'CANCELLED');
+    const nextV = nextVisit();
+    return json({
+      next: nextV ? {
+        patientLabel: nextV.patientLabel,
+        visitType: nextV.visitType,
+        inMinutes: nextV.startsInMinutes,
+        chairLabel: nextV.chairLabel,
+      } : null,
+      waiting: visits.filter((v) => v.status === 'ARRIVED').map((v) => ({
+        id: v.id, patientLabel: v.patientLabel, visitType: v.visitType,
+        waitingMinutes: v.arrivedAt ? Math.round((Date.now() - v.arrivedAt) / 60000) : 0,
+      })),
+      // A patient whose slot has passed and who is not in a chair.
+      delayed: visits.filter((v) =>
+        v.status === 'ARRIVED' && visitStart(v) < Date.now()).map((v) => ({
+        id: v.id, patientLabel: v.patientLabel,
+        lateMinutes: Math.round((Date.now() - visitStart(v)) / 60000),
+      })),
+      confirmations: visits.filter((v) => v.status === 'BOOKED').length,
+      followups: db.followups.filter((f) => f.outcome === 'PENDING').map((f) => ({
+        id: f.id, patientLabel: f.patientLabel, procedureName: f.procedureName,
+        dueLabel: f.dueLabel, overdue: f.overdue,
+      })),
+      labReady: db.labCases.filter((l) => l.deliveryReady).map((l) => ({
+        id: l.id, reference: l.reference, patientLabel: l.patientLabel, workType: l.workType,
+      })),
+      // Payments need a billing module. Said rather than shown as zero.
+      paymentsAvailable: false,
+    });
+  }
+
   // ---- OPERATIONS: equipment, stock, implants, sterilisation ----
 
   if (path === '/api/v1/operations' && method === 'GET') {

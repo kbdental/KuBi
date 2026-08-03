@@ -102,20 +102,36 @@ for (const s of SIZES) {
   await page.waitForTimeout(900);
 
   const tabs = await page.$$eval('.tab', (els) => els.map((e) => e.textContent?.trim() ?? ''));
-  if (!tabs.some((t) => t.includes('Overview'))) {
-    problems.push(`${s.name}: the manager has no Overview tab (tabs: ${tabs.join(', ')})`);
+  // The manager's clinic-wide view is the command centre now, not "Overview".
+  // What is being checked has not changed: an assistant must not get it.
+  if (!tabs.some((t) => t.includes('Command'))) {
+    problems.push(`${s.name}: the manager has no clinic-wide view (tabs: ${tabs.join(', ')})`);
   } else {
-    await page.click('.tab:has-text("Overview")');
+    await page.click('.tab:has-text("Command")');
     await page.waitForTimeout(400);
-    await sideways('Overview');
-    await shot(page, `${s.name}-03-overview`);
+    await sideways('the command centre');
+    await shot(page, `${s.name}-03-command`);
 
-    const bars = await page.$$eval('.bar-slot', (e) => e.length);
-    if (bars !== 7) problems.push(`${s.name}: the week chart has ${bars} bars, expected 7`);
-    // A shut day must draw as absent. Drawn as a zero-height bar it would read
-    // as a failed day, which is a lie about the clinic.
-    const hollow = await page.$$eval('.bar-none', (e) => e.length);
-    if (hollow !== 1) problems.push(`${s.name}: expected 1 no-data slot in the week, found ${hollow}`);
+    // The command centre answers six questions and shows nothing else. These
+    // check the constraints the owner set, not the styling:
+    //
+    //   the readiness verdict is present and is the largest thing on it;
+    //   at most five attention cards, because a sixth makes it a list;
+    //   no sparkline, bar chart or trend line anywhere.
+    const verdict = await page.$('.cc-verdict');
+    if (!verdict) problems.push(`${s.name}: the command centre has no readiness verdict`);
+
+    const cards = await page.$$eval('.cc-card', (e) => e.length);
+    if (cards > 5) problems.push(`${s.name}: ${cards} attention cards, more than the five allowed`);
+
+    const charts = await page.$$eval('.spark, .bars, .bar-slot, .chart', (e) => e.length);
+    if (charts > 0) {
+      problems.push(`${s.name}: ${charts} chart elements on the command centre — it should have none`);
+    }
+
+    // Every light is a light, never a percentage.
+    const lights = await page.$$eval('.lt', (e) => e.length);
+    if (lights < 6) problems.push(`${s.name}: expected at least 6 status lights, found ${lights}`);
   }
 
   for (const [tab, name] of [['Clinic', '04-clinic'], ['Attention', '05-attention']]) {
@@ -129,7 +145,10 @@ for (const s of SIZES) {
   // so reaching it is the only way to prove the screen renders at all.
   await page.click('.demo-reset:has-text("closing")');
   await page.waitForTimeout(900);
-  await page.click('.tab:has-text("Today")');
+  // The personal task list is labelled "Today" for staff and "My tasks" for
+  // roles that have their own command centre. Matched on either, so renaming
+  // a tab for one role does not silently stop verifying the handover.
+  await page.click('.tab:has-text("Today"), .tab:has-text("My tasks")');
   await page.waitForTimeout(500);
   const cue = await page.$('.handover-cue');
   if (!cue) {

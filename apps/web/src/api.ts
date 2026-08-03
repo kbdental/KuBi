@@ -406,6 +406,47 @@ export interface Operations {
   };
 }
 
+export interface CommandCentre {
+  ready: boolean;
+  blockers: Array<{ id: string; label: string }>;
+  readiness: {
+    opening: string | null; rooms: string | null; sterilization: string | null;
+    /** Null where KuBi genuinely does not know. Never rendered as a tick. */
+    doctors: string | null; reception: string | null;
+    patientsToday: number; firstPatientInMinutes: number | null;
+  };
+  cards: Array<{ id: string; headline: string; severity: string }>;
+  work: { total: number; done: number; running: number; pending: number };
+  patients: {
+    appointments: number; waiting: number; inChair: number;
+    surgery: number; followupsDue: number;
+  };
+  team: Array<{ name: string; role: string; light: string; note: string | null }>;
+  health: Array<{ name: string; light: string }>;
+}
+
+export interface OwnerBusiness {
+  clinicName: string;
+  known: Array<{ name: string; value: string | null; available: boolean; module: string | null }>;
+  /** Asked for, and not answerable without the named module. */
+  missing: Array<{ name: string; value: string | null; available: boolean; module: string | null }>;
+  critical: Array<{ id: string; headline: string }>;
+  attention: Array<{ id: string; headline: string }>;
+}
+
+export interface ReceptionBoard {
+  next: { patientLabel: string; visitType: string; inMinutes: number; chairLabel: string } | null;
+  waiting: Array<{ id: string; patientLabel: string; visitType: string; waitingMinutes: number }>;
+  delayed: Array<{ id: string; patientLabel: string; lateMinutes: number }>;
+  confirmations: number;
+  followups: Array<{
+    id: string; patientLabel: string; procedureName: string;
+    dueLabel: string; overdue: boolean;
+  }>;
+  labReady: Array<{ id: string; reference: string; patientLabel: string; workType: string }>;
+  paymentsAvailable: boolean;
+}
+
 export const api = {
   login: (email: string, password: string) =>
     post<{ displayLabel: string; roleCodes: string[] }>('/api/v1/auth/login', { email, password }),
@@ -482,4 +523,8 @@ export const api = {
   labQc: (id: string, result: 'PASS' | 'FAIL', note?: string) =>
     post<DemoLabCase>(`/api/v1/lab-cases/${id}/qc`, { result, ...(note ? { note } : {}) }),
   bookDelivery: (id: string) => post<DemoLabCase>(`/api/v1/lab-cases/${id}/book`, {}),
+
+  commandCentre: () => call<CommandCentre>('/api/v1/command-centre'),
+  ownerBusiness: () => call<OwnerBusiness>('/api/v1/owner-business'),
+  receptionBoard: () => call<ReceptionBoard>('/api/v1/reception-board'),
 };

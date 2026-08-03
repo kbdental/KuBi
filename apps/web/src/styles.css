@@ -1452,3 +1452,169 @@ label.field-label {
   background: #fdf4f4;
   border-radius: 0 7px 7px 0;
 }
+
+/* ---- Command centre ---------------------------------------------------- */
+
+/* 1 — Is my clinic ready. Roughly 40% of a laptop viewport, deliberately: it
+   is the only question that must be answered before the rest matter. */
+.cc-ready {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(240px, 1fr);
+  gap: 24px;
+  align-items: start;
+  /* Prominent, but sized by its content rather than pinned to a fraction of
+     the viewport: a card holding two blockers should not reserve a third of
+     the screen of empty pink below them. On a ready clinic it collapses to
+     the verdict and the facts, which is the right amount of space for good
+     news. */
+  min-height: 30vh;
+  padding: 28px 30px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  margin-bottom: 26px;
+}
+.cc-ready-yes { background: #eef7f3; border-color: #bfdfd2; }
+.cc-ready-no { background: #fdf2f2; border-color: #f0c2c4; }
+
+.cc-verdict {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: clamp(24px, 3.6vw, 38px);
+  font-weight: 750;
+  letter-spacing: -.025em;
+  line-height: 1.05;
+}
+.cc-dot { width: 16px; height: 16px; border-radius: 50%; flex: 0 0 auto; }
+.cc-ready-yes .cc-verdict { color: #0b5648; }
+.cc-ready-yes .cc-dot { background: var(--ok); }
+.cc-ready-no .cc-verdict { color: var(--safety); }
+.cc-ready-no .cc-dot { background: var(--safety); }
+
+.cc-blockers { margin: 14px 0 6px; font-weight: 650; }
+.cc-blocker-list { margin: 0 0 16px; padding-left: 18px; line-height: 1.7; }
+.cc-open { min-width: 160px; }
+
+.cc-facts { display: grid; gap: 10px; margin: 0; }
+.cc-fact { display: flex; justify-content: space-between; gap: 14px; align-items: baseline; }
+.cc-fact dt { color: var(--ink-soft); font-size: 13.5px; }
+.cc-fact dd { margin: 0; font-weight: 650; font-size: 15px; }
+/* Not known, said plainly. Never a tick nobody earned. */
+.cc-unknown { color: var(--ink-soft); font-weight: 400; font-style: italic; }
+
+.cc-head {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-soft);
+  margin: 0 0 12px;
+}
+
+/* 2 — Cards, never a list. Five is the cap. */
+.cc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; margin-bottom: 26px; }
+.cc-card {
+  text-align: left;
+  font: inherit;
+  font-weight: 600;
+  padding: 15px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+  line-height: 1.35;
+}
+.cc-card:hover { border-color: var(--ink-soft); }
+.cc-patient_safety { border-color: #f0c2c4; background: #fdf4f4; color: var(--safety); }
+.cc-critical { border-color: #f0c2c4; background: #fdf6f5; }
+.cc-important { border-color: #ecd9a8; background: var(--warn-tint); }
+.cc-ok { border-color: #bfdfd2; background: #eef7f3; }
+
+.cc-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-bottom: 22px; }
+.cc-panel { border: 1px solid var(--line); border-radius: 14px; background: #fff; padding: 18px 20px; }
+
+/* 3 — The work ring. One arc, no axis, no legend, readable across a room. */
+.cc-ring-row { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+.cc-ring { width: 128px; height: 128px; flex: 0 0 auto; }
+.cc-ring-track { fill: none; stroke: var(--line); stroke-width: 14; }
+.cc-ring-value { fill: none; stroke: var(--ok); stroke-width: 14; stroke-linecap: round; }
+.cc-ring-n { text-anchor: middle; font-size: 30px; font-weight: 750; fill: var(--ink); }
+.cc-ring-of { text-anchor: middle; font-size: 13px; fill: var(--ink-soft); }
+
+.cc-counts { display: grid; gap: 8px; margin: 0; }
+.cc-counts > div { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.cc-counts dt { color: var(--ink-soft); font-size: 13.5px; }
+.cc-counts dd { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+
+/* The patient counts are five separate facts, not a two-column table. Laid
+   out as blocks with the number above its label: run as label/value rows they
+   read as one long sentence ("Appointments 5 Waiting 0 In chair 0"). */
+.cc-counts-wide {
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 14px 10px;
+  margin-bottom: 16px;
+}
+.cc-counts-wide > div { display: block; }
+.cc-counts-wide dd { font-size: 26px; line-height: 1.1; }
+.cc-counts-wide dt { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.25; }
+
+/* 5 and 6 — one light each. No percentages anywhere. */
+.cc-lights { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 9px; }
+.cc-lights li { display: flex; align-items: baseline; gap: 10px; }
+.lt { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; transform: translateY(1px); }
+.lt-green { background: var(--ok); }
+.lt-amber { background: var(--warn); }
+.lt-red { background: var(--safety); }
+.lt-name { font-weight: 600; }
+.lt-role { color: var(--ink-soft); font-size: 12.5px; }
+.cc-note { margin: 0; font-size: 12.5px; color: var(--ink-soft); line-height: 1.5; }
+
+@media (max-width: 720px) {
+  .cc-ready { grid-template-columns: 1fr; min-height: 0; padding: 22px; }
+}
+
+/* ---- Owner business ---------------------------------------------------- */
+
+.biz-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 8px; }
+.biz-tile { border: 1px solid var(--line); border-radius: 13px; background: #fff; padding: 18px 20px; }
+.biz-tile b { display: block; font-size: 30px; font-weight: 750; letter-spacing: -.03em; line-height: 1.1; }
+.biz-tile span { display: block; font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+/* Absent, and saying what would answer it. Dashed, so it never reads as data. */
+.biz-missing { border-style: dashed; background: transparent; }
+.biz-missing b { color: #c4ccd4; }
+.biz-missing em { display: block; font-size: 11.5px; color: var(--ink-soft); margin-top: 6px; font-style: normal; }
+.biz-cta { margin-top: 20px; }
+
+/* ---- Reception --------------------------------------------------------- */
+
+.rc-next {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  padding: 24px 26px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  margin-bottom: 24px;
+}
+.rc-next-when {
+  font-size: clamp(22px, 3.4vw, 34px);
+  font-weight: 750;
+  letter-spacing: -.02em;
+  color: var(--ok);
+  white-space: nowrap;
+}
+.rc-next-who { font-size: 19px; font-weight: 650; }
+
+.rc-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 10px; }
+.rc-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  align-items: baseline;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.rc-list li:last-child { border-bottom: 0; }
+.rc-name { font-weight: 600; }
+.rc-mins { color: var(--ink-soft); font-size: 13px; white-space: nowrap; }
+.rc-list .row-note { grid-column: 1 / -1; }
