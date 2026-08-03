@@ -146,9 +146,12 @@ function Row({ p, health }: { p: Parameter; health: ParameterHealthRow | null })
       <div className="std-main">
         <div className="std-name">{PARAMETER_LABEL[p]}</div>
 
+        {/* Seven facts a row, of which four changed nobody's behaviour on a
+            Tuesday morning. Weight, what this feeds, and evidence confidence
+            are all true and all inert: if they change, nothing happens today.
+            They move behind the fold rather than out of the product. */}
         <div className="std-meta">
-          <span className="std-weight">{weightOf(p).toFixed(1)} pts</span>
-          {/* One owner, or the absence said out loud rather than left blank. */}
+          {/* Who to talk to — the one piece of metadata that is actionable. */}
           {unowned ? (
             <span className="std-unowned">owner not decided</span>
           ) : (
@@ -156,25 +159,30 @@ function Row({ p, health }: { p: Parameter; health: ParameterHealthRow | null })
           )}
         </div>
 
-        {/* The graph, in the two directions that matter operationally. */}
-        {spec.dependsOn.length > 0 && (
-          <div className="std-dep">
-            needs {spec.dependsOn.map((d) => PARAMETER_LABEL[d]).join(', ').toLowerCase()}
-          </div>
-        )}
-        {feeds.length > 0 && (
-          <div className="std-dep std-feeds">
-            feeds {feeds.map((d) => PARAMETER_LABEL[d]).join(', ').toLowerCase()}
-          </div>
-        )}
-
-        {/* A parameter cannot honestly outrank what it stands on. */}
+        {/* Only when it is actually blocking. The full dependency graph is a
+            reference fact; a parameter being held back right now is a job. */}
         {health && health.blockedBy.length > 0 && (
           <div className="std-blocked">
             held back by {health.blockedBy
               .map((d) => PARAMETER_LABEL[d as Parameter] ?? d).join(', ').toLowerCase()}
           </div>
         )}
+
+        <details className="std-more">
+          <summary>How it is weighted</summary>
+          <div className="std-more-body">
+            <div>{weightOf(p).toFixed(1)} points of the grade</div>
+            {spec.dependsOn.length > 0 && (
+              <div>needs {spec.dependsOn.map((d) => PARAMETER_LABEL[d]).join(', ').toLowerCase()}</div>
+            )}
+            {feeds.length > 0 && (
+              <div>feeds {feeds.map((d) => PARAMETER_LABEL[d]).join(', ').toLowerCase()}</div>
+            )}
+            {health?.confidence != null && (
+              <div>evidence confidence {health.confidence}%</div>
+            )}
+          </div>
+        </details>
       </div>
 
       <div className="std-health">
@@ -188,11 +196,6 @@ function Row({ p, health }: { p: Parameter; health: ParameterHealthRow | null })
           <span aria-hidden="true">{TREND_MARK[trend]}</span> {TREND_LABEL[trend]}
           {health?.days ? ` ${health.days}d` : ''}
         </div>
-        {health?.confidence !== null && health?.confidence !== undefined && (
-          // Two clinics can both report 100% while one proves it with printouts
-          // and the other with ticked boxes. This is the difference.
-          <div className="std-conf">evidence {health.confidence}%</div>
-        )}
       </div>
     </div>
   );

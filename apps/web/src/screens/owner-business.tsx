@@ -41,6 +41,11 @@ export function OwnerBusiness({ onOpenQuality }: { onOpenQuality?: () => void })
     .filter((l) => l.deviationCount > 0)
     .sort((a, b) => (a.value ?? 101) - (b.value ?? 101))[0] ?? null;
 
+  // "If this number changes, what will the user do?" — for a line with no
+  // deviations behind it, nothing. It is reported, not offered as a control.
+  const actionable = sb.lines.filter((l) => l.deviationCount > 0);
+  const clear = sb.lines.filter((l) => l.deviationCount === 0);
+
   // The drill-down. Only deviations — never a report.
   if (open) {
     return (
@@ -109,9 +114,18 @@ export function OwnerBusiness({ onOpenQuality }: { onOpenQuality?: () => void })
         </div>
       </div>
 
-      {/* The eight. Not sixteen parameters, and not a chart. */}
+      {/* Two of the eight had nothing wrong with them, and pressing either
+          opened a screen saying "nothing wrong here". A number you cannot act
+          on does not deserve a control — so the clear lines are stated once,
+          quietly, and the pressable list is only what has something behind it. */}
+      {clear.length > 0 && (
+        <p className="sb-clear">
+          Running to standard: {clear.map((l) => l.label.toLowerCase()).join(', ')}.
+        </p>
+      )}
+
       <ul className="sb-lines">
-        {sb.lines.map((l) => (
+        {actionable.map((l) => (
           <li key={l.id}>
             <button
               className="sb-line"

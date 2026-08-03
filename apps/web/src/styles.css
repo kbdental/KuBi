@@ -2233,3 +2233,23 @@ label.field-label {
 .sb-verdict.is-bad b { color: var(--safety); }
 .sb-verdict.is-ok { background: var(--accent-soft); border-color: var(--accent-line); }
 .sb-verdict.is-ok b { color: var(--accent); }
+
+/* Facts that are true and inert — behind the fold rather than out of the
+   product. If a number changes and nothing happens today, it is not a
+   headline. */
+.std-more { margin-top: 6px; }
+.std-more summary {
+  cursor: pointer; list-style: none;
+  font-size: 12.5px; color: var(--ink-faint); min-height: 28px;
+  display: flex; align-items: center;
+}
+.std-more summary::-webkit-details-marker { display: none; }
+.std-more summary::after { content: ' ›'; margin-left: 4px; }
+.std-more[open] summary::after { content: ' ⌄'; }
+.std-more-body {
+  display: grid; gap: 2px; padding: 6px 0 2px;
+  font-size: 12.5px; color: var(--ink-soft);
+}
+.sb-clear {
+  margin: 0 0 14px; font-size: 13.5px; color: var(--ink-faint); line-height: 1.5;
+}
