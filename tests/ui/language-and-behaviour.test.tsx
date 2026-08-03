@@ -89,7 +89,18 @@ describe('the screens speak clinic language, never the engine’s', () => {
   it('Today shows the work without jargon', () => {
     // The most urgent unblocked task is lifted out into "Happening now", so
     // the list below holds what is still to come.
-    render(<Today day={day} onOpenTask={() => {}} onRefresh={() => {}} />);
+    // Checks moved inside Today: doing and checking are both "my work today",
+    // so a person looks in one place rather than two.
+    render(
+      <Today
+        day={day}
+        checks={[]}
+        onOpenTask={() => {}}
+        onRefresh={() => {}}
+        onOpenHandover={() => {}}
+        onChecked={() => {}}
+      />,
+    );
     expect(screen.getByText('Check the emergency kit')).toBeDefined();
     expect(visibleText()).not.toMatch(NEVER_ON_SCREEN);
   });

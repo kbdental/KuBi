@@ -19,17 +19,19 @@ import { IconGo, IconTick } from '../icons.js';
  * not who did it.
  */
 export function Checks({
-  items, onDone,
+  items, onDone, embedded = false,
 }: {
   items: CheckRow[];
   onDone: () => void;
+  /** Rendered inside Today, which already asks "what is my work". */
+  embedded?: boolean;
 }) {
   const [open, setOpen] = useState<CheckRow | null>(null);
 
   if (open) return <OneCheck item={open} onCancel={() => setOpen(null)} onDone={onDone} />;
 
-  return (
-    <div className="screen">
+  const body = (
+    <>
       <h1 className="screen-title">Checks</h1>
       <p className="screen-sub">
         {items.length === 0 ? 'Nothing to confirm.' : 'Work waiting on your confirmation.'}
@@ -55,8 +57,11 @@ export function Checks({
           <span className="row-go"><IconGo /></span>
         </button>
       ))}
-    </div>
+    </>
   );
+
+  if (embedded) return body;
+  return <div className="screen">{body}</div>;
 }
 
 function OneCheck({

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Operations } from './operations.js';
 import { api, type Schedule, type ScheduleRow } from '../api.js';
 
 /**
@@ -28,12 +29,17 @@ function hhmm(iso: string, timezone: string | undefined): string {
 }
 
 export function Clinic({
-  schedule, canAct, onChanged,
+  schedule, canAct, onChanged, showOperations = false,
 }: {
   schedule: Schedule;
   canAct: boolean;
   onChanged: () => void;
+  /** Only for people who may see the clinic as a whole. */
+  showOperations?: boolean;
 }) {
+  // The clinic is its people and its kit. Splitting those across two tabs made
+  // "is the clinic able to work" a two-place question.
+  const [view, setView] = useState<'PATIENTS' | 'KIT'>('PATIENTS');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -58,9 +64,20 @@ export function Clinic({
     }
   }
 
+  if (view === 'KIT') {
+    return (
+      <div className="screen screen-wide">
+        <h1 className="screen-title">Clinic</h1>
+        <ClinicSwitch view={view} setView={setView} />
+        <Operations onChanged={onChanged} embedded />
+      </div>
+    );
+  }
+
   return (
     <div className="screen">
       <h1 className="screen-title">Clinic</h1>
+      {showOperations && <ClinicSwitch view={view} setView={setView} />}
       <p className="screen-sub">
         {rows.length === 0
           ? 'Nothing booked today.'
@@ -127,6 +144,39 @@ export function Clinic({
         );
       })}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The people in the clinic, versus the kit they need.
+ *
+ * Only shown to people who may see the clinic as a whole — an assistant gets
+ * the patient list and nothing else, which is the same permission the separate
+ * Operations tab used to carry.
+ */
+function ClinicSwitch({
+  view, setView,
+}: {
+  view: 'PATIENTS' | 'KIT';
+  setView: (v: 'PATIENTS' | 'KIT') => void;
+}) {
+  return (
+    <div className="std-switch">
+      <button
+        className={`std-tab ${view === 'PATIENTS' ? 'is-on' : ''}`}
+        type="button"
+        onClick={() => setView('PATIENTS')}
+      >
+        Today’s list
+      </button>
+      <button
+        className={`std-tab ${view === 'KIT' ? 'is-on' : ''}`}
+        type="button"
+        onClick={() => setView('KIT')}
+      >
+        Equipment &amp; stock
+      </button>
     </div>
   );
 }

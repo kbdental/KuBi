@@ -1,4 +1,6 @@
-import type { MyDay, BucketName, TaskRow } from '../api.js';
+import type { MyDay, BucketName, TaskRow, CheckRow } from '../api.js';
+import { Checks } from './checks.js';
+import { useState } from 'react';
 import { ClinicHeader } from './clinic-header.js';
 import { CurrentTask } from './current-task.js';
 import { IconGo } from '../icons.js';
@@ -31,13 +33,20 @@ function time(iso: string, timezone: string | undefined): string {
 }
 
 export function Today({
-  day, onOpenTask, onRefresh, onOpenHandover,
+  day, checks, onOpenTask, onRefresh, onOpenHandover, onChecked,
 }: {
   day: MyDay;
+  /** What this person must check for somebody else. Empty for most people. */
+  checks: CheckRow[];
   onOpenTask: (id: string) => void;
   onRefresh: () => void;
   onOpenHandover: () => void;
+  onChecked: () => void;
 }) {
+  // Doing and checking are both "my work today", so they share a destination.
+  // A separate Checks tab made a person look in two places for one question,
+  // and sat empty for everybody who is nobody's checker.
+  const [view, setView] = useState<'MINE' | 'CHECK'>('MINE');
   const total = SECTIONS.reduce((n, s) => n + day.buckets[s.key].length, 0);
 
   // The one thing happening right now: the most urgent unfinished task. It is
@@ -46,10 +55,22 @@ export function Today({
   const current = [...day.buckets.OVERDUE, ...day.buckets.NOW]
     .find((t) => !t.blockedBy) ?? null;
 
+  if (view === 'CHECK') {
+    return (
+      <div className="screen">
+        {day.clinic && <ClinicHeader clinic={day.clinic} />}
+        <WorkSwitch view={view} setView={setView} checks={checks.length} />
+        <Checks items={checks} onDone={() => { onChecked(); setView('MINE'); }} embedded />
+      </div>
+    );
+  }
+
   return (
     <div className="screen">
       {/* Where the clinic is, before what any one person has to do. */}
       {day.clinic && <ClinicHeader clinic={day.clinic} />}
+
+      {checks.length > 0 && <WorkSwitch view={view} setView={setView} checks={checks.length} />}
 
       {/* The handover appears when the day is actually ending, rather than as a
           seventh tab sitting empty until 8pm. The owner asked for a small number
@@ -147,5 +168,38 @@ function TaskButton({
       </div>
       <span className="row-go"><IconGo /></span>
     </button>
+  );
+}
+
+/**
+ * Mine to do, versus mine to check.
+ *
+ * Only appears for people who are actually somebody's checker — most staff
+ * never see it, which is the point of merging rather than adding a tab.
+ */
+function WorkSwitch({
+  view, setView, checks,
+}: {
+  view: 'MINE' | 'CHECK';
+  setView: (v: 'MINE' | 'CHECK') => void;
+  checks: number;
+}) {
+  return (
+    <div className="std-switch">
+      <button
+        className={`std-tab ${view === 'MINE' ? 'is-on' : ''}`}
+        type="button"
+        onClick={() => setView('MINE')}
+      >
+        My work
+      </button>
+      <button
+        className={`std-tab ${view === 'CHECK' ? 'is-on' : ''}`}
+        type="button"
+        onClick={() => setView('CHECK')}
+      >
+        To check {checks > 0 && <span className="bf-count">{checks}</span>}
+      </button>
+    </div>
   );
 }

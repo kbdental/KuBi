@@ -11,10 +11,8 @@ import { TaskSheetScreen } from './screens/task-sheet.js';
 import { Attention } from './screens/attention.js';
 import { dashboardsFor, homeFor, DashboardStatus } from './app/registry.js';
 import { registerAllDashboards } from './app/dashboards.js';
-import { Operations } from './screens/operations.js';
 import { Patients } from './screens/patients.js';
 import { Quality } from './screens/quality.js';
-import { Checks } from './screens/checks.js';
 import { Standards } from './screens/standards.js';
 import { ConfirmationsBoard } from './screens/confirmations.js';
 import { Gate } from './screens/gate.js';
@@ -163,7 +161,6 @@ export function App() {
     }
   }
 
-  const showChecks = data.checks.length > 0;
   // The owner's KuBi is a different app, not a filtered one.
   const isOwner = data.me.roleCodes.includes('OWNER_DIRECTOR');
 
@@ -212,9 +209,6 @@ export function App() {
           {/* Readiness before the chair, follow-up after it. Clinical work, so
               it follows the same permission as the clinic-wide views. */}
           {!isOwner && data.overview && <Tab id="PATIENTS" label="Patients" now={here} go={setChosen} />}
-          {/* Equipment, stock and sterilisation. Clinic-wide, so it follows the
-              same permission as the other whole-clinic views. */}
-          {!isOwner && data.overview && <Tab id="OPERATIONS" label="Operations" now={here} go={setChosen} />}
           {!isOwner && (
             <Tab
               id="ATTENTION"
@@ -223,9 +217,6 @@ export function App() {
               go={setChosen}
               count={data.attention.length}
             />
-          )}
-          {!isOwner && showChecks && (
-            <Tab id="CHECKS" label="Checks" now={here} go={setChosen} count={data.checks.length} />
           )}
           {/* The IMPROVE stage. Clinic-wide, like Overview: an assistant has a
               day, a manager has a clinic — and learning is a clinic's job. */}
@@ -250,9 +241,11 @@ export function App() {
       {here === 'TODAY' && (
         <Today
           day={data.day}
+          checks={data.checks}
           onOpenTask={(id) => void open(id)}
           onRefresh={reload}
           onOpenHandover={() => void openTheHandover()}
+          onChecked={reload}
         />
       )}
       {here === 'CLINIC' && (
@@ -260,6 +253,7 @@ export function App() {
           schedule={data.schedule}
           canAct={CAN_MOVE_VISITS.some((r) => data.me.roleCodes.includes(r))}
           onChanged={reload}
+          showOperations={data.overview !== null}
         />
       )}
       {here === 'ATTENTION' && (
@@ -277,9 +271,7 @@ export function App() {
         openTask: (id) => void open(id),
       })}
       {here === 'PATIENTS' && <Patients onChanged={reload} />}
-      {here === 'OPERATIONS' && <Operations onChanged={reload} />}
       {here === 'QUALITY' && <Quality onChanged={reload} />}
-      {here === 'CHECKS' && <Checks items={data.checks} onDone={reload} />}
       {here === 'STANDARDS' && <Standards />}
       {here === 'CONFIRMATIONS' && <ConfirmationsBoard />}
       {here === 'GATE' && <Gate />}
@@ -303,12 +295,10 @@ const TAB_ICON: Record<string, (p: { filled: boolean }) => ReactElement> = {
   LAB: ({ filled }) => <IconOperations filled={filled} />,
   INVENTORY: ({ filled }) => <IconOperations filled={filled} />,
   PATIENTS: ({ filled }) => <IconPatients filled={filled} />,
-  OPERATIONS: ({ filled }) => <IconOperations filled={filled} />,
   QUALITY: ({ filled }) => <IconQuality filled={filled} />,
   STANDARDS: ({ filled }) => <IconChecks filled={filled} />,
   CONFIRMATIONS: ({ filled }) => <IconClinic filled={filled} />,
   GATE: ({ filled }) => <IconChecks filled={filled} />,
-  CHECKS: ({ filled }) => <IconChecks filled={filled} />,
   ME: ({ filled }) => <IconMe filled={filled} />,
 };
 

@@ -40,7 +40,13 @@ const STOCK_STATE: Record<string, { label: string; cls: string }> = {
 /** Where a batch is, in order. QUARANTINED is off the line, not late on it. */
 const STAGES = ['COLLECTED', 'ULTRASONIC', 'INSPECTED', 'PACKED', 'AUTOCLAVED', 'VERIFIED', 'RELEASED'];
 
-export function Operations({ onChanged }: { onChanged?: () => void }) {
+export function Operations({
+  onChanged, embedded = false,
+}: {
+  onChanged?: () => void;
+  /** Rendered inside Clinic, which already asks "can we work today". */
+  embedded?: boolean;
+}) {
   const [ops, setOps] = useState<Operations | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,9 +70,8 @@ export function Operations({ onChanged }: { onChanged?: () => void }) {
   const short = ops.stock.filter((s) => s.state !== 'OK');
   const gaps = ops.implants.filter((i) => i.quantity === 0);
 
-  return (
-    <div className="screen screen-wide">
-      <h1 className="screen-title">Operations</h1>
+  const body = (
+    <>
       <p className="screen-sub">
         Equipment, stock and sterilisation — the four things that stop the clinic treating people.
       </p>
@@ -225,6 +230,15 @@ export function Operations({ onChanged }: { onChanged?: () => void }) {
           );
         })}
       </div>
+    </>
+  );
+
+  // Rendered inside Clinic, which already asks "can we work today".
+  if (embedded) return body;
+  return (
+    <div className="screen screen-wide">
+      <h1 className="screen-title">Operations</h1>
+      {body}
     </div>
   );
 }
