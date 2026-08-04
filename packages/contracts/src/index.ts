@@ -9,3 +9,4 @@ export * from './automation.js';
 export * from './activity-generation.js';
 export * from './audit.js';
 export * from './notifications.js';
+export * from './daily-standard.js';

@@ -23,6 +23,7 @@ import { useEffect, useState } from 'react';
 import { api, type ParameterHealthRow } from '../api.js';
 import { ActivityLibrary } from './activity-library.js';
 import { Engines } from './engines.js';
+import { TheDay } from './day.js';
 
 const CLASS_LABEL: Record<WeightClass, string> = {
   PATIENT_SAFETY: 'Patient safety',
@@ -52,7 +53,10 @@ export function Standards() {
   const [health, setHealth] = useState<ParameterHealthRow[] | null>(null);
   // Parameters and Activities are two views of one spine, so they share a
   // destination rather than adding a tab. Navigation is unchanged.
-  const [view, setView] = useState<'PARAMETERS' | 'ACTIVITIES' | 'ENGINES'>('PARAMETERS');
+  // The day comes first. A new assistant needs to know how a morning moves
+  // long before she needs to know what a control parameter is worth, and the
+  // old default opened on the weighting model.
+  const [view, setView] = useState<'DAY' | 'PARAMETERS' | 'ACTIVITIES' | 'ENGINES'>('DAY');
   useEffect(() => { void api.parameterHealth().then(setHealth).catch(() => setHealth([])); }, []);
 
   const byId = new Map((health ?? []).map((h) => [h.parameter, h]));
@@ -64,6 +68,13 @@ export function Standards() {
       <h1 className="screen-title">Clinic operating standards</h1>
 
       <div className="std-switch">
+        <button
+          className={`std-tab ${view === 'DAY' ? 'is-on' : ''}`}
+          type="button"
+          onClick={() => setView('DAY')}
+        >
+          The day
+        </button>
         <button
           className={`std-tab ${view === 'PARAMETERS' ? 'is-on' : ''}`}
           type="button"
@@ -87,6 +98,7 @@ export function Standards() {
         </button>
       </div>
 
+      {view === 'DAY' && <TheDay />}
       {view === 'ACTIVITIES' && <ActivityLibrary />}
       {view === 'ENGINES' && <Engines embedded />}
 

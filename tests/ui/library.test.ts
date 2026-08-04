@@ -75,6 +75,7 @@ const CONVERTED = [
   'audit.tsx',
   'briefing.tsx',
   'checks.tsx',
+  'day.tsx',
   'exceptions.tsx',
   'gate.tsx',
   'notifications.tsx',
