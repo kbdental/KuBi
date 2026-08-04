@@ -2456,3 +2456,7 @@ label.field-label {
 .switch-opt.is-on { background: var(--card); color: var(--ink); box-shadow: var(--lift); }
 
 .more { margin-top: 18px; }
+
+/* A group that follows a button needs air, or the heading sits on the button.
+   Cheaper than giving every group a top margin it does not need. */
+.btn + .group { margin-top: 24px; }
