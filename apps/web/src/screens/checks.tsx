@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type CheckRow, type CheckDetail } from '../api.js';
-import { IconGo, IconTick } from '../icons.js';
+import { Screen, Title, Answer, Group, Row, Tag, Empty, Notice, Action } from '../ui.js';
 
 /**
  * CHECKS — work someone else finished that needs a second pair of eyes.
@@ -30,38 +30,39 @@ export function Checks({
 
   if (open) return <OneCheck item={open} onCancel={() => setOpen(null)} onDone={onDone} />;
 
-  const body = (
-    <>
-      <h1 className="screen-title">Checks</h1>
-      <p className="screen-sub">
-        {items.length === 0 ? 'Nothing to confirm.' : 'Work waiting on your confirmation.'}
-      </p>
+  const list = items.length === 0
+    ? <Empty big="Nothing waiting">We’ll bring you anything that needs confirming.</Empty>
+    : items.map((item) => (
+      <Row
+        key={item.id}
+        title={item.title}
+        note={`Finished at ${new Date(item.completedAt).toLocaleTimeString([], {
+          hour: 'numeric', minute: '2-digit',
+        })}`}
+        onOpen={() => setOpen(item)}
+      />
+    ));
 
-      {items.length === 0 && (
-        <div className="empty">
-          <div className="empty-big">Nothing waiting</div>
-          <div>We&rsquo;ll bring you anything that needs confirming.</div>
-        </div>
-      )}
+  // Embedded inside Today, which has already said whose work this is and
+  // already carries the answer. Repeating both would be the system saying the
+  // same thing twice in two different sizes.
+  if (embedded) return <>{list}</>;
 
-      {items.map((item) => (
-        <button key={item.id} className="row" type="button" onClick={() => setOpen(item)}>
-          <div className="row-main">
-            <div className="row-title">{item.title}</div>
-            <div className="row-note">
-              Finished at {new Date(item.completedAt).toLocaleTimeString([], {
-                hour: 'numeric', minute: '2-digit',
-              })}
-            </div>
-          </div>
-          <span className="row-go"><IconGo /></span>
-        </button>
-      ))}
-    </>
+  return (
+    <Screen>
+      <Title>Checks</Title>
+      <Answer
+        verdict={items.length === 0
+          ? 'Nothing to confirm'
+          : `${items.length} waiting on you`}
+        why={items.length === 0
+          ? 'Nobody is held up by a confirmation.'
+          : 'Work someone else finished that needs a second pair of eyes.'}
+        tone={items.length === 0 ? 'good' : 'warn'}
+      />
+      {list}
+    </Screen>
   );
-
-  if (embedded) return body;
-  return <div className="screen">{body}</div>;
 }
 
 function OneCheck({
@@ -99,64 +100,48 @@ function OneCheck({
   }
 
   return (
-    <div className="screen">
-      <button className="back" onClick={onCancel} type="button">‹ Checks</button>
-      <h1 className="screen-title">{item.title}</h1>
-      {item.standard && <p className="screen-sub">{item.standard}</p>}
+    <Screen back={onCancel}>
+      <Title {...(item.standard ? { question: item.standard } : {})}>{item.title}</Title>
 
-      {problem && <div className="notice notice-stop" role="alert">{problem}</div>}
+      {problem && <Notice tone="stop">{problem}</Notice>}
 
       {!askingWhy ? (
         <>
-          <div className="group-label" style={{ marginTop: 18 }}>What was recorded</div>
-          {detail
-            ? detail.items.map((i) => (
-                <div key={i.id} className="recorded">
-                  <span
-                    className={i.checked ? 'recorded-mark is-yes' : 'recorded-mark is-no'}
-                    aria-hidden="true"
-                  >
-                    {i.checked ? <IconTick size={14} /> : '—'}
-                  </span>
-                  <span className="recorded-label">{i.label}</span>
-                  {i.value != null && (
-                    <span className="recorded-value">{i.value}{i.unit ?? ''}</span>
+          <Group title="What was recorded" note="Have a look for yourself before confirming.">
+            {detail
+              ? detail.items.map((i) => (
+                <Row
+                  key={i.id}
+                  title={i.label}
+                  tone={i.checked ? 'good' : 'calm'}
+                  right={(
+                    <Tag tone={i.checked ? 'good' : 'calm'}>
+                      {i.value != null ? `${i.value}${i.unit ?? ''}` : i.checked ? 'done' : 'not done'}
+                    </Tag>
                   )}
-                </div>
+                />
               ))
-            : (
-              <div className="notice notice-calm">
-                {detailFailed
-                  ? 'We could not load what was recorded. Please try again before confirming.'
-                  : 'Loading what was recorded…'}
-              </div>
-            )}
+              : (
+                <Notice tone="calm">
+                  {detailFailed
+                    ? 'We could not load what was recorded. Please try again before confirming.'
+                    : 'Loading what was recorded…'}
+                </Notice>
+              )}
+          </Group>
 
-          <div className="notice notice-calm" style={{ marginTop: 16 }}>
-            Have a look for yourself before confirming.
-          </div>
           {/* Confirming without having seen the work is the one thing this
               screen exists to prevent, so it waits for the detail to load. */}
-          <button
-            className="btn"
-            type="button"
-            disabled={busy || !detail}
-            onClick={() => void submit('PASS')}
-          >
-            {busy ? 'Saving…' : 'Looks right'}
-          </button>
-          <button
-            className="btn btn-quiet"
-            type="button"
-            disabled={busy}
-            onClick={() => setAskingWhy(true)}
-          >
+          <Action busy={busy} disabled={!detail} onClick={() => void submit('PASS')}>
+            Looks right
+          </Action>
+          <Action quiet disabled={busy} onClick={() => setAskingWhy(true)}>
             Not right
-          </button>
+          </Action>
         </>
       ) : (
         <>
-          <label className="field-label" htmlFor="what-was-wrong">What wasn&rsquo;t right?</label>
+          <label className="field-label" htmlFor="what-was-wrong">What wasn’t right?</label>
           <textarea
             id="what-was-wrong"
             className="field"
@@ -164,19 +149,17 @@ function OneCheck({
             value={comment}
             onChange={(e) => setComment(e.target.value)}
           />
-          <button
-            className="btn btn-danger"
-            type="button"
-            disabled={busy || comment.trim().length === 0}
+          <Action
+            danger
+            busy={busy}
+            disabled={comment.trim().length === 0}
             onClick={() => void submit('FAIL')}
           >
-            {busy ? 'Saving…' : 'Send it back'}
-          </button>
-          <button className="btn btn-quiet" type="button" onClick={() => setAskingWhy(false)}>
-            Back
-          </button>
+            Send it back
+          </Action>
+          <Action quiet onClick={() => setAskingWhy(false)}>Back</Action>
         </>
       )}
-    </div>
+    </Screen>
   );
 }

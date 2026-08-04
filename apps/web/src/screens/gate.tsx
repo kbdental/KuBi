@@ -12,15 +12,20 @@
  *
  * Toggling a requirement re-renders the verdict immediately, because the point
  * is that the verdict is *derived* — nobody declares a procedure ready.
+ *
+ * The verdict used to sit under the list, which meant this screen also opened
+ * at level 2: you read eight requirements before finding out whether they
+ * added up. It leads now, like every other screen.
  */
 import { useEffect, useState } from 'react';
 import { api, type GateView } from '../api.js';
+import { Screen, Title, Answer, Group, Row, Tag, Loading } from '../ui.js';
 
 export function Gate() {
   const [g, setG] = useState<GateView | null>(null);
   const load = () => { void api.gate().then(setG).catch(() => setG(null)); };
   useEffect(load, []);
-  if (!g) return <div className="screen"><p className="screen-sub">Loading…</p></div>;
+  if (!g) return <Loading />;
 
   async function toggle(id: string) {
     await api.toggleGateCheck(id);
@@ -28,46 +33,30 @@ export function Gate() {
   }
 
   return (
-    <div className="screen screen-tight">
-      <h1 className="screen-title">Procedure readiness</h1>
-      <p className="screen-sub">{g.procedure}</p>
-
-      <ul className="gt-list">
-        {g.checks.map((c) => (
-          <li key={c.id}>
-            <button className="gt-check" type="button" onClick={() => void toggle(c.id)}>
-              <span className={`gt-box ${c.met ? 'is-met' : 'is-missing'}`} aria-hidden="true">
-                {c.met ? '✓' : '!'}
-              </span>
-              <span className="gt-label">{c.label}</span>
-              <span className={`gt-state ${c.met ? 'is-met' : 'is-missing'}`}>
-                {c.met ? 'met' : 'missing'}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+    <Screen>
+      <Title question={g.procedure}>Procedure readiness</Title>
 
       {/* The verdict IS the screen. Derived, never declared. */}
-      <div className={`gt-verdict ${g.ready ? 'is-ready' : 'is-not'}`}>
-        {g.ready ? (
-          <b>✓ READY FOR SURGERY</b>
-        ) : (
-          <>
-            <b>⚠ PROCEDURE NOT READY</b>
-            <p>
-              {g.missingCount} mandatory requirement{g.missingCount === 1 ? '' : 's'}{' '}
-              outstanding. The procedure cannot be started, and the requirement does not
-              disappear.
-            </p>
-          </>
-        )}
-      </div>
+      <Answer
+        verdict={g.ready ? 'READY FOR SURGERY' : 'PROCEDURE NOT READY'}
+        why={g.ready
+          ? 'Every mandatory requirement is met.'
+          : `${g.missingCount} mandatory requirement${g.missingCount === 1 ? '' : 's'} outstanding. `
+            + 'The procedure cannot be started, and the requirement does not disappear.'}
+        tone={g.ready ? 'good' : 'stop'}
+      />
 
-      <p className="cc-note">
-        This is a gate, not a checklist. A checklist can be ticked while the thing is
-        wrong; a gate refuses, and says which requirement is refusing.
-      </p>
-    </div>
+      <Group title="Requirements" note="A gate refuses, and says which requirement is refusing.">
+        {g.checks.map((c) => (
+          <Row
+            key={c.id}
+            title={c.label}
+            tone={c.met ? 'good' : 'stop'}
+            right={<Tag tone={c.met ? 'good' : 'stop'}>{c.met ? 'met' : 'missing'}</Tag>}
+            onOpen={() => void toggle(c.id)}
+          />
+        ))}
+      </Group>
+    </Screen>
   );
 }

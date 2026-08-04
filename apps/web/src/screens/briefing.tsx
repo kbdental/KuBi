@@ -17,12 +17,18 @@
  * So: sections carry both. A task opens. A fact does not pretend to be a
  * button, because a control that does nothing when pressed is worse than a
  * line of text.
+ *
+ * Every shape on this screen now comes from ui.tsx. It used to own eleven
+ * class names of its own, four of which were second copies of something the
+ * patient record had already built differently.
  */
 import { useEffect, useState } from 'react';
 import { api, type Briefing as Data, type BriefingItem } from '../api.js';
+import {
+  Screen, Title, Answer, Group, Row, Tag, Fact, Facts, Empty, Action,
+  Loading, Failed, toneOf,
+} from '../ui.js';
 
-/** Same lookup the Attention screen uses. Not a second set of class names. */
-const TONE: Record<string, string> = { GREEN: 'ok', AMBER: 'important', RED: 'critical' };
 /**
  * Why each item exists, in one word.
  *
@@ -31,18 +37,17 @@ const TONE: Record<string, string> = { GREEN: 'ok', AMBER: 'important', RED: 'cr
  * true of the architecture and invisible in anybody's actual day. A person
  * looking at their list should be able to see that this line came from a
  * clinical event and that one is a gate refusing to let a procedure start.
+ *
+ * They all carry the same quiet tone on purpose. Origin is not severity, and
+ * colouring GATE red would say a gate is worse than a missed patient event.
+ * Severity is the row's stripe; this is only which engine spoke.
  */
-const ORIGIN: Record<string, { label: string; cls: string }> = {
-  RECURRING: { label: 'Scheduled', cls: 'or-time' },
-  PATIENT_EVENT: { label: 'Patient event', cls: 'or-event' },
-  CONDITION: { label: 'Condition', cls: 'or-cond' },
-  GATE: { label: 'Gate', cls: 'or-gate' },
-  EXCEPTION: { label: 'Overdue', cls: 'or-exc' },
-};
-
-const RAIL: Record<string, string> = {
-  PATIENT_SAFETY: 'pri-safety', CRITICAL: 'pri-critical',
-  IMPORTANT: 'pri-important', ROUTINE: 'pri-routine',
+const ORIGIN: Record<string, string> = {
+  RECURRING: 'Scheduled',
+  PATIENT_EVENT: 'Patient event',
+  CONDITION: 'Condition',
+  GATE: 'Gate',
+  EXCEPTION: 'Overdue',
 };
 
 export function BriefingScreen({
@@ -59,121 +64,100 @@ export function BriefingScreen({
       .catch(() => setFailed(true));
   }, []);
 
-  if (failed) {
-    return (
-      <div className="screen">
-        <p className="screen-sub">That didn’t load. Pull down to try again.</p>
-      </div>
-    );
-  }
-  if (!data) return <div className="screen"><p className="screen-sub">Loading…</p></div>;
+  if (failed) return <Failed what="That didn’t load. Pull down to try again." />;
+  if (!data) return <Loading />;
 
   return (
-    <div className="screen screen-wide">
-      <h1 className="screen-title">{data.roleLabel}</h1>
+    <Screen wide>
       {/* The question this screen answers, said out loud. Constitution rule 8. */}
-      <p className="screen-sub">{data.question}</p>
+      <Title question={data.question}>{data.roleLabel}</Title>
 
       {/* The answer, before any of the detail that explains it. Every screen
           used to open at level 2 — six sections of equal weight and nothing
           telling the eye where to go first. */}
-      <div className={`bf-answer bf-answer-${TONE[data.headline.tone] ?? 'ok'}`}>
-        <b>{data.headline.verdict}</b>
-        <span>{data.headline.why}</span>
-        {/* One primary action. Never two. */}
-        {data.headline.action && (
-          <button
-            className="btn bf-answer-go"
-            type="button"
-            onClick={() => {
-              document.getElementById(`bf-${data.headline.action}`)
-                ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }}
-          >
-            Take me to it
-          </button>
-        )}
-      </div>
+      <Answer
+        verdict={data.headline.verdict}
+        why={data.headline.why}
+        tone={toneOf(data.headline.tone, 'good')}
+        {...(data.headline.action
+          ? {
+            action: {
+              label: 'Take me to it',
+              onClick: () => document.getElementById(`bf-${data.headline.action}`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+            },
+          }
+          : {})}
+      />
 
       {/* A real fraction of a real denominator, or nothing. Never a score. */}
       {data.work && data.work.total > 0 && (
-        <p className="bf-work">
-          <b>{data.work.done}</b> of {data.work.total} done
-        </p>
+        <Facts>
+          <Fact value={`${data.work.done} of ${data.work.total}`} label="done so far" />
+        </Facts>
       )}
 
       {data.sections.map((s) => (
-        <section key={s.key} id={`bf-${s.key}`} className="bf-section">
-          <h2 className={`bf-head bf-${TONE[s.tone] ?? 'ok'}`}>
-            {s.label}
-            {s.items.length > 0 && <span className="bf-count">{s.items.length}</span>}
-          </h2>
-          {s.hint && <p className="bf-hint">{s.hint}</p>}
-
-          {s.items.length === 0 ? (
-            <p className="bf-empty">{s.emptyText}</p>
-          ) : (
-            <ul className="bf-items">
-              {s.items.map((i) => <Item key={i.id} item={i} onOpenTask={onOpenTask} />)}
-            </ul>
-          )}
-        </section>
+        <Group
+          key={s.key}
+          id={`bf-${s.key}`}
+          title={s.label}
+          count={s.items.length}
+          tone={toneOf(s.tone, 'good')}
+          {...(s.hint ? { note: s.hint } : {})}
+        >
+          {s.items.length === 0
+            ? <Empty>{s.emptyText}</Empty>
+            : s.items.map((i) => <Line key={i.id} item={i} onOpenTask={onOpenTask} />)}
+        </Group>
       ))}
 
-      {onRefresh && (
-        <button className="btn btn-quiet" type="button" onClick={onRefresh}>
-          Refresh
-        </button>
-      )}
-    </div>
+      {onRefresh && <Action quiet onClick={onRefresh}>Refresh</Action>}
+    </Screen>
   );
 }
 
-/** One word saying which engine raised this. */
-function Origin({ origin }: { origin: string }) {
-  const o = ORIGIN[origin];
-  if (!o) return null;
-  return <span className={`bf-origin ${o.cls}`}>{o.label}</span>;
-}
-
-function Item({
+function Line({
   item, onOpenTask,
 }: {
   item: BriefingItem;
   onOpenTask: (taskId: string) => void;
 }) {
-  const rail = item.priority ? RAIL[item.priority] ?? 'pri-routine' : '';
+  const origin = ORIGIN[item.origin];
+  const tags = (
+    <>
+      {/* Every task traces to a standard. Constitution rule 5, on screen. */}
+      {item.activityCode && <Tag mono>{item.activityCode}</Tag>}
+      {origin && <Tag>{origin}</Tag>}
+    </>
+  );
 
   // Blocked work is shown as blocked, with what it is waiting for. Not hidden,
   // and not offered as a button that fails on submit.
   if (item.blockedBy) {
-    return (
-      <li className={`bf-item bf-blocked ${rail}`}>
-        <div className="bf-text">{item.text}</div>
-        <div className="row-note">Waiting for {item.blockedBy}</div>
-      </li>
-    );
+    return <Row title={item.text} blockedBy={item.blockedBy} tags={tags} />;
   }
 
+  // A fact is not a button. It carries the tone it was given, because "three
+  // batches unfinished" is a different colour of true from "all sterile".
   if (item.kind === 'fact') {
     return (
-      <li className={`bf-item ${item.tone ? `bf-fact-${TONE[item.tone] ?? 'ok'}` : ''}`}>
-        <div className="bf-text">{item.text}</div>
-        {item.detail && <div className="row-note">{item.detail}</div>}
-        <Origin origin={item.origin} />
-      </li>
+      <Row
+        title={item.text}
+        {...(item.detail ? { note: item.detail } : {})}
+        {...(item.tone ? { tone: toneOf(item.tone) } : {})}
+        tags={tags}
+      />
     );
   }
 
   return (
-    <li className={`bf-item ${rail}`}>
-      <button className="bf-task" type="button" onClick={() => item.taskId && onOpenTask(item.taskId)}>
-        <span className="bf-text">{item.text}</span>
-        {item.detail && <span className="row-note">{item.detail}</span>}
-        {/* Every task traces to a standard. Constitution rule 5, on screen. */}
-        {item.activityCode && <span className="bf-code">{item.activityCode}</span>}
-        <Origin origin={item.origin} />
-      </button>
-    </li>
+    <Row
+      title={item.text}
+      {...(item.detail ? { note: item.detail } : {})}
+      {...(item.priority ? { tone: toneOf(item.priority) } : {})}
+      tags={tags}
+      onOpen={() => item.taskId && onOpenTask(item.taskId)}
+    />
   );
 }

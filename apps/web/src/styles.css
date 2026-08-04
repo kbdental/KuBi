@@ -2324,3 +2324,130 @@ label.field-label {
 }
 .nav-search:hover { border-color: var(--ink-faint); color: var(--ink); }
 @media (width >= 900px) { .nav-search { display: flex; } }
+
+/* ==========================================================================
+ * ONE VOCABULARY  —  the primitives in ui.tsx
+ *
+ * Everything below is the shared language. Before this existed, the answer
+ * block was written twice (`bf-answer` at 22px, `p360-verdict` at 21px, with
+ * tone names that did not match), and the row four times. It looked like four
+ * products stitched together, which is exactly what it was.
+ *
+ * The rule from here: a screen may not invent a second way to say something
+ * that already has a way. If a screen needs a shape that is not here, it is
+ * added here first, once, and every screen gets it.
+ *
+ * Three levels of size and nothing between them:
+ *   answer  28/22px  — what is true. One per screen.
+ *   group   17px     — the question behind it.
+ *   row     17.5px   — the explanation, and the thing you press.
+ * ========================================================================== */
+
+/* ---- level 1: the answer ------------------------------------------------- */
+
+.answer {
+  display: flex; flex-direction: column; gap: 6px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 18px 20px; margin: 0 0 24px;
+  background: var(--card);
+}
+.answer-verdict {
+  font-size: 22px; font-weight: 700; letter-spacing: -0.018em; line-height: 1.2;
+}
+.answer-why { font-size: 15.5px; color: var(--ink-soft); line-height: 1.45; }
+.answer-do { margin-top: 10px; }
+
+.answer-good { background: var(--accent-soft); border-color: var(--accent-line); }
+.answer-good .answer-verdict { color: var(--accent); }
+.answer-warn { background: var(--warn-tint); border-color: var(--warn-line); }
+.answer-warn .answer-verdict { color: var(--warn); }
+.answer-stop { background: var(--safety-tint); border-color: var(--safety-line); }
+.answer-stop .answer-verdict { color: var(--safety); }
+/* Calm is GREY — nothing to measure. It must not read as failure, and it must
+   not read as pass either, so it carries no colour at all. */
+.answer-calm { background: var(--card); border-color: var(--line); }
+.answer-calm .answer-verdict { color: var(--ink); }
+
+/* ---- level 2: the group -------------------------------------------------- */
+
+.group-title {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 17px; font-weight: 680; letter-spacing: -0.012em;
+  margin: 0 0 10px;
+}
+.group-good .group-count { background: var(--accent-soft); color: var(--accent); }
+.group-warn .group-count { background: var(--warn-tint); color: var(--warn); }
+.group-stop .group-count { background: var(--safety-tint); color: var(--safety); }
+.group-count {
+  font-size: 12.5px; font-weight: 700; line-height: 1;
+  background: var(--line-soft); color: var(--ink-soft);
+  border-radius: 999px; padding: 4px 8px; min-width: 22px; text-align: center;
+}
+.group-note { color: var(--ink-soft); font-size: 14.5px; margin: -4px 0 10px; }
+
+/* ---- level 3: the row ---------------------------------------------------- */
+
+/* A row that is not a button must not move under the cursor or offer a
+   pointer. Four of the old row components disagreed about this. */
+.row-static { cursor: default; }
+.row-static:hover { box-shadow: var(--lift); }
+.row-static:active { transform: none; }
+
+.row-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+
+/* Same stripe language as is-overdue: read from across a room. */
+.row-stop { border-color: var(--safety-line); }
+.row-stop::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--safety);
+}
+.row-warn { border-color: var(--warn-line); }
+.row-warn::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: #c9902b;
+}
+.row-good::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--accent);
+}
+
+/* ---- furniture ----------------------------------------------------------- */
+
+.tag-good { background: var(--accent-soft); color: var(--accent); }
+.tag-warn { background: var(--warn-tint); color: var(--warn); }
+.tag-stop { background: var(--safety-tint); color: var(--safety); }
+.tag-calm { background: var(--line-soft); color: var(--ink-soft); }
+/* Activity codes. Tabular, because they are compared down a column. */
+.tag-mono {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  text-transform: none; letter-spacing: 0;
+}
+
+.facts { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; }
+.fact {
+  flex: 1 1 120px; background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 12px 14px;
+}
+.fact-value { font-size: 23px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.fact-label { font-size: 13px; color: var(--ink-soft); margin-top: 3px; }
+.fact-good .fact-value { color: var(--accent); }
+.fact-warn .fact-value { color: var(--warn); }
+.fact-stop .fact-value { color: var(--safety); }
+.fact-calm .fact-value { color: var(--ink-faint); }
+
+/* Nothing here, said once and quietly. Not a card — an empty card looks like
+   a thing that failed to load. */
+.empty-line {
+  color: var(--ink-faint); font-size: 15px; margin: 0 0 10px; padding: 2px 2px 8px;
+}
+
+.switch {
+  display: flex; gap: 4px; background: var(--line-soft);
+  border-radius: var(--radius-sm); padding: 4px; margin-bottom: 20px;
+}
+.switch-opt {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 42px; border: 0; background: none; border-radius: 8px;
+  font-size: 15px; font-weight: 620; color: var(--ink-soft); cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.switch-opt.is-on { background: var(--card); color: var(--ink); box-shadow: var(--lift); }
+
+.more { margin-top: 18px; }

@@ -3,7 +3,7 @@ import { Checks } from './checks.js';
 import { useState } from 'react';
 import { ClinicHeader } from './clinic-header.js';
 import { CurrentTask } from './current-task.js';
-import { IconGo } from '../icons.js';
+import { Screen, Group, Row, Empty, Switch, Columns } from '../ui.js';
 
 /**
  * TODAY — where the clinic is, and the thing in front of you.
@@ -55,151 +55,105 @@ export function Today({
   const current = [...day.buckets.OVERDUE, ...day.buckets.NOW]
     .find((t) => !t.blockedBy) ?? null;
 
+  const workSwitch = (
+    <Switch
+      value={view}
+      onChange={setView}
+      options={[
+        { value: 'MINE', label: 'My work' },
+        { value: 'CHECK', label: 'To check', count: checks.length },
+      ]}
+    />
+  );
+
   if (view === 'CHECK') {
     return (
-      <div className="screen">
+      <Screen>
         {day.clinic && <ClinicHeader clinic={day.clinic} />}
-        <WorkSwitch view={view} setView={setView} checks={checks.length} />
+        {workSwitch}
         <Checks items={checks} onDone={() => { onChecked(); setView('MINE'); }} embedded />
-      </div>
+      </Screen>
     );
   }
 
   return (
-    <div className="screen">
+    <Screen>
       {/* Where the clinic is, before what any one person has to do. */}
       {day.clinic && <ClinicHeader clinic={day.clinic} />}
 
-      {checks.length > 0 && <WorkSwitch view={view} setView={setView} checks={checks.length} />}
+      {checks.length > 0 && workSwitch}
 
       {/* The handover appears when the day is actually ending, rather than as a
           seventh tab sitting empty until 8pm. The owner asked for a small number
           of primary screens, and a screen that is meaningless for ten hours a
           day does not deserve permanent furniture. */}
       {(day.clinic?.phase === 'CLOSING' || day.clinic?.phase === 'CLOSED') && (
-        <button type="button" className="handover-cue" onClick={onOpenHandover}>
-          <span className="handover-cue-main">
-            <span className="handover-cue-title">Read the handover</span>
-            <span className="handover-cue-note">
-              What tomorrow inherits. Check it before you lock up.
-            </span>
-          </span>
-          <span className="row-go"><IconGo /></span>
-        </button>
+        <Row
+          title="Read the handover"
+          note="What tomorrow inherits. Check it before you lock up."
+          onOpen={onOpenHandover}
+        />
       )}
 
-      {/* Two columns on a laptop, stacked on a phone. The thing being done
-          gets the wider side; what is still to come sits alongside instead of
-          being pushed below the fold on a screen with room to spare. */}
-      <div className="today-columns">
-        <div className="today-main">
-          {current && (
-            <CurrentTask
-              key={current.id}
-              taskId={current.id}
-              onOpenFull={onOpenTask}
-              onDone={onRefresh}
-            />
-          )}
-        </div>
-        <div className="today-side">
+      {/* The thing being done gets the wider side; what is still to come sits
+          alongside instead of being pushed below the fold on a screen with
+          room to spare. */}
+      <Columns
+        main={current && (
+          <CurrentTask
+            key={current.id}
+            taskId={current.id}
+            onOpenFull={onOpenTask}
+            onDone={onRefresh}
+          />
+        )}
+        side={(
+          <>
+            {total === 0 && (
+              <Empty big="You’re all clear">Anything new will appear here on its own.</Empty>
+            )}
 
-      {/* When there is nothing, the empty state below says so. Saying it twice
-          in two different ways reads as a system repeating itself. */}
-      {total > 0 && (
-        <p className="screen-sub">
-          {total} {total === 1 ? 'thing' : 'things'} for you.
-        </p>
-      )}
-
-      {total === 0 && (
-        <div className="empty">
-          <div className="empty-big">You&rsquo;re all clear</div>
-          <div>Anything new will appear here on its own.</div>
-        </div>
-      )}
-
-      {SECTIONS.map(({ key, label }) => {
-        const rows = day.buckets[key].filter((t) => t.id !== current?.id);
-        if (rows.length === 0) return null;
-        return (
-          <section className="group" key={key}>
-            <div className="group-label">{label}</div>
-            {rows.map((t) => (
-              <TaskButton
-                key={t.id}
-                task={t}
-                timezone={day.clinic?.timezone}
-                onOpen={() => onOpenTask(t.id)}
-              />
-            ))}
-          </section>
-        );
-      })}
-        </div>
-      </div>
-    </div>
+            {SECTIONS.map(({ key, label }) => {
+              const rows = day.buckets[key].filter((t) => t.id !== current?.id);
+              if (rows.length === 0) return null;
+              return (
+                <Group key={key} title={label} count={rows.length}>
+                  {rows.map((t) => (
+                    <TaskLine
+                      key={t.id}
+                      task={t}
+                      timezone={day.clinic?.timezone}
+                      onOpen={() => onOpenTask(t.id)}
+                    />
+                  ))}
+                </Group>
+              );
+            })}
+          </>
+        )}
+      />
+    </Screen>
   );
 }
 
-function TaskButton({
+function TaskLine({
   task, timezone, onOpen,
 }: {
   task: TaskRow;
   timezone: string | undefined;
   onOpen: () => void;
 }) {
-  const classes = ['row'];
-  if (task.blockedBy) classes.push('is-blocked');
-  else if (task.status === 'OVERDUE') classes.push('is-overdue');
+  if (task.blockedBy) return <Row title={task.title} blockedBy={task.blockedBy} />;
 
   // One line of context, and only when it earns its place.
-  const note = task.blockedBy
-    ? `Waiting on: ${task.blockedBy}`
-    : task.started
-      ? 'You started this'
-      : `By ${time(task.dueAt, timezone)}`;
+  const note = task.started ? 'You started this' : `By ${time(task.dueAt, timezone)}`;
 
   return (
-    <button className={classes.join(' ')} onClick={onOpen} type="button">
-      <div className="row-main">
-        <div className="row-title">{task.title}</div>
-        <div className="row-note">{note}</div>
-      </div>
-      <span className="row-go"><IconGo /></span>
-    </button>
-  );
-}
-
-/**
- * Mine to do, versus mine to check.
- *
- * Only appears for people who are actually somebody's checker — most staff
- * never see it, which is the point of merging rather than adding a tab.
- */
-function WorkSwitch({
-  view, setView, checks,
-}: {
-  view: 'MINE' | 'CHECK';
-  setView: (v: 'MINE' | 'CHECK') => void;
-  checks: number;
-}) {
-  return (
-    <div className="std-switch">
-      <button
-        className={`std-tab ${view === 'MINE' ? 'is-on' : ''}`}
-        type="button"
-        onClick={() => setView('MINE')}
-      >
-        My work
-      </button>
-      <button
-        className={`std-tab ${view === 'CHECK' ? 'is-on' : ''}`}
-        type="button"
-        onClick={() => setView('CHECK')}
-      >
-        To check {checks > 0 && <span className="bf-count">{checks}</span>}
-      </button>
-    </div>
+    <Row
+      title={task.title}
+      note={note}
+      {...(task.status === 'OVERDUE' ? { tone: 'stop' as const } : {})}
+      onOpen={onOpen}
+    />
   );
 }

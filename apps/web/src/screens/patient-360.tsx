@@ -2,8 +2,8 @@
  * Patient 360 — and Journey 2, because they are the same thing.
  *
  * A patient record organised by module would be sixteen equal sections and
- * would repeat the mistake the owner just named: every page starting at
- * level 2. So this screen leads with one answer, and the journey is its spine.
+ * would repeat the mistake the owner named: every page starting at level 2.
+ * So this screen leads with one answer, and the journey is its spine.
  *
  *   Mrs Sharma
  *   NOT READY — signed consent, implant components
@@ -16,14 +16,10 @@
  */
 import { useEffect, useState } from 'react';
 import { api, type Patient360, type JourneyStage } from '../api.js';
-
-const STATE_CLASS: Record<string, string> = {
-  DONE: 'jr-done', NOW: 'jr-now', BLOCKED: 'jr-blocked',
-  WAITING: 'jr-waiting', ABSENT: 'jr-absent',
-};
-const STATE_MARK: Record<string, string> = {
-  DONE: '✓', NOW: '●', BLOCKED: '✗', WAITING: '·', ABSENT: '–',
-};
+import {
+  Screen, Answer, Group, Row, Tag, Notice, Empty, More, Journey,
+  Loading, Failed, toneOf, type Step,
+} from '../ui.js';
 
 export function Patient360({
   patientLabel, onBack,
@@ -67,171 +63,130 @@ export function Patient360({
     }
   }
 
-  if (failed) {
-    return (
-      <div className="screen">
-        <button className="back" type="button" onClick={onBack}>Back</button>
-        <p className="screen-sub">No record for that patient.</p>
-      </div>
-    );
-  }
-  if (!p) return <div className="screen"><p className="screen-sub">Loading…</p></div>;
+  if (failed) return <Failed what="No record for that patient." back={onBack} />;
+  if (!p) return <Loading />;
 
-  const ready = p.headline.verdict === 'READY';
-  const blocked = p.headline.verdict === 'NOT READY';
+  const verdictTone = p.headline.verdict === 'READY'
+    ? 'good' as const
+    : p.headline.verdict === 'NOT READY' ? 'stop' as const : 'calm' as const;
+
+  const steps: Step[] = p.journey.map((s) => ({
+    key: s.key,
+    label: s.label,
+    state: s.state as Step['state'],
+    detail: s.detail,
+    needs: s.needs,
+    act: s.act
+      ? { label: s.act.label, onClick: () => void advance(s.act!), busy: busy === s.act.id }
+      : null,
+  }));
 
   return (
-    <div className="screen screen-wide p360">
-      <button className="back" type="button" onClick={onBack}>Back</button>
-
+    <Screen wide back={onBack}>
       {/* The answer, first and biggest. Everything below explains why. */}
-      <h1 className="p360-name">{p.patientLabel.replace('SYNTHETIC ', '')}</h1>
-      {p.uhid && <div className="p360-uhid">{p.uhid}</div>}
+      <h1 className="screen-title">{p.patientLabel.replace('SYNTHETIC ', '')}</h1>
+      <p className="screen-sub">{p.uhid ?? 'No UHID recorded'}</p>
 
-      <div className={`p360-verdict ${blocked ? 'is-blocked' : ready ? 'is-ready' : 'is-neutral'}`}>
-        <b>{p.headline.verdict}</b>
-        <span>{p.headline.why}</span>
-      </div>
+      <Answer verdict={p.headline.verdict} why={p.headline.why} tone={verdictTone} />
 
-      {/* Safety before anything else, never inside a tab. */}
+      {/* Safety before anything else, never inside a tab and never folded. */}
       {p.alerts.length > 0 && (
-        <div className="p360-alerts">
-          <div className="p360-alerts-head">Medical alerts — read before treating</div>
-          {p.alerts.map((a) => <div key={a} className="p360-alert">{a}</div>)}
-        </div>
+        <Notice tone="stop" title="Medical alerts — read before treating">
+          {p.alerts.map((a) => <div key={a}>{a}</div>)}
+        </Notice>
       )}
 
-      {problem && <div className="notice notice-stop" role="alert">{problem}</div>}
+      {problem && <Notice tone="stop">{problem}</Notice>}
 
       {/* Journey 2, as the spine of the record. */}
-      <h2 className="cc-head">The journey</h2>
-      <ol className="jr">
-        {p.journey.map((s) => (
-          <li key={s.key} className={`jr-step ${STATE_CLASS[s.state] ?? 'jr-absent'}`}>
-            <span className="jr-mark" aria-hidden="true">{STATE_MARK[s.state] ?? '·'}</span>
-            <div className="jr-main">
-              <div className="jr-label">{s.label}</div>
-              {s.detail && <div className="row-note">{s.detail}</div>}
-              {/* What is standing in the way, by name. */}
-              {s.needs && <div className="jr-needs">{s.needs}</div>}
-              {/* One action, at the stage it belongs to. */}
-              {s.act && (
-                <button
-                  className="btn jr-act"
-                  type="button"
-                  disabled={busy === s.act.id}
-                  onClick={() => void advance(s.act!)}
-                >
-                  {busy === s.act.id ? 'Working…' : s.act.label}
-                </button>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
+      <Group title="The journey">
+        <Journey steps={steps} />
+      </Group>
 
-      {/* Progressive disclosure: the detail is here, and folded away until
-          somebody asks for it. */}
-      <button
-        className="btn btn-quiet"
-        type="button"
-        onClick={() => setShowAll(!showAll)}
-        aria-expanded={showAll}
-      >
-        {showAll ? 'Hide the detail' : 'Show the full record'}
-      </button>
-
-      {showAll && (
-        <div className="p360-detail">
-          {/* One continuous log. A timeline explains a day without opening a
-              report, which is why owners read them and not dashboards. */}
-          <Section title="Timeline" empty="Nothing has happened yet.">
-            {p.timeline.map((t, i) => (
-              <div key={`${t.at}-${i}`} className={`p360-tl p360-tl-${t.tone.toLowerCase()}`}>
-                <span className="p360-tl-at">{t.at}</span>
-                <span className="p360-tl-what">{t.what}</span>
-              </div>
+      {/* Progressive disclosure: detail, never a decision. */}
+      <More label="Show the full record" open={showAll} onToggle={() => setShowAll(!showAll)}>
+        {/* One continuous log. A timeline explains a day without opening a
+            report, which is why owners read them and not dashboards. */}
+        <Group title="Timeline">
+          {p.timeline.length === 0
+            ? <Empty>Nothing has happened yet.</Empty>
+            : p.timeline.map((t, i) => (
+              <Row
+                key={`${t.at}-${i}`}
+                title={t.what}
+                note={t.at}
+                tone={t.tone === 'RED' ? 'stop' : t.tone === 'AMBER' ? 'warn' : 'calm'}
+              />
             ))}
-          </Section>
+        </Group>
 
-          <Section title="Appointments" empty="Nothing booked.">
-            {p.appointments.map((a) => (
-              <div key={a.id} className="p360-row">
-                <span className="p360-row-main">{a.visitType}</span>
-                <span className="row-note">
-                  {a.chairLabel} · {a.status.toLowerCase().replace(/_/g, ' ')}
-                </span>
-              </div>
+        <Group title="Appointments">
+          {p.appointments.length === 0
+            ? <Empty>Nothing booked.</Empty>
+            : p.appointments.map((a) => (
+              <Row
+                key={a.id}
+                title={a.visitType}
+                note={`${a.chairLabel} · ${a.status.toLowerCase().replace(/_/g, ' ')}`}
+              />
             ))}
-          </Section>
+        </Group>
 
-          <Section title="Procedures and readiness" empty="No procedure planned.">
-            {p.procedures.map((pr) => (
-              <div key={pr.id} className="p360-row">
-                <span className="p360-row-main">{pr.name}</span>
-                <span className="row-note">{pr.status.toLowerCase().replace(/_/g, ' ')}</span>
-                <ul className="p360-reqs">
-                  {pr.requirements.map((r) => (
-                    <li key={r.label} className={r.result === 'PASS' ? 'is-ok' : 'is-not'}>
-                      {r.label} — {r.result.toLowerCase().replace(/_/g, ' ')}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+        <Group title="Procedures and readiness">
+          {p.procedures.length === 0
+            ? <Empty>No procedure planned.</Empty>
+            : p.procedures.map((pr) => (
+              <Row
+                key={pr.id}
+                title={pr.name}
+                note={pr.status.toLowerCase().replace(/_/g, ' ')}
+                /* Each requirement carries its own verdict. UNKNOWN is not
+                   PASS and must not be allowed to look like it, so the tone
+                   comes from the five-valued result, not from a boolean. */
+                tags={pr.requirements.map((r) => (
+                  <Tag key={r.label} tone={toneOf(r.result)}>
+                    {r.label} — {r.result.toLowerCase().replace(/_/g, ' ')}
+                  </Tag>
+                ))}
+              />
             ))}
-          </Section>
+        </Group>
 
-          <Section title="Laboratory" empty="No lab work.">
-            {p.labCases.map((l) => (
-              <div key={l.id} className="p360-row">
-                <span className="p360-row-main">{l.workType}</span>
-                <span className="row-note">{l.reference}</span>
-                {/* The gate says why, not merely that it refuses. */}
-                {l.reason && <div className="jr-needs">{l.reason}</div>}
-              </div>
+        <Group title="Laboratory">
+          {p.labCases.length === 0
+            ? <Empty>No lab work.</Empty>
+            /* The gate says why, not merely that it refuses. */
+            : p.labCases.map((l) => (
+              <Row
+                key={l.id}
+                title={l.workType}
+                note={l.reference}
+                {...(l.reason ? { tone: 'stop' as const } : {})}
+                {...(l.reason ? { tags: <Tag tone="stop">{l.reason}</Tag> } : {})}
+              />
             ))}
-          </Section>
+        </Group>
 
-          <Section title="Follow-ups" empty="None due.">
-            {p.followups.map((f) => (
-              <div key={f.id} className="p360-row">
-                <span className="p360-row-main">{f.procedureName}</span>
-                <span className="row-note">
-                  {f.dueLabel} · {f.outcome.toLowerCase().replace(/_/g, ' ')}
-                </span>
-                {f.redFlagReason && <div className="jr-needs">{f.redFlagReason}</div>}
-              </div>
+        <Group title="Follow-ups">
+          {p.followups.length === 0
+            ? <Empty>None due.</Empty>
+            : p.followups.map((f) => (
+              <Row
+                key={f.id}
+                title={f.procedureName}
+                note={`${f.dueLabel} · ${f.outcome.toLowerCase().replace(/_/g, ' ')}`}
+                {...(f.redFlagReason ? { tone: 'stop' as const } : {})}
+                {...(f.redFlagReason ? { tags: <Tag tone="stop">{f.redFlagReason}</Tag> } : {})}
+              />
             ))}
-          </Section>
+        </Group>
 
-          {/* Principle 3 — say the gap out loud. */}
-          <section className="p360-missing">
-            <div className="why-head">Not held in KuBi yet</div>
-            {p.notHeld.map((m) => (
-              <div key={m.what} className="p360-row">
-                <span className="p360-row-main">{m.what}</span>
-                <span className="row-note">needs {m.needs}</span>
-              </div>
-            ))}
-          </section>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Section({
-  title, empty, children,
-}: {
-  title: string;
-  empty: string;
-  children: React.ReactNode;
-}) {
-  const has = Array.isArray(children) ? children.length > 0 : !!children;
-  return (
-    <section className="p360-section">
-      <div className="why-head">{title}</div>
-      {has ? children : <p className="bf-empty">{empty}</p>}
-    </section>
+        {/* Principle 3 — say the gap out loud. A record that silently lacks
+            payments looks complete and is not. */}
+        <Group title="Not held in KuBi yet" note="Named rather than omitted.">
+          {p.notHeld.map((m) => <Row key={m.what} title={m.what} note={`needs ${m.needs}`} />)}
+        </Group>
+      </More>
+    </Screen>
   );
 }

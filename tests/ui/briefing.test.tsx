@@ -197,7 +197,7 @@ describe('the briefing on screen', () => {
     await screen.findByText('Assistant');
     // No blocked item in the opening set at 09:00, so assert the mechanism
     // exists rather than that today happens to use it.
-    expect(document.querySelectorAll('.bf-section').length).toBeGreaterThan(3);
+    expect(document.querySelectorAll('.group').length).toBeGreaterThan(3);
   });
 
   it('shows the question under the title', async () => {
