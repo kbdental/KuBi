@@ -18,11 +18,8 @@
  */
 import { useEffect, useState } from 'react';
 import { api, type ExceptionRow } from '../api.js';
+import { Screen, Title, Row, Tag, Empty, toneOf } from '../ui.js';
 
-const SEVERITY: Record<string, string> = {
-  PATIENT_SAFETY: 'ex-safety', CRITICAL: 'ex-critical',
-  IMPORTANT: 'ex-important', ROUTINE: 'ex-routine',
-};
 const SEVERITY_WORD: Record<string, string> = {
   PATIENT_SAFETY: 'Patient safety', CRITICAL: 'Critical',
   IMPORTANT: 'Important', ROUTINE: 'Routine',
@@ -35,64 +32,57 @@ export function Exceptions({ embedded = false }: { embedded?: boolean } = {}) {
   useEffect(() => { void api.exceptions().then(setRows).catch(() => setRows([])); }, []);
   if (!rows) return <p className="screen-sub">Loading…</p>;
 
-  const body = (
-    <>
-      <p className="screen-sub">
-        Work that was due and is not done, with who has been told.
-      </p>
-
-      {rows.length === 0 ? (
-        <div className="empty">
-          <div className="empty-big">Nothing is overdue</div>
-          <p className="row-note">Every control is running to standard right now.</p>
-        </div>
-      ) : (
-        <ul className="ex-list">
-          {rows.map((r) => (
-            <li key={r.id} className={`ex-row ${SEVERITY[r.severity] ?? 'ex-routine'}`}>
-              <div className="ex-main">
-                <div className="ex-head">
-                  {/* Not yet escalated is a real state. Showing L1 immediately
-                      would make every late thing look identical. */}
-                  {r.level === null ? (
-                    <span className="ex-level ex-level-none">not yet escalated</span>
-                  ) : (
-                    <span className="ex-level">L{r.level}</span>
-                  )}
-                  <span className="ex-sev">{SEVERITY_WORD[r.severity] ?? r.severity}</span>
-                  {r.activityCode && <span className="ex-code">{r.activityCode}</span>}
-                </div>
-
-                <div className="ex-title">{r.headline}</div>
-                {r.detail && <div className="row-note">{r.detail}</div>}
-
-                <div className="ex-ladder">
-                  <b>{r.minutesLate} min late</b>
-                  {r.escalatedTo && <> · with {role(r.escalatedTo)}</>}
-                  {r.nextRung && (
-                    <> · then {role(r.nextRung.to)} at {r.nextRung.afterMinutes} min</>
-                  )}
-                </div>
-
+  const body = rows.length === 0
+    ? (
+      <Empty big="Nothing is overdue">
+        Every control is running to standard right now.
+      </Empty>
+    )
+    : (
+      <>
+        <p className="screen-sub">
+          Work that was due and is not done, with who has been told.
+        </p>
+        {rows.map((r) => (
+          <Row
+            key={r.id}
+            title={r.headline}
+            /* The ladder, running. Not a description of escalation policy —
+               where this item has actually reached, and where it goes next. */
+            note={(
+              <>
+                <b>{r.minutesLate} min late</b>
+                {r.escalatedTo && <> · with {role(r.escalatedTo)}</>}
+                {r.nextRung && <> · then {role(r.nextRung.to)} at {r.nextRung.afterMinutes} min</>}
                 {/* Accountable for the result, whoever happened to be doing it. */}
-                {r.owner && (
-                  <div className="ex-owner">Owned by {role(r.owner)}</div>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
-  );
+                {r.owner && <> · owned by {role(r.owner)}</>}
+                {r.detail && <> — {r.detail}</>}
+              </>
+            )}
+            tone={toneOf(r.severity)}
+            tags={(
+              <>
+                {/* Not yet escalated is a real state. Showing L1 immediately
+                    would make every late thing look identical. */}
+                <Tag tone={r.level === null ? 'calm' : 'warn'}>
+                  {r.level === null ? 'not yet escalated' : `L${r.level}`}
+                </Tag>
+                <Tag tone={toneOf(r.severity)}>{SEVERITY_WORD[r.severity] ?? r.severity}</Tag>
+                {r.activityCode && <Tag mono>{r.activityCode}</Tag>}
+              </>
+            )}
+          />
+        ))}
+      </>
+    );
 
   // Rendered inside Attention, which already asks "what needs a person".
   // A separate destination would split one question across two places.
   if (embedded) return body;
   return (
-    <div className="screen screen-wide">
-      <h1 className="screen-title">What is not happening</h1>
+    <Screen wide>
+      <Title>What is not happening</Title>
       {body}
-    </div>
+    </Screen>
   );
 }

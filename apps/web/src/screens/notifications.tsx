@@ -15,10 +15,10 @@
  */
 import { useEffect, useState } from 'react';
 import { api, type NotificationRow } from '../api.js';
+import { Row, Tag, Empty, type Tone } from '../ui.js';
 
-const SEVERITY: Record<string, string> = {
-  EMERGENCY: 'nt-emergency', CRITICAL: 'nt-critical',
-  IMPORTANT: 'nt-important', ROUTINE: 'nt-routine',
+const SEVERITY_TONE: Record<string, Tone> = {
+  EMERGENCY: 'stop', CRITICAL: 'stop', IMPORTANT: 'warn', ROUTINE: 'calm',
 };
 const KIND_WORD: Record<string, string> = {
   TASK_OVERDUE: 'Overdue', LOW_STOCK: 'Stock',
@@ -32,6 +32,14 @@ export function Notifications() {
   useEffect(() => { void api.notifications().then(setRows).catch(() => setRows([])); }, []);
   if (!rows) return <p className="screen-sub">Loading…</p>;
 
+  if (rows.length === 0) {
+    return (
+      <Empty big="Nothing to tell you">
+        No condition in the clinic currently warrants a message.
+      </Empty>
+    );
+  }
+
   return (
     <>
       <p className="screen-sub">
@@ -39,27 +47,25 @@ export function Notifications() {
         when the condition behind it stops being true.
       </p>
 
-      {rows.length === 0 ? (
-        <div className="empty">
-          <div className="empty-big">Nothing to tell you</div>
-          <p className="row-note">No condition in the clinic currently warrants a message.</p>
-        </div>
-      ) : (
-        <ul className="nt-list">
-          {rows.map((n) => (
-            <li key={n.id} className={`nt-row ${SEVERITY[n.severity] ?? 'nt-routine'}`}>
-              <div className="nt-head">
-                <span className="nt-kind">{KIND_WORD[n.kind] ?? n.kind}</span>
-                <span className="nt-to">{n.to}</span>
+      {rows.map((n) => {
+        const tone = SEVERITY_TONE[n.severity] ?? 'calm';
+        return (
+          <Row
+            key={n.id}
+            title={n.headline}
+            {...(n.detail ? { note: n.detail } : {})}
+            tone={tone}
+            tags={(
+              <>
+                <Tag tone={tone}>{KIND_WORD[n.kind] ?? n.kind}</Tag>
+                <Tag>{n.to}</Tag>
                 {/* Every notification traces to a standard where one exists. */}
-                {n.activityId && <span className="bf-code">{n.activityId}</span>}
-              </div>
-              <div className="nt-headline">{n.headline}</div>
-              {n.detail && <div className="row-note">{n.detail}</div>}
-            </li>
-          ))}
-        </ul>
-      )}
+                {n.activityId && <Tag mono>{n.activityId}</Tag>}
+              </>
+            )}
+          />
+        );
+      })}
     </>
   );
 }

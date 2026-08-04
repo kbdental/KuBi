@@ -471,6 +471,11 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .row:hover { box-shadow: var(--lift-md); }
 .row:active { transform: translateY(1px); box-shadow: var(--lift); }
 .row-main { flex: 1; min-width: 0; }
+/* Block, not inline. The library builds a row out of spans so that it can be
+   either a <button> or a <div> without changing its markup — and a span in a
+   button lays out inline, which ran the title and the note together on one
+   line: "Autoclave log missingNeeded within 40 min". */
+.row-main, .row-title, .row-note { display: block; }
 .row-title { font-weight: 620; font-size: 17.5px; letter-spacing: -0.012em; }
 .row-note { color: var(--ink-soft); font-size: 14.5px; margin-top: 3px; }
 .row-go { color: var(--ink-faint); display: grid; place-items: center; }

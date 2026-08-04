@@ -14,6 +14,7 @@
  */
 import { useEffect, useState } from 'react';
 import { api, type AuditRow } from '../api.js';
+import { Row, Tag, Empty, Switch } from '../ui.js';
 
 const REFUSALS = ['BLOCKED', 'SENT_BACK', 'OVERRIDE_REQUESTED'];
 
@@ -46,59 +47,51 @@ export function AuditTrail() {
         that points at the old one, so the trail shows both.
       </p>
 
-      <div className="std-switch">
-        {(['ALL', 'REFUSALS', 'DEVIATIONS'] as const).map((k) => (
-          <button
-            key={k}
-            className={`std-tab ${only === k ? 'is-on' : ''}`}
-            type="button"
-            onClick={() => setOnly(k)}
-          >
-            {k === 'ALL' ? 'Everything' : k === 'REFUSALS' ? 'What was refused' : 'Deviations'}
-          </button>
-        ))}
-      </div>
+      <Switch
+        value={only}
+        onChange={setOnly}
+        options={[
+          { value: 'ALL', label: 'Everything' },
+          { value: 'REFUSALS', label: 'What was refused' },
+          { value: 'DEVIATIONS', label: 'Deviations' },
+        ]}
+      />
 
       {shown.length === 0 ? (
-        <div className="empty">
-          <div className="empty-big">
-            {rows.length === 0 ? 'Nothing recorded yet' : 'Nothing of that kind'}
-          </div>
-          <p className="row-note">
-            {rows.length === 0
-              ? 'Complete or start a task and it appears here.'
-              : only === 'REFUSALS'
-                ? 'The system has not had to refuse anything.'
-                : 'No departure from a standard has been recorded.'}
-          </p>
-        </div>
-      ) : (
-        <ul className="au-list">
-          {shown.map((r) => (
-            <li
-              key={r.id}
-              className={`au-row ${REFUSALS.includes(r.action) ? 'au-refusal' : ''}`}
-            >
-              <div className="au-head">
-                <span className="au-action">{ACTION_WORD[r.action] ?? r.action}</span>
-                <span className="bf-code">{r.activityId}</span>
-                <span className="au-at">{new Date(r.at).toLocaleTimeString()}</span>
-              </div>
-              <div className="au-subject">{r.subject}</div>
-              <div className="row-note">
+        <Empty big={rows.length === 0 ? 'Nothing recorded yet' : 'Nothing of that kind'}>
+          {rows.length === 0
+            ? 'Complete or start a task and it appears here.'
+            : only === 'REFUSALS'
+              ? 'The system has not had to refuse anything.'
+              : 'No departure from a standard has been recorded.'}
+        </Empty>
+      ) : shown.map((r) => {
+        const refused = REFUSALS.includes(r.action);
+        return (
+          <Row
+            key={r.id}
+            title={r.subject}
+            note={(
+              <>
                 by {r.by}
                 {r.verifiedBy && ` · verified by ${r.verifiedBy}`}
-              </div>
-              {/* What the evidence actually said, not merely that some existed. */}
-              {r.evidenceValue && <div className="au-evidence">{r.evidenceValue}</div>}
-              {r.deviation && <div className="au-deviation">{r.deviation}</div>}
-              {r.supersedes && (
-                <div className="row-note">Supersedes {r.supersedes} — both are kept.</div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+                {' · '}{new Date(r.at).toLocaleTimeString()}
+                {/* What the evidence actually said, not merely that some existed. */}
+                {r.evidenceValue && <> · {r.evidenceValue}</>}
+                {r.supersedes && <> · supersedes {r.supersedes}, both are kept</>}
+              </>
+            )}
+            tone={refused ? 'stop' : r.deviation ? 'warn' : 'calm'}
+            tags={(
+              <>
+                <Tag tone={refused ? 'stop' : 'calm'}>{ACTION_WORD[r.action] ?? r.action}</Tag>
+                <Tag mono>{r.activityId}</Tag>
+                {r.deviation && <Tag tone="warn">{r.deviation}</Tag>}
+              </>
+            )}
+          />
+        );
+      })}
     </>
   );
 }

@@ -97,8 +97,13 @@ export function Today({
 
       {/* The thing being done gets the wider side; what is still to come sits
           alongside instead of being pushed below the fold on a screen with
-          room to spare. */}
-      <Columns
+          room to spare.
+
+          With nothing in the chair there is no left column, so the list runs
+          full width. Two columns with one of them empty pushed "You're all
+          clear" over to the right of a blank screen, which read as a layout
+          that had failed rather than as good news. */}
+      <Body columns={current !== null}
         main={current && (
           <CurrentTask
             key={current.id}
@@ -134,6 +139,18 @@ export function Today({
       />
     </Screen>
   );
+}
+
+/** Two columns when there is something in the chair, one when there is not. */
+function Body({
+  columns, main, side,
+}: {
+  columns: boolean;
+  main: React.ReactNode;
+  side: React.ReactNode;
+}) {
+  if (!columns) return <>{side}</>;
+  return <Columns main={main} side={side} />;
 }
 
 function TaskLine({

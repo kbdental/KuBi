@@ -72,9 +72,12 @@ const LIBRARY = new Set([
  */
 const CONVERTED = [
   'attention.tsx',
+  'audit.tsx',
   'briefing.tsx',
   'checks.tsx',
+  'exceptions.tsx',
   'gate.tsx',
+  'notifications.tsx',
   'patient-360.tsx',
   'today.tsx',
 ];
@@ -85,10 +88,10 @@ const CONVERTED = [
  * and files may leave; nothing may be added.
  */
 const NOT_YET_CONVERTED = [
-  'activity-library.tsx', 'audit.tsx', 'clinic.tsx', 'clinic-header.tsx',
+  'activity-library.tsx', 'clinic.tsx', 'clinic-header.tsx',
   'command-centre.tsx', 'command-palette.tsx', 'confirmations.tsx',
-  'current-task.tsx', 'engines.tsx', 'entry.tsx', 'exceptions.tsx',
-  'handover.tsx', 'notifications.tsx', 'operations.tsx', 'owner-business.tsx',
+  'current-task.tsx', 'engines.tsx', 'entry.tsx',
+  'handover.tsx', 'operations.tsx', 'owner-business.tsx',
   'patients.tsx', 'quality.tsx', 'reception-board.tsx', 'sign-in.tsx',
   'standards.tsx', 'task-sheet.tsx',
 ];
@@ -134,6 +137,6 @@ describe('the UI library', () => {
   it('the debt register only shrinks', () => {
     // Recorded when the library landed. Raising this number is the one change
     // this test exists to prevent.
-    expect(NOT_YET_CONVERTED.length).toBeLessThanOrEqual(21);
+    expect(NOT_YET_CONVERTED.length).toBeLessThanOrEqual(18);
   });
 });
