@@ -24,6 +24,7 @@ import { api, type ParameterHealthRow } from '../api.js';
 import { ActivityLibrary } from './activity-library.js';
 import { Engines } from './engines.js';
 import { TheDay } from './day.js';
+import { Rules } from './rules.js';
 
 const CLASS_LABEL: Record<WeightClass, string> = {
   PATIENT_SAFETY: 'Patient safety',
@@ -56,7 +57,7 @@ export function Standards() {
   // The day comes first. A new assistant needs to know how a morning moves
   // long before she needs to know what a control parameter is worth, and the
   // old default opened on the weighting model.
-  const [view, setView] = useState<'DAY' | 'PARAMETERS' | 'ACTIVITIES' | 'ENGINES'>('DAY');
+  const [view, setView] = useState<'DAY' | 'RULES' | 'PARAMETERS' | 'ACTIVITIES' | 'ENGINES'>('DAY');
   useEffect(() => { void api.parameterHealth().then(setHealth).catch(() => setHealth([])); }, []);
 
   const byId = new Map((health ?? []).map((h) => [h.parameter, h]));
@@ -74,6 +75,13 @@ export function Standards() {
           onClick={() => setView('DAY')}
         >
           The day
+        </button>
+        <button
+          className={`std-tab ${view === 'RULES' ? 'is-on' : ''}`}
+          type="button"
+          onClick={() => setView('RULES')}
+        >
+          The rules
         </button>
         <button
           className={`std-tab ${view === 'PARAMETERS' ? 'is-on' : ''}`}
@@ -99,6 +107,7 @@ export function Standards() {
       </div>
 
       {view === 'DAY' && <TheDay />}
+      {view === 'RULES' && <Rules />}
       {view === 'ACTIVITIES' && <ActivityLibrary />}
       {view === 'ENGINES' && <Engines embedded />}
 

@@ -80,6 +80,7 @@ const CONVERTED = [
   'gate.tsx',
   'notifications.tsx',
   'patient-360.tsx',
+  'rules.tsx',
   'today.tsx',
 ];
 
