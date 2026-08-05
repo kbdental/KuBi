@@ -141,6 +141,8 @@ export function TaskSheetScreen({
       <h1 className="screen-title">{sheet.title}</h1>
       {sheet.standard && <p className="screen-sub">{sheet.standard}</p>}
 
+      <Trace why={sheet.why} />
+
       {sheet.blockedBy && (
         <div className="notice notice-warn">
           <div className="notice-title">This is on hold</div>
@@ -547,6 +549,45 @@ function Finished({
       </div>
 
       <button className="btn" type="button" onClick={onBack}>Back to Today</button>
+    </div>
+  );
+}
+
+/**
+ * Where this work came from — connection 3, in full.
+ *
+ * The row on Today shows two tags; this shows the whole chain, because the
+ * moment a person is actually doing the thing is the moment "why am I doing
+ * this" is worth answering properly.
+ *
+ * Four lines, and two of them are frequently uncomfortable:
+ *
+ *   the standard      the clinic's own sentence, in the clinic's own words
+ *   the control       or nothing, said plainly
+ *   the proof         how KuBi would know — often "somebody says so"
+ *   the ladder        who hears if it does not happen, or nobody
+ *
+ * A task that traces to nothing shows nothing rather than a plausible chain.
+ */
+function Trace({ why }: { why: TaskSheet['why'] }) {
+  if (!why) return null;
+  return (
+    <div className="trace">
+      <div className="trace-head">Why this exists</div>
+      <div className="trace-line">
+        <b>{why.standardId}</b> · {why.standard} · {why.when}
+      </div>
+      <div className={why.covers ? 'trace-line' : 'trace-line is-gap'}>
+        {why.covers
+          ? <>Governed by <b>{why.covers}</b></>
+          : <>Nothing governs this yet{why.gap ? ` — ${why.gap}` : ''}</>}
+      </div>
+      <div className="trace-line">How KuBi would know: {why.proof}</div>
+      <div className={why.unsupervised ? 'trace-line is-gap' : 'trace-line'}>
+        {why.unsupervised
+          ? 'If this does not happen, nobody is told. There is no ladder for it to climb.'
+          : `If this is late, ${String(why.escalatesTo).replace(/_/g, ' ').toLowerCase()} hears first.`}
+      </div>
     </div>
   );
 }

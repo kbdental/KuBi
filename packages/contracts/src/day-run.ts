@@ -31,7 +31,9 @@
 import { ACTIVITY_LIBRARY } from './activity-library.js';
 import { ladder, rungAt, type EscalationRung, type Responsibility } from './work-model.js';
 import type { RoleCode } from './enums.js';
-import { DAILY_STANDARD, Rhythm, type DailyStandard } from './daily-standard.js';
+import {
+  DAILY_STANDARD, Rhythm, RHYTHM_LABEL, type DailyStandard, type Proof,
+} from './daily-standard.js';
 
 /* -------------------------------------------------------------------------
  * The clock
@@ -277,4 +279,88 @@ function stateOf(
   }
 
   return { clinic: 'OPEN', why: 'Open and running.', blocking: [] };
+}
+
+/* -------------------------------------------------------------------------
+ * Provenance
+ *
+ * Where a task came from, in the words a person would use.
+ *
+ * The owner's point, and the thing no competitor can show: every piece of work
+ * in KuBi traces to a standard somebody wrote down. So any task can answer
+ * three questions without leaving the screen —
+ *
+ *   Why am I doing this?     the standard, in the clinic's own wording
+ *   What governs it?         the control, or nothing, said out loud
+ *   Who hears if I don't?    the rung, or nobody, said out loud
+ *
+ * Derived rather than stored on each task. Copying provenance onto every
+ * instance is how the copies drift apart, and a task claiming a standard it
+ * no longer matches is worse than a task with no provenance at all.
+ * ---------------------------------------------------------------------- */
+
+export interface WorkProvenance {
+  /** DOS-nn. The row in the daily operating standard. */
+  standardId: string;
+  /** The owner's KPI for it, verbatim. */
+  standard: string;
+  /** When in the day it belongs, in words. */
+  when: string;
+  /** The frozen matrix control that governs it, or null. */
+  covers: string | null;
+  /** How KuBi would know it happened, in words. */
+  proof: string;
+  /** Why nothing governs it, or why it cannot be proved. Null when neither. */
+  gap: string | null;
+  /** Who hears about it first if it is late. Null when nothing governs it. */
+  escalatesTo: string | null;
+  /** True when there is no ladder at all — nobody hears, ever. */
+  unsupervised: boolean;
+}
+
+const PROOF_WORD: Record<Proof, string> = {
+  SYSTEM: 'KuBi knows on its own',
+  READING: 'a reading is recorded',
+  CONFIRMATION: 'somebody says so',
+  NOT_YET: 'KuBi cannot prove this',
+};
+
+export function provenanceOf(s: DailyStandard): WorkProvenance {
+  const rungs = ladderFor(s);
+  return {
+    standardId: s.id,
+    standard: s.standard,
+    when: RHYTHM_LABEL[s.rhythm].toLowerCase(),
+    covers: s.covers,
+    proof: PROOF_WORD[s.proof],
+    gap: s.gap ?? null,
+    escalatesTo: rungs && rungs[0] ? String(rungs[0].to) : null,
+    unsupervised: rungs === null,
+  };
+}
+
+/** The standard behind an id, or null. Used to trace a task back. */
+export function standardById(id: string): DailyStandard | null {
+  return DAILY_STANDARD.find((s) => s.id === id) ?? null;
+}
+
+/**
+ * When a role's non-negotiable falls due, as minutes from the clinic opening.
+ *
+ * The demo's task seed measures everything that way, so this is the one place
+ * the rhythm is translated into it. EVERY_PATIENT returns null: those are
+ * raised by a patient arriving and putting them on the opening clock would
+ * claim a schedule that does not exist.
+ */
+export function minutesFromOpening(s: DailyStandard): number | null {
+  switch (s.rhythm) {
+    case Rhythm.BEFORE_OPENING: return CLINIC_DAY.readyBy - CLINIC_DAY.opens;
+    case Rhythm.EVERY_PATIENT: return null;
+    case Rhythm.HOURLY: return 60;
+    case Rhythm.TWO_HOURLY: return 120;
+    case Rhythm.LUNCH: return CLINIC_DAY.lunch - CLINIC_DAY.opens;
+    case Rhythm.LAST_PATIENT: return CLINIC_DAY.lastPatient - CLINIC_DAY.opens;
+    case Rhythm.CLOSING: return CLINIC_DAY.closeBy - CLINIC_DAY.opens;
+    default: return null;
+  }
 }

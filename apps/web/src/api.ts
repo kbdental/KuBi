@@ -56,6 +56,8 @@ export interface Me {
 
 export type BucketName = 'OVERDUE' | 'NOW' | 'NEXT' | 'LATER';
 
+import type { WorkProvenance } from '@kubi/contracts';
+
 export interface TaskRow {
   id: string;
   title: string;
@@ -64,6 +66,14 @@ export interface TaskRow {
   status: string;
   started: boolean;
   blockedBy: string | null;
+  /**
+   * Where this work came from — the standard, the control, the ladder.
+   *
+   * Null for the handful of tasks that predate the library. An absent trace
+   * is honest; an invented one would be the thing the libraries exist to
+   * prevent.
+   */
+  why: WorkProvenance | null;
 }
 
 /**
@@ -129,6 +139,8 @@ export interface TaskSheet {
   problemKinds: Array<{ key: string; label: string }>;
   /** Why this task exists, who owns it, and what it moves. */
   spec: WorkSpecView | null;
+  /** The row in the owner's operating standard this came from. */
+  why: WorkProvenance | null;
 }
 
 /**

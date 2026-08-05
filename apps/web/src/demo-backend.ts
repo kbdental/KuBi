@@ -30,6 +30,8 @@ import {
   STERILIZATION_SAME_DAY, ACTIVITY_LIBRARY,
   type ManagementScore,
   type Responsibility, type EscalationRung,
+  DAILY_STANDARD, provenanceOf, minutesFromOpening, standardById,
+  type WorkProvenance,
 } from '@kubi/contracts';
 
 type Role =
@@ -91,8 +93,14 @@ interface Task {
   code: string;
   /** Which of the 16 control heads this belongs to. */
   parameter: ParameterKey;
-  /** Which half of the day this belongs to. Counted separately, always. */
-  process: 'Opening Readiness' | 'Closing Readiness';
+  /**
+   * Which half of the day this belongs to. Counted separately, always.
+   *
+   * 'Daily Standard' is the third value and is deliberately outside the two
+   * tallies: the opening and closing progress bars answer "can the clinic
+   * open", and the hourly washroom round is not part of that question.
+   */
+  process: 'Opening Readiness' | 'Closing Readiness' | 'Daily Standard';
   title: string;
   standard: string;
   assignee: string;
@@ -107,6 +115,14 @@ interface Task {
   blockedBy: string | null;
   releasedAt: number | null;
   completedBy: string | null;
+  /**
+   * The row in the owner's daily operating standard this came from.
+   *
+   * Null only where a task predates the library. Everything generated carries
+   * it, and it is what lets any task answer "why am I doing this" without
+   * storing a copy of the answer that could drift.
+   */
+  standardId: string | null;
 }
 
 /**
@@ -439,7 +455,7 @@ const OPENING_DUE = OPENED_AT - 12 * 60_000;
 const CLOSING_DUE = OPENING_DUE + 660 * 60_000;
 
 function freshState() {
-  const tasks: Task[] = [
+  const seeded: Array<Omit<Task, 'standardId'>> = [
     {
       id: 't-004', code: 'OPN-004', parameter: 'OPENING_READINESS', process: 'Opening Readiness', title: 'Set up the clinic environment',
       standard: 'AC 24°C where applicable, diffuser and lights as schedule',
@@ -604,6 +620,78 @@ function freshState() {
       responses: {}, blockedBy: null, releasedAt: null, completedBy: null,
     },
   ];
+
+  /**
+   * The day, taken from the owner's operating standard.
+   *
+   * Connection 1. Until now the tasks above were the whole day and they were
+   * written by hand — a demonstration of a clinic rather than this clinic's
+   * own standard. The forty-seven non-negotiables are the standard, so they
+   * are the day.
+   *
+   * Two rules keep it honest:
+   *
+   * 1. **Nothing is duplicated.** Where a hand-written task already covers a
+   *    control the standard names, the standard is linked to it rather than
+   *    raised again. Priya does not get two "check the emergency kit" tasks
+   *    because one file wrote it twice.
+   * 2. **Patient work is not on the clock.** The thirteen EVERY_PATIENT
+   *    non-negotiables are raised by a patient arriving, and minutesFromOpening
+   *    returns null for them, so they never appear on a timeline that would
+   *    claim a schedule the clinic does not have.
+   */
+  const ROLE_EMPLOYEE: Record<string, string> = {
+    HOUSEKEEPING: 'e-ramesh',
+    DENTAL_ASSISTANT: 'e-priya',
+    RECEPTION: 'e-kavita',
+    CLINIC_MANAGER: 'e-rahul',
+    TREATING_DOCTOR: 'e-mehta',
+  };
+
+  // Which controls the hand-written tasks already cover.
+  const alreadyCovered = new Set(seeded.map((t) => t.code));
+
+  const tasks: Task[] = seeded.map((t) => ({
+    ...t,
+    // Trace a hand-written task back to the standard it satisfies, where one
+    // names the same control. Matching on the control rather than on the title
+    // is deliberate — titles are written for a person and drift.
+    standardId: DAILY_STANDARD.find((d) => d.covers === t.code)?.id ?? null,
+  }));
+
+  let generated = 0;
+  for (const std of DAILY_STANDARD) {
+    if (std.covers && alreadyCovered.has(std.covers)) continue;
+    const minutes = minutesFromOpening(std);
+    if (minutes === null) continue;              // patient-driven, never on the clock
+    const assignee = ROLE_EMPLOYEE[std.role];
+    if (!assignee) continue;                     // no such person in the demo clinic
+    generated += 1;
+    tasks.push({
+      id: `t-std-${std.id}`,
+      // Where nothing governs it, the code says so rather than borrowing one.
+      code: std.covers ?? 'NO CONTROL',
+      parameter: 'OPENING_READINESS',
+      process: 'Daily Standard',
+      // The owner's own wording, both lines. Rewriting them here would be a
+      // second copy of the standard, which is the thing the library prevents.
+      title: std.task,
+      standard: std.standard,
+      assignee,
+      selfVerifyAllowed: true,
+      checkerRoles: [],
+      cantConfirm: null,
+      minutesFromOpening: minutes,
+      status: 'DUE',
+      items: [{ id: `i-${std.id}`, label: std.task }],
+      responses: {},
+      blockedBy: null,
+      releasedAt: null,
+      completedBy: null,
+      standardId: std.id,
+    });
+  }
+  void generated;
 
   const visits: Visit[] = [
     { id: 'v1', patientLabel: 'SYNTHETIC Meera J.', patientUhid: 'SYN-1001', visitType: 'Check-up', chairLabel: 'Chair 1', startsInMinutes: 18, minutes: 30, status: 'BOOKED', arrivedAt: null },
@@ -1023,6 +1111,20 @@ function raise(a: Omit<Attention, 'id' | 'open'>) {
  * Counts for one half of the day. Null when that half does not exist, which is
  * not the same as "none done" and must never render as a zero.
  */
+/**
+ * Why this task exists, for the person holding the tablet.
+ *
+ * Connection 3. Derived from the standard every time rather than copied onto
+ * the task, so a task can never claim a standard it no longer matches.
+ * Returns null for the handful of tasks that predate the library — an absent
+ * trace is honest; an invented one is not.
+ */
+function traceOf(t: Task): WorkProvenance | null {
+  if (!t.standardId) return null;
+  const std = standardById(t.standardId);
+  return std ? provenanceOf(std) : null;
+}
+
 function tally(process: Task['process']) {
   const forProcess = db.tasks.filter((t) => t.process === process);
   if (forProcess.length === 0) return null;
@@ -1211,6 +1313,10 @@ function taskView(t: Task, me: Person) {
     canOverrideBlock: t.cantConfirm !== null,
     blockedBy: t.blockedBy,
     problemKinds: PROBLEM_KINDS,
+    // The row in the owner's own operating standard this came from. Distinct
+    // from `spec` below: spec is the control model, this is the clinic's own
+    // sentence about what good looks like.
+    why: traceOf(t),
     // Why this exists, who the four people are, and what it moves. Without
     // these a task is a tickable box, which is the thing the owner said this
     // must not degrade into.
@@ -1446,6 +1552,9 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         status: mins < 0 ? 'OVERDUE' : t.status,
         started: t.status === 'IN_PROGRESS',
         blockedBy: t.blockedBy,
+        // Every task traces to a standard somebody wrote down. This is the
+        // thing no competitor can show, and it costs one field.
+        why: traceOf(t),
       });
     }
 
@@ -2790,6 +2899,33 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     const mine = db.tasks.filter((t) => t.assignee === me.employeeId);
     const openTasks = mine.filter((t) => t.status === 'DUE' || t.status === 'IN_PROGRESS');
 
+    /**
+     * A section straight out of the owner's daily operating standard.
+     *
+     * Connection 1, on the screen five of the roles actually land on. Until
+     * now these sections were hand-written facts — "Treatment rooms and chairs
+     * cleaned" was my phrasing, not the clinic's, and it appeared whether or
+     * not the standard said anything of the kind. A briefing that invents a
+     * role's day is a demonstration of a clinic, not this clinic.
+     *
+     * Items come from the person's real open tasks, filtered to the part of
+     * the day being asked about, in the owner's wording, with the activity
+     * code that governs them — or none, visibly.
+     */
+    const standardSection = (
+      key: string, label: string, hint: string | null, emptyText: string,
+      rhythms: string[],
+    ) => {
+      const items = openTasks
+        .filter((t) => {
+          if (!t.standardId) return false;
+          const std = standardById(t.standardId);
+          return std ? rhythms.includes(std.rhythm) : false;
+        })
+        .map((t) => task(t));
+      return section(key, label, items.length > 0 ? 'AMBER' : 'GREEN', hint, emptyText, items);
+    };
+
     // ---- Doctor ----
     if (me.roles.includes('TREATING_DOCTOR')) {
       const seated = db.visits.filter((v) => v.status === 'IN_CHAIR');
@@ -2923,15 +3059,13 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     if (me.roles.includes('HOUSEKEEPING')) {
       const rooms = db.visits.filter((v) => v.status === 'COMPLETED');
       return json(briefing('Housekeeping', 'What needs cleaning, and when?', null, [
-        section('opening', 'Before the first patient', 'AMBER',
-          'Rooms, chairs, washrooms.', 'Opening clean is done.',
-          [
-            fact('hk1', 'Treatment rooms and chairs cleaned', 'by 09:30', 'GREEN', TaskOrigin.RECURRING),
-            fact('hk2', 'Washrooms cleaned and stocked', 'by 09:30', 'GREEN', TaskOrigin.RECURRING),
-          ]),
-        section('midday', 'During the day', 'AMBER',
-          null, 'Nothing outstanding.',
-          [fact('hk3', 'High-touch surface round', 'by 14:00', 'AMBER', TaskOrigin.RECURRING)]),
+        standardSection('opening', 'Before the first patient',
+          'The clinic does not open with any of these outstanding.',
+          'Opening clean is done.',
+          ['BEFORE_OPENING']),
+        standardSection('midday', 'During the day',
+          'Every two hours, whatever else is happening.', 'Nothing outstanding.',
+          ['HOURLY', 'TWO_HOURLY', 'LUNCH']),
         section('turnaround', 'Rooms to turn around',
           rooms.length ? 'AMBER' : 'GREEN',
           'A chair cannot take the next patient until it is done.',
@@ -2942,9 +3076,9 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
           spawned('Housekeeping').length ? 'AMBER' : 'GREEN',
           'Nobody typed these in.', 'No clinical event has raised work for you.',
           spawned('Housekeeping')),
-        section('closing', 'Closing', 'AMBER',
-          'The day cannot close with these open.', 'Closing is clear.',
-          [fact('hk4', 'Biomedical waste segregated and handed over', 'at closing', 'AMBER', TaskOrigin.RECURRING)]),
+        standardSection('closing', 'Closing',
+          'Nobody locks up with these open.', 'Closing is clear.',
+          ['CLOSING', 'LAST_PATIENT']),
       ]));
     }
 

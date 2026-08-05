@@ -3,7 +3,7 @@ import { Checks } from './checks.js';
 import { useState } from 'react';
 import { ClinicHeader } from './clinic-header.js';
 import { CurrentTask } from './current-task.js';
-import { Screen, Group, Row, Empty, Switch, Columns } from '../ui.js';
+import { Screen, Group, Row, Tag, Empty, Switch, Columns } from '../ui.js';
 
 /**
  * TODAY — where the clinic is, and the thing in front of you.
@@ -160,7 +160,26 @@ function TaskLine({
   timezone: string | undefined;
   onOpen: () => void;
 }) {
-  if (task.blockedBy) return <Row title={task.title} blockedBy={task.blockedBy} />;
+  /**
+   * The trace, in two tags.
+   *
+   * Only the two facts that change what a person does: which control governs
+   * this, and whether anybody hears if it does not happen. Everything else
+   * about the standard is on the task itself — a row with six tags is a table,
+   * and a table is a different screen.
+   */
+  const trace = task.why && (
+    <>
+      {task.why.covers
+        ? <Tag mono>{task.why.covers}</Tag>
+        : <Tag tone="warn">no control</Tag>}
+      {task.why.unsupervised && <Tag tone="stop">nobody is told</Tag>}
+    </>
+  );
+
+  if (task.blockedBy) {
+    return <Row title={task.title} blockedBy={task.blockedBy} tags={trace} />;
+  }
 
   // One line of context, and only when it earns its place.
   const note = task.started ? 'You started this' : `By ${time(task.dueAt, timezone)}`;
@@ -170,6 +189,7 @@ function TaskLine({
       title={task.title}
       note={note}
       {...(task.status === 'OVERDUE' ? { tone: 'stop' as const } : {})}
+      tags={trace}
       onOpen={onOpen}
     />
   );

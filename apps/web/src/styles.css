@@ -2460,3 +2460,26 @@ label.field-label {
 /* A group that follows a button needs air, or the heading sits on the button.
    Cheaper than giving every group a top margin it does not need. */
 .btn + .group { margin-top: 24px; }
+
+/* ---- the trace: where a task came from -----------------------------------
+ *
+ * Deliberately quiet and deliberately not a card. It is context for the work,
+ * not the work — a person doing the task should be able to ignore it, and a
+ * person asking "why am I doing this" should find it without leaving.
+ * ------------------------------------------------------------------------- */
+.trace {
+  border-left: 3px solid var(--line);
+  padding: 2px 0 2px 14px;
+  margin: 0 0 22px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.trace-head {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--ink-faint); margin-bottom: 2px;
+}
+.trace-line { font-size: 14.5px; color: var(--ink-soft); line-height: 1.45; }
+.trace-line b { color: var(--ink); font-weight: 620; }
+/* The two lines that are often uncomfortable carry the warning colour, so a
+   gap in the standard is visible at the moment somebody is working to it. */
+.trace-line.is-gap { color: var(--warn); }
+.trace-line.is-gap b { color: var(--warn); }
