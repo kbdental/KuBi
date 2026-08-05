@@ -9,13 +9,15 @@
  * says so once rather than showing a zero that would be read as "nobody owes
  * anything".
  */
-import { useEffect, useState } from 'react';
+import { useLoad, Unavailable, Loading } from '../ui.js';
+
 import { api, type ReceptionBoard as Board } from '../api';
 
 export function ReceptionBoard({ onOpenClinic }: { onOpenClinic?: () => void }) {
-  const [b, setB] = useState<Board | null>(null);
-  useEffect(() => { void api.receptionBoard().then(setB).catch(() => setB(null)); }, []);
-  if (!b) return <div className="screen"><p className="screen-sub">Loading…</p></div>;
+  const { data: b, failed } = useLoad<Board>(() => api.receptionBoard());
+
+  if (failed) return <Unavailable what="The reception board is not served by this server yet." />;
+  if (!b) return <Loading />;
 
   return (
     <div className="screen screen-wide">

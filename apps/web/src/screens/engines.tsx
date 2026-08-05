@@ -14,13 +14,15 @@
  * process, a trigger, an owner, a due rule, a nine-step SOP, an evidence type,
  * a verification, and a KPI with a formula and a target.
  */
-import { useEffect, useState } from 'react';
+
+import { useLoad, Unavailable } from '../ui.js';
 import { api, type EnginesView } from '../api.js';
 
 export function Engines({ embedded = false }: { embedded?: boolean } = {}) {
-  const [d, setD] = useState<EnginesView | null>(null);
-  const load = () => { void api.engines().then(setD).catch(() => setD(null)); };
-  useEffect(load, []);
+  const { data: d, failed, reload: load } = useLoad<EnginesView>(() => api.engines());
+  if (failed) {
+    return <Unavailable what="The engine view is not served by this server yet." />;
+  }
   if (!d) return <p className="screen-sub">Loading…</p>;
 
   const a = d.anatomy;

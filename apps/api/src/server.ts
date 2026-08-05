@@ -37,7 +37,35 @@ import {
   raiseIncident, containIncident, investigateIncident, addAction,
   implementAction, checkEffectiveness, closeIncident, listIncidents, CapaRuleError,
 } from './platform/quality/capa.service.js';
-import { ActivityStatus, ExceptionStatus } from '@kubi/contracts';
+import { ActivityStatus, ExceptionStatus, DAILY_STANDARD } from '@kubi/contracts';
+
+/**
+ * What each role's briefing is called, and the one question it answers.
+ *
+ * Kept here rather than in the client so the two cannot disagree about what a
+ * screen is for. Anything not listed gets the neutral pair — a role with no
+ * entry is honest about being unlabelled rather than borrowing another's.
+ */
+const ROLE_LABEL: Record<string, string> = {
+  DENTAL_ASSISTANT: 'Assistant',
+  SENIOR_ASSISTANT: 'Senior assistant',
+  RECEPTION: 'Reception',
+  HOUSEKEEPING: 'Housekeeping',
+  CLINIC_MANAGER: 'Clinic manager',
+  TREATING_DOCTOR: 'Doctor',
+  STERILIZATION_TECHNICIAN: 'Sterilisation',
+  LAB_COORDINATOR: 'Laboratory',
+};
+const ROLE_QUESTION: Record<string, string> = {
+  DENTAL_ASSISTANT: 'What do I do now?',
+  SENIOR_ASSISTANT: 'What do I do now?',
+  RECEPTION: 'Who is waiting, and who needs calling?',
+  HOUSEKEEPING: 'What needs cleaning, and when?',
+  CLINIC_MANAGER: 'Is the clinic running to standard?',
+  TREATING_DOCTOR: 'Which patient needs me?',
+  STERILIZATION_TECHNICIAN: 'What is in the loop, and what is stuck?',
+  LAB_COORDINATOR: 'What is due back, and what is stuck?',
+};
 
 const clock = systemClock;
 
@@ -334,6 +362,129 @@ export async function buildServer(): Promise<FastifyInstance> {
 
     await track(s, 'view_today');
     return result;
+  });
+
+  /**
+   * The briefing — the screen five of the roles actually land on.
+   *
+   * my-day answers "what do I owe"; this answers "how is my part of the day
+   * going". They read the same instances and differ only in shape: buckets by
+   * urgency there, sections by the owner's rhythm here.
+   *
+   * The sections come from DAILY_STANDARD rather than being written into this
+   * file. Before that, a briefing hard-coded its own idea of a role's day —
+   * "Treatment rooms and chairs cleaned" appeared for housekeeping whether or
+   * not the standard said anything of the kind, which is a demonstration of a
+   * clinic rather than this clinic.
+   *
+   * Deliberately thinner than the demo backend's version: no cascade, no lab
+   * or sterilisation facts. Those need domain reads this route has no business
+   * doing, and a section that quietly showed nothing would read as "all clear"
+   * rather than "not built". Sections appear only where they are real.
+   */
+  app.get('/api/v1/briefing', async (req) => {
+    const s = await requireSession(req);
+    const now = clock.now();
+
+    const roleLabel = ROLE_LABEL[s.roleCodes[0] ?? ''] ?? 'My work';
+    const question = ROLE_QUESTION[s.roleCodes[0] ?? ''] ?? 'What do I do now?';
+
+    if (!s.employeeId) {
+      return {
+        roleLabel, question, work: null,
+        headline: { verdict: 'Nothing assigned', why: 'This account has no employee record.', tone: 'GREEN', action: null },
+        sections: [],
+      };
+    }
+
+    return withTenantContext(prisma, s.tenancy, async (tx) => {
+      const instances = await tx.activityInstance.findMany({
+        where: {
+          assigneeEmployeeId: s.employeeId!,
+          status: { in: [ActivityStatus.DUE, ActivityStatus.IN_PROGRESS, ActivityStatus.OVERDUE] },
+        },
+        include: { definition: true },
+        orderBy: { dueAt: 'asc' },
+      });
+      const done = await tx.activityInstance.count({
+        where: {
+          assigneeEmployeeId: s.employeeId!,
+          status: { in: [ActivityStatus.COMPLETED, ActivityStatus.VERIFIED] },
+        },
+      });
+
+      // Which part of the day an instance belongs to, via the control it was
+      // raised from. Null where the standard names no control for it — those
+      // fall into "Everything else" rather than being guessed into a slot.
+      const rhythmOf = (code: string): string | null =>
+        DAILY_STANDARD.find((d) => d.covers === code)?.rhythm ?? null;
+
+      const item = (i: (typeof instances)[number]) => ({
+        id: i.id,
+        kind: 'task' as const,
+        text: i.definition.title,
+        detail: i.status === ActivityStatus.IN_PROGRESS ? 'started' : null,
+        origin: 'RECURRING',
+        taskId: i.id,
+        priority: null,
+        tone: i.status === ActivityStatus.OVERDUE ? 'RED' : null,
+        blockedBy: null,
+        activityCode: i.definition.code,
+      });
+
+      const slot = (rhythms: string[]) =>
+        instances.filter((i) => rhythms.includes(rhythmOf(i.definition.code) ?? ''));
+
+      const before = slot(['BEFORE_OPENING']);
+      const during = slot(['HOURLY', 'TWO_HOURLY', 'LUNCH']);
+      const closing = slot(['CLOSING', 'LAST_PATIENT']);
+      const rest = instances.filter(
+        (i) => !before.includes(i) && !during.includes(i) && !closing.includes(i),
+      );
+
+      const section = (
+        key: string, label: string, hint: string | null, emptyText: string,
+        rows: typeof instances,
+      ) => ({
+        key, label,
+        tone: rows.some((r) => r.status === ActivityStatus.OVERDUE) ? 'RED'
+          : rows.length > 0 ? 'AMBER' : 'GREEN',
+        hint, emptyText, items: rows.map(item),
+      });
+
+      const sections = [
+        section('opening', 'Before the first patient',
+          'The clinic does not open with any of these outstanding.',
+          'Opening is done.', before),
+        section('during', 'Through the day',
+          'On a cadence, whatever else is happening.', 'Nothing due this hour.', during),
+        section('other', 'Everything else', null, 'Nothing outstanding.', rest),
+        section('closing', 'Closing',
+          'Nobody locks up with these open.', 'Closing is clear.', closing),
+      ];
+
+      // The answer is derived from the sections, never authored, so a headline
+      // cannot claim something its own content does not support.
+      const live = sections.filter((x) => x.items.length > 0);
+      const worst = live.find((x) => x.tone === 'RED') ?? live.find((x) => x.tone === 'AMBER') ?? null;
+      const headline = worst
+        ? {
+          verdict: worst.label,
+          why: worst.items.length === 1
+            ? worst.items[0]!.text
+            : `${worst.items.length} things — ${worst.items[0]!.text} and ${worst.items.length - 1} more`,
+          tone: worst.tone,
+          action: worst.key,
+        }
+        : { verdict: 'All clear', why: 'Nothing needs you right now.', tone: 'GREEN', action: null };
+
+      void now;
+      return {
+        roleLabel, question,
+        work: { total: instances.length + done, done },
+        headline, sections,
+      };
+    });
   });
 
   // ---- DO THIS ----

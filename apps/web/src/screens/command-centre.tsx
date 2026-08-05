@@ -27,7 +27,8 @@
  * reason attached rather than a reassuring row of green dots. A dashboard that
  * guesses is worse than one that admits a gap, because the guess is invisible.
  */
-import { useEffect, useState } from 'react';
+import { useLoad, Unavailable, Loading } from '../ui.js';
+
 import { api, type CommandCentre } from '../api';
 
 const LIGHT: Record<string, string> = { GREEN: 'lt-green', AMBER: 'lt-amber', RED: 'lt-red' };
@@ -39,10 +40,10 @@ export function CommandCentre({
   onOpenClinic?: () => void;
   onOpenOperations?: () => void;
 }) {
-  const [cc, setCc] = useState<CommandCentre | null>(null);
+  const { data: cc, failed } = useLoad<CommandCentre>(() => api.commandCentre());
 
-  useEffect(() => { void api.commandCentre().then(setCc).catch(() => setCc(null)); }, []);
-  if (!cc) return <div className="screen"><p className="screen-sub">Loading…</p></div>;
+  if (failed) return <Unavailable what="Command centre needs the owner and scoreboard reads, which this server does not serve yet." />;
+  if (!cc) return <Loading />;
 
   const r = cc.readiness;
 

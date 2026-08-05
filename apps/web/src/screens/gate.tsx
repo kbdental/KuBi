@@ -19,12 +19,25 @@
  */
 import { useEffect, useState } from 'react';
 import { api, type GateView } from '../api.js';
-import { Screen, Title, Answer, Group, Row, Tag, Loading } from '../ui.js';
+import { Screen, Title, Answer, Group, Row, Tag, Loading, Failed } from '../ui.js';
 
 export function Gate() {
   const [g, setG] = useState<GateView | null>(null);
-  const load = () => { void api.gate().then(setG).catch(() => setG(null)); };
+  // Failure and "not yet arrived" are different states, and collapsing them
+  // was a real bug: against the server this screen showed "Loading…" for ever,
+  // because the gate endpoint does not exist there yet. A spinner that never
+  // resolves is the software telling a person it is working when it is not.
+  const [failed, setFailed] = useState(false);
+  const load = () => {
+    void api.gate().then((v) => { setG(v); setFailed(false); }).catch(() => setFailed(true));
+  };
   useEffect(load, []);
+  if (failed) {
+    return (
+      <Failed what={'Procedure readiness is not available on this server yet. '
+        + 'The gate model is built and tested; the endpoint that serves it is not.'} />
+    );
+  }
   if (!g) return <Loading />;
 
   async function toggle(id: string) {

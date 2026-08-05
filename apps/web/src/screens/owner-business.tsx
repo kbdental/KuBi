@@ -21,7 +21,8 @@
  * list still matters and still appears, but below, because it answers a
  * question the owner asked once rather than the one they ask every morning.
  */
-import { useEffect, useState } from 'react';
+import { useLoad, Unavailable, Loading } from '../ui.js';
+import { useState } from 'react';
 import { api, type Scoreboard, type ScoreLine } from '../api.js';
 
 const OUTCOME_CLASS: Record<string, string> = {
@@ -29,11 +30,11 @@ const OUTCOME_CLASS: Record<string, string> = {
 };
 
 export function OwnerBusiness({ onOpenQuality }: { onOpenQuality?: () => void }) {
-  const [sb, setSb] = useState<Scoreboard | null>(null);
+  const { data: sb, failed } = useLoad<Scoreboard>(() => api.scoreboard());
   const [open, setOpen] = useState<ScoreLine | null>(null);
 
-  useEffect(() => { void api.scoreboard().then(setSb).catch(() => setSb(null)); }, []);
-  if (!sb) return <div className="screen"><p className="screen-sub">Loading…</p></div>;
+  if (failed) return <Unavailable what="The business scoreboard is not served by this server yet." />;
+  if (!sb) return <Loading />;
 
   // The weakest line that actually has something wrong with it. Sorting by
   // percentage alone would point at a low score with nothing to act on.

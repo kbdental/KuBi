@@ -22,7 +22,7 @@
  * Everything else (Tag, Fact, Empty, Notice, Switch) is furniture that hangs
  * off those three.
  */
-import type { ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { IconGo } from './icons.js';
 
 /* -------------------------------------------------------------------------
@@ -407,6 +407,58 @@ export function Journey({ steps }: { steps: Step[] }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+/**
+ * Load something, and tell the truth about what happened.
+ *
+ * Five screens independently wrote `catch(() => setThing(null))` and then
+ * rendered "Loading…" whenever the thing was null. Against the demo backend
+ * that never mattered, because nothing ever failed. Against the real server it
+ * meant a screen whose endpoint does not exist yet spun for ever — the
+ * software telling a person it is working when it is not, which is the one
+ * thing this product is not allowed to do.
+ *
+ * Three states, never two: waiting, failed, and loaded.
+ */
+export function useLoad<T>(
+  fetcher: () => Promise<T>,
+  deps: React.DependencyList = [],
+): { data: T | null; failed: boolean; reload: () => void } {
+  const [data, setData] = useState<T | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  const reload = useCallback(() => {
+    setFailed(false);
+    let alive = true;
+    void fetcher()
+      .then((v) => { if (alive) setData(v); })
+      .catch(() => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+    // The caller owns when this re-runs. `fetcher` is a fresh closure on every
+    // render, so including it would loop for ever — the deps the caller passes
+    // are the whole contract.
+  }, deps);
+
+  useEffect(reload, [reload]);
+  return { data, failed, reload };
+}
+
+/**
+ * An endpoint this build cannot reach.
+ *
+ * Says which screen and why, rather than a spinner or a generic apology. The
+ * distinction that matters to somebody standing in a clinic: the thing is not
+ * broken, it is not there yet.
+ */
+export function Unavailable({ what }: { what: string }) {
+  return (
+    <Screen>
+      <Notice tone="calm" title="Not available on this server yet">
+        {what}
+      </Notice>
+    </Screen>
   );
 }
 

@@ -16,7 +16,8 @@
  *    action-required counts are the ones given weight, and the confirmed count
  *    is present but quiet.
  */
-import { useEffect, useState } from 'react';
+import { useLoad, Unavailable, Loading } from '../ui.js';
+
 import { api, type Confirmations as Data } from '../api.js';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -35,9 +36,10 @@ const STATUS_CLASS: Record<string, string> = {
 };
 
 export function ConfirmationsBoard() {
-  const [d, setD] = useState<Data | null>(null);
-  useEffect(() => { void api.confirmations().then(setD).catch(() => setD(null)); }, []);
-  if (!d) return <div className="screen"><p className="screen-sub">Loading…</p></div>;
+  const { data: d, failed } = useLoad<Data>(() => api.confirmations());
+
+  if (failed) return <Unavailable what="The morning confirmation board is not served by this server yet." />;
+  if (!d) return <Loading />;
 
   const s = d.summary;
   const unresolved = s.unconfirmed + s.actionRequired;
