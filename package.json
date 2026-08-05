@@ -22,7 +22,8 @@
     "db:seed": "tsx prisma/seed/index.ts",
     "build:app": "pnpm --filter @kubi/web build:demo && node scripts/build-try-it.mjs",
     "verify:app": "pnpm build:app && node scripts/verify-app.mjs",
-    "test:reset": "bash scripts/reset-test-db.sh"
+    "test:reset": "bash scripts/reset-test-db.sh",
+    "db:seed:dev": "tsx prisma/seed/dev.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
