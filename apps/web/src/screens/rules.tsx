@@ -20,7 +20,8 @@ import {
   theExceptions, stopsWork, immediate, ESCALATION_MATRIX, unmappedRoles,
   exceptionCoverage, isImmediate, ActionKind,
   procedures, protocolOf, runProtocol, stepsFor, protocolCoverage,
-  UNIVERSAL_PROTOCOL, PHASE_LABEL,
+  UNIVERSAL_PROTOCOL, PHASE_LABEL, PROCEDURE_PROTOCOLS, protocolNeedsOwner,
+  PATIENT_JOURNEY, theJourney, needsOwner, CONDITION_LIBRARY,
   type ConditionRule, type ExceptionRule,
 } from '@kubi/contracts';
 import { Screen, Title, Answer, Group, Row, Tag, Switch, type Tone } from '../ui.js';
@@ -33,7 +34,7 @@ const ACTION_WORD: Record<string, string> = {
 };
 
 export function Rules() {
-  const [view, setView] = useState<'CONDITIONS' | 'GATES' | 'EXCEPTIONS' | 'PROTOCOLS'>('CONDITIONS');
+  const [view, setView] = useState<'CONDITIONS' | 'GATES' | 'EXCEPTIONS' | 'PROTOCOLS' | 'UNOWNED'>('CONDITIONS');
 
   return (
     <Screen wide>
@@ -49,6 +50,7 @@ export function Rules() {
           { value: 'GATES', label: 'Gates' },
           { value: 'EXCEPTIONS', label: 'Exceptions' },
           { value: 'PROTOCOLS', label: 'Protocols' },
+          { value: 'UNOWNED', label: 'Nobody owns', count: 322 },
         ]}
       />
 
@@ -56,6 +58,7 @@ export function Rules() {
       {view === 'GATES' && <Gates />}
       {view === 'EXCEPTIONS' && <Exceptions />}
       {view === 'PROTOCOLS' && <Protocols />}
+      {view === 'UNOWNED' && <Unowned />}
     </Screen>
   );
 }
@@ -381,6 +384,131 @@ function Protocols() {
         {UNIVERSAL_PROTOCOL.map((u) => (
           <Row key={u.id} title={u.task} note={`raised by "${u.when}"`} />
         ))}
+      </Group>
+    </>
+  );
+}
+
+/* ---- what nobody owns ----------------------------------------------------
+ *
+ * The largest single thing standing between KuBi and working, in one place.
+ *
+ * Across the libraries, 322 rows have no owner. That is not a cosmetic gap:
+ * an escalation ladder needs a doer to start from, so an unowned task raises
+ * nothing when it does not happen. Every unowned row is a rule that looks
+ * live and is inert.
+ *
+ * Deliberately read-only, with no Save button. Assignment has to persist, and
+ * KuBi has no database yet — a button that appeared to save and did not would
+ * be worse than no button. This screen exists to make the size and shape of
+ * the decision visible so it can be made on paper today and typed in once.
+ * ---------------------------------------------------------------------- */
+
+function Unowned() {
+  const journey = needsOwner();
+  const conditions = CONDITION_LIBRARY.filter((r) => r.role === null);
+  const steps = protocolNeedsOwner();
+  const total = journey.length + conditions.length + steps.length;
+
+  // Which roles already do this kind of work, from the rows that DO have an
+  // owner. A starting point for the decision, never the decision itself.
+  const knownRoles = [...new Set([
+    ...PATIENT_JOURNEY.filter((p) => p.role).map((p) => p.role!),
+    ...CONDITION_LIBRARY.filter((r) => r.role).map((r) => r.role!),
+    ...PROCEDURE_PROTOCOLS.filter((s) => s.role).map((s) => s.role!),
+  ])].map((r) => r.replace(/_/g, ' ').toLowerCase());
+
+  return (
+    <>
+      <Answer
+        verdict={`${total} rules have nobody assigned`}
+        why="An escalation ladder needs a doer to start from. Until a rule has an owner,
+             nothing happens when it does not happen — so every one of these looks live
+             and is inert."
+        tone="stop"
+      />
+
+      <Group
+        title="Why there is no Save button here"
+        note="Assignment has to persist, and KuBi has no database yet. A button that looked
+              like it saved and did not would be worse than no button. Decide these on paper;
+              they get typed in once, when there is somewhere to put them."
+      >
+        <Row
+          title="Roles already used in your libraries"
+          note={knownRoles.join(' · ')}
+          tags={<Tag>{knownRoles.length} roles</Tag>}
+        />
+        <Row
+          title="Escalation targets with no role in KuBi"
+          note={unmappedRoles().join(' · ')}
+          tone="warn"
+          tags={<Tag tone="warn">{unmappedRoles().length} job titles</Tag>}
+        />
+      </Group>
+
+      <Group
+        title="Procedure steps"
+        count={steps.length}
+        note="The largest group. A step nobody owns cannot be chased, and a protocol is
+              a sequence — one unowned step stalls everything after it."
+        tone="stop"
+      >
+        {procedures().map((p) => {
+          const mine = steps.filter((s) => s.procedure === p);
+          if (mine.length === 0) return null;
+          return (
+            <Row
+              key={p}
+              title={p}
+              note={mine.map((s) => s.task).join(' · ')}
+              tone="warn"
+              tags={<Tag tone="warn">{mine.length} steps</Tag>}
+            />
+          );
+        })}
+      </Group>
+
+      <Group
+        title="Patient journey tasks"
+        count={journey.length}
+        note="Stages 3 to 13. Stages 1 and 2 arrived with a Responsible column; these did not."
+        tone="stop"
+      >
+        {theJourney().map((st) => {
+          const mine = st.tasks.filter((t) => t.role === null);
+          if (mine.length === 0) return null;
+          return (
+            <Row
+              key={st.stage}
+              title={st.label}
+              note={mine.map((t) => t.task).join(' · ')}
+              tone="warn"
+              tags={<Tag tone="warn">{mine.length} tasks</Tag>}
+            />
+          );
+        })}
+      </Group>
+
+      <Group
+        title="Condition rules"
+        count={conditions.length}
+        note="Groups C to R. These fire automatically and land on nobody."
+        tone="stop"
+      >
+        {theConditions().map((g) => {
+          const mine = g.rules.filter((r) => r.role === null);
+          if (mine.length === 0) return null;
+          return (
+            <Row
+              key={g.group}
+              title={`${g.letter}. ${g.label}`}
+              note={mine.map((r) => `${r.condition} → ${r.task}`).join(' · ')}
+              tone="warn"
+              tags={<Tag tone="warn">{mine.length} rules</Tag>}
+            />
+          );
+        })}
       </Group>
     </>
   );

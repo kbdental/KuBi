@@ -18,14 +18,14 @@
  */
 import { writeFileSync } from 'node:fs';
 import {
-  DAILY_STANDARD, RHYTHM_LABEL, theDay, proofMix, ungoverned, unproven,
+  DAILY_STANDARD, theDay, proofMix, ungoverned, unproven,
   PATIENT_JOURNEY, theJourney, journeyCompleteness, needsOwner,
   CONDITION_LIBRARY, theConditions, conditionCoverage, missingCapabilities,
   COMPLIANCE_GATES, TREATMENT_GATES, gateCoverage, missingForGates,
   EXCEPTION_LIBRARY, theExceptions, ESCALATION_MATRIX, exceptionCoverage,
   unmappedRoles, isImmediate,
   PROCEDURE_PROTOCOLS, UNIVERSAL_PROTOCOL, procedures, protocolOf,
-  protocolCoverage, PHASE_LABEL,
+  protocolCoverage,
 } from '../packages/contracts/src/index.js';
 
 const out = process.argv[2] ?? 'docs/kubi-libraries.html';
