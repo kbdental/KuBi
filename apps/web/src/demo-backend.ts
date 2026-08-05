@@ -3083,10 +3083,26 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     }
 
     // ---- Assistant (dental and senior) ----
-    const before = openTasks.filter((t) => t.process === 'Opening Readiness');
-    const closing = openTasks.filter((t) => t.process === 'Closing Readiness');
+    //
+    // Grouped by the owner's own rhythm rather than by the two process names.
+    // Before the standard arrived there were only two halves of a day, so the
+    // hourly sterile-instrument check and the lunchtime restock had nowhere to
+    // go and fell into "Everything else" — which is where work goes to be
+    // ignored. The rhythm has seven slots and the briefing now uses them.
+    const rhythmOf = (t: Task) =>
+      (t.standardId ? standardById(t.standardId)?.rhythm ?? null : null);
+    const before = openTasks.filter(
+      (t) => t.process === 'Opening Readiness' || rhythmOf(t) === 'BEFORE_OPENING',
+    );
+    const during = openTasks.filter(
+      (t) => ['HOURLY', 'TWO_HOURLY', 'LUNCH'].includes(rhythmOf(t) ?? ''),
+    );
+    const closing = openTasks.filter(
+      (t) => t.process === 'Closing Readiness'
+        || ['CLOSING', 'LAST_PATIENT'].includes(rhythmOf(t) ?? ''),
+    );
     const other = openTasks.filter(
-      (t) => t.process !== 'Opening Readiness' && t.process !== 'Closing Readiness',
+      (t) => !before.includes(t) && !during.includes(t) && !closing.includes(t),
     );
     const toPrepare = db.visits.filter((v) => v.status === 'BOOKED' || v.status === 'ARRIVED');
     const sterPending = db.batches.filter((b) => b.stage !== 'RELEASED');
@@ -3098,7 +3114,11 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
       { total: mine.length, done: mine.filter((t) => t.status === 'VERIFIED' || t.status === 'COMPLETED').length },
       [
         section('opening', 'Before the first patient', before.length ? 'AMBER' : 'GREEN',
-          null, 'Opening is done.', before.map((t) => task(t))),
+          'The clinic does not open with any of these outstanding.',
+          'Opening is done.', before.map((t) => task(t))),
+        section('during', 'Through the day', during.length ? 'AMBER' : 'GREEN',
+          'On a cadence, whatever else is happening.', 'Nothing due this hour.',
+          during.map((t) => task(t))),
         section('patients', 'Patients to prepare', toPrepare.length ? 'AMBER' : 'GREEN',
           'Chairside setup and scans.', 'Nobody left to prepare.',
           toPrepare.map((v) => fact(v.id, v.patientLabel,
