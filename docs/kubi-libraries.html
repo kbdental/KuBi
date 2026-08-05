@@ -1,0 +1,1204 @@
+<title>KuBi — the six libraries</title>
+<style>
+:root {
+  /* Inherited from apps/web/src/styles.css. A second palette for the same
+     product would be the exact mistake these libraries were built against. */
+  --ink: #101a22; --ink-soft: #4f5f6c; --ink-faint: #7d8b97;
+  --line: #dde4ea; --line-soft: #eaeff3;
+  --page: #f2f5f7; --card: #ffffff;
+  --accent: #0d6e5e; --accent-soft: #e8f3f0;
+  --safety: #b0202a; --safety-soft: #fdf1f1;
+  --warn: #8a5a00; --warn-soft: #fdf7e9;
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e6edf2; --ink-soft: #9aa9b5; --ink-faint: #74838f;
+    --line: #24313c; --line-soft: #1b262f;
+    --page: #0c1319; --card: #121b22;
+    --accent: #4fbfa8; --accent-soft: #12302b;
+    --safety: #f08a90; --safety-soft: #2e1519;
+    --warn: #e0b45f; --warn-soft: #2b2213;
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #e6edf2; --ink-soft: #9aa9b5; --ink-faint: #74838f;
+  --line: #24313c; --line-soft: #1b262f;
+  --page: #0c1319; --card: #121b22;
+  --accent: #4fbfa8; --accent-soft: #12302b;
+  --safety: #f08a90; --safety-soft: #2e1519;
+  --warn: #e0b45f; --warn-soft: #2b2213;
+}
+:root[data-theme="light"] {
+  --ink: #101a22; --ink-soft: #4f5f6c; --ink-faint: #7d8b97;
+  --line: #dde4ea; --line-soft: #eaeff3;
+  --page: #f2f5f7; --card: #ffffff;
+  --accent: #0d6e5e; --accent-soft: #e8f3f0;
+  --safety: #b0202a; --safety-soft: #fdf1f1;
+  --warn: #8a5a00; --warn-soft: #fdf7e9;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 16px/1.55 var(--sans); font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { display: grid; grid-template-columns: 1fr; gap: 0; max-width: 1500px; margin: 0 auto; }
+@media (min-width: 1000px) {
+  .wrap { grid-template-columns: 250px minmax(0, 1fr); gap: 48px; padding-right: 40px; }
+}
+/* ---- the rail ---- */
+nav { padding: 40px 24px; }
+@media (min-width: 1000px) {
+  nav { position: sticky; top: 0; height: 100vh; overflow-y: auto; border-right: 1px solid var(--line); }
+}
+.mark { font: 700 26px/1 var(--serif); letter-spacing: -0.02em; color: var(--accent); }
+.mark-sub { font-size: 13px; color: var(--ink-faint); margin-top: 6px; line-height: 1.4; }
+nav ol { list-style: none; margin: 28px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; counter-reset: lib; }
+nav a {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  padding: 9px 10px; border-radius: 7px; text-decoration: none; color: var(--ink-soft);
+  font-size: 14.5px; line-height: 1.3;
+}
+nav a:hover, nav a:focus-visible { background: var(--line-soft); color: var(--ink); outline: none; }
+nav a:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+nav a b { font-size: 12px; color: var(--ink-faint); font-weight: 600; }
+.key { margin-top: 30px; border-top: 1px solid var(--line); padding-top: 18px; }
+.key p { font: 600 11.5px/1 var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 12px; }
+.key ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; font-size: 13.5px; color: var(--ink-soft); }
+.key li { padding-left: 14px; border-left: 3px solid var(--line); line-height: 1.35; }
+.key li.k-verbatim { border-left-color: var(--ink-faint); }
+.key li.k-derived { border-left-color: var(--accent); }
+.key li.k-open { border-left-color: var(--warn); }
+.key li.k-cannot { border-left-color: var(--safety); }
+/* ---- the page ---- */
+main { padding: 40px 24px 120px; min-width: 0; }
+@media (min-width: 1000px) { main { padding: 56px 0 140px; } }
+h1 { font: 700 clamp(30px, 4.6vw, 46px)/1.08 var(--serif); letter-spacing: -0.022em; margin: 0 0 18px; text-wrap: balance; }
+.intro { font-size: 18px; line-height: 1.6; color: var(--ink-soft); max-width: 62ch; margin: 0 0 14px; }
+.intro strong { color: var(--ink); font-weight: 620; }
+.count { font: 700 15px/1 var(--sans); color: var(--accent); letter-spacing: .02em; margin: 26px 0 0; }
+section { margin-top: 76px; scroll-margin-top: 20px; }
+.eyebrow { font: 700 11.5px/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 10px; }
+h2 { font: 700 clamp(24px, 3.2vw, 33px)/1.15 var(--serif); letter-spacing: -0.018em; margin: 0 0 12px; text-wrap: balance; }
+.lede { font-size: 16.5px; color: var(--ink-soft); max-width: 66ch; margin: 0 0 26px; line-height: 1.6; }
+h3 {
+  font: 650 18px/1.3 var(--sans); letter-spacing: -0.012em;
+  margin: 40px 0 12px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+}
+h3 .n { font-size: 12.5px; font-weight: 700; color: var(--ink-soft); background: var(--line-soft); border-radius: 999px; padding: 3px 9px; }
+h4 { font: 620 14.5px/1 var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-faint); margin: 26px 0 8px; }
+.blockif { font-size: 14.5px; color: var(--ink-soft); margin: 0 0 12px; max-width: 76ch; line-height: 1.5; }
+/* ---- the numbers that lead each library ---- */
+.stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 8px; padding: 0; }
+.stats > div {
+  flex: 1 1 150px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 11px; padding: 14px 16px;
+}
+.stats dt { font: 700 25px/1.05 var(--sans); letter-spacing: -0.02em; }
+.stats dd { margin: 5px 0 0; font-size: 13px; color: var(--ink-soft); line-height: 1.35; }
+.stats .s-warn dt { color: var(--warn); }
+.stats .s-warn { background: var(--warn-soft); border-color: var(--warn); }
+.stats .s-stop dt { color: var(--safety); }
+.stats .s-stop { background: var(--safety-soft); border-color: var(--safety); }
+/* ---- tables ---- */
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 11px; background: var(--card); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th {
+  text-align: left; font: 700 11.5px/1 var(--sans); letter-spacing: .085em;
+  text-transform: uppercase; color: var(--ink-faint);
+  padding: 12px 14px; border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+td { padding: 11px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; line-height: 1.45; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr { border-left: 3px solid transparent; }
+tbody tr.p-verbatim { border-left-color: var(--ink-faint); }
+tbody tr.p-derived { border-left-color: var(--accent); }
+tbody tr.p-open { border-left-color: var(--warn); }
+tbody tr.p-cannot { border-left-color: var(--safety); }
+tbody tr:hover { background: var(--line-soft); }
+td.is-open { color: var(--warn); }
+td.is-cannot { color: var(--safety); }
+td.is-derived { color: var(--accent); }
+.mono { font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; }
+.tag {
+  display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; background: var(--warn-soft); color: var(--warn);
+  border-radius: 4px; padding: 2px 5px; margin-left: 5px; white-space: nowrap;
+}
+footer { margin-top: 90px; border-top: 1px solid var(--line); padding-top: 22px; font-size: 14px; color: var(--ink-faint); max-width: 66ch; line-height: 1.6; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+<nav>
+  <div class="mark">KuBi</div>
+  <div class="mark-sub">The six libraries, generated from the code that holds them.</div>
+  <ol>
+    <li><a href="#daily">The daily standard <b>47</b></a></li>
+    <li><a href="#journey">The patient journey <b>96</b></a></li>
+    <li><a href="#conditions">Condition-based tasks <b>100</b></a></li>
+    <li><a href="#gates">Compliance gates <b>181</b></a></li>
+    <li><a href="#exceptions">Exceptions <b>68</b></a></li>
+    <li><a href="#protocols">Procedure protocols <b>164</b></a></li>
+  </ol>
+  <div class="key">
+    <p>The stripe on each row</p>
+    <ul>
+      <li class="k-verbatim">Your words, stored unedited</li>
+      <li class="k-derived">Read out of your words — a verb, a heading</li>
+      <li class="k-open">Nobody has decided. Stored as blank, never guessed</li>
+      <li class="k-cannot">KuBi cannot do this today, and says what it needs</li>
+    </ul>
+  </div>
+</nav>
+
+<main>
+<h1>What KuBi is holding, and where it came from</h1>
+<p class="intro">
+  Six libraries, <strong>666 rows</strong>, generated from the TypeScript that holds them
+  rather than typed out here — so what you are reading is what the system is actually
+  running on. Every row carries a stripe saying whose decision it was.
+</p>
+<p class="intro">
+  The one rule throughout: <strong>nothing is invented.</strong> Where you gave a role, a KPI or
+  a priority, it is stored verbatim. Where you did not, it is stored as blank and shown as blank.
+  A plausible guess would look complete, survive review, and name the wrong person the first time
+  something went wrong in a real clinic.
+</p>
+<p class="count">288 unit tests hold these numbers in place. Changing one is a visible event.</p>
+
+<section id="daily">
+  <p class="eyebrow">Library 1 of 6</p>
+  <h2>The daily operating standard</h2>
+  <p class="lede">Everything the clock raises. Your forty-seven non-negotiables, in your wording, in the seven slots of a day.</p>
+  <dl class="stats"><div><dt>47</dt><dd>non-negotiables</dd></div><div><dt>18</dt><dd>KuBi knows on its own</dd></div><div class="s-warn"><dt>21</dt><dd>rest on somebody’s word</dd></div><div class="s-warn"><dt>17</dt><dd>have no control behind them</dd></div><div class="s-stop"><dt>5</dt><dd>cannot be proved at all</dd></div></dl>
+  <h3>Before opening <span class="n">14</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Your standard</th><th>Role</th><th>Control</th><th>How KuBi would know</th></tr></thead>
+<tbody><tr class="p-verbatim"><td>Unlock clinic, switch on electricity, AC, compressor, suction, RO water system</td><td class="is-verbatim">100% before clinic opens</td><td>housekeeping</td><td class="mono">OPN-001</td><td class="">somebody says so</td></tr>
+<tr class="p-open"><td>Clean reception, waiting area, washroom, doctor’s room, operatories</td><td class="is-verbatim">100% checklist completed</td><td>housekeeping</td><td class="is-open">none — No housekeeping control exists in matrix v2.0 — there is no HK- prefix at all.</td><td class="">somebody says so</td></tr>
+<tr class="p-open"><td>Mop floors with disinfectant</td><td class="is-verbatim">100% completed</td><td>housekeeping</td><td class="is-open">none — No housekeeping control exists in matrix v2.0.</td><td class="">somebody says so</td></tr>
+<tr class="p-open"><td>Empty all waste bins and place fresh liners</td><td class="is-verbatim">100% completed</td><td>housekeeping</td><td class="is-open">none — General waste is not STER-007, which governs biomedical waste only.</td><td class="">somebody says so</td></tr>
+<tr class="p-verbatim"><td>Start compressor, suction, autoclave, X-ray/RVG, scanner, intraoral camera and check functionality</td><td class="is-verbatim">Zero equipment failures before first patient</td><td>dental assistant</td><td class="mono">EQP-001</td><td class="">somebody says so</td></tr>
+<tr class="p-open"><td>Flush dental unit waterlines</td><td class="is-verbatim">As per protocol</td><td>dental assistant</td><td class="is-open">none — Dental unit waterline management is absent from matrix v2.0 — a named NABH infection-control item, and flushed twice daily in this standard.</td><td class="">somebody says so</td></tr>
+<tr class="p-verbatim"><td>Disinfect all chairs, trays, light handles and work surfaces</td><td class="is-verbatim">100% completed</td><td>dental assistant</td><td class="mono">OPN-002</td><td class="">somebody says so</td></tr>
+<tr class="p-verbatim"><td>Arrange sterile instrument trays for all planned procedures</td><td class="is-verbatim">No missing trays</td><td>dental assistant</td><td class="mono">CLN-005</td><td class="">KuBi knows</td></tr>
+<tr class="p-verbatim"><td>Verify emergency drug kit and oxygen availability</td><td class="is-verbatim">100% available</td><td>dental assistant</td><td class="mono">EMR-001</td><td class="">somebody says so</td></tr>
+<tr class="p-verbatim"><td>Check implant motor, curing light and scaler function</td><td class="is-verbatim">100% functional</td><td>dental assistant</td><td class="mono">EQP-001</td><td class="">somebody says so</td></tr>
+<tr class="p-verbatim"><td>Log into clinic software and verify internet, printer and payment systems</td><td class="is-verbatim">Operational before first patient</td><td>reception</td><td class="mono">OPN-003</td><td class="">KuBi knows</td></tr>
+<tr class="p-verbatim"><td>Review day’s appointments and identify pending confirmations</td><td class="is-verbatim">100% reviewed</td><td>reception</td><td class="mono">APT-001</td><td class="">KuBi knows</td></tr>
+<tr class="p-verbatim"><td>Confirm all remaining appointments</td><td class="is-verbatim">≥95% confirmed</td><td>reception</td><td class="mono">APT-002</td><td class="">KuBi knows</td></tr>
+<tr class="p-open"><td>Conduct morning huddle with team</td><td class="is-verbatim">Completed within 10 minutes</td><td>clinic manager</td><td class="is-open">none — The huddle has no control in matrix v2.0. It is the one place the day is set verbally, so its absence is felt everywhere else.</td><td class="">somebody says so</td></tr></tbody></table></div>
+<h3>Every patient <span class="n">13</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Your standard</th><th>Role</th><th>Control</th><th>How KuBi would know</th></tr></thead>
+<tbody><tr class="p-verbatim"><td>Register patient and verify demographic details</td><td class="is-verbatim">Completed before consultation</td><td>reception</td><td class="mono">APT-004</td><td class="">KuBi knows</td></tr>
+<tr class="p-verbatim"><td>Verify consent forms and previous records</td><td class="is-verbatim">100% completed</td><td>reception</td><td class="mono">CLN-002</td><td class="">KuBi knows</td></tr>
+<tr class="p-verbatim"><td>Prepare treatment room before patient enters</td><td class="is-verbatim">Ready within 3 minutes</td><td>dental assistant</td><td class="mono">CLN-005</td><td class="">somebody says so</td></tr>
+<tr class="p-verbatim"><td>Complete examination and diagnosis documentation</td><td class="is-verbatim">Before treatment begins</td><td>treating doctor</td><td class="mono">CLN-011</td><td class="">KuBi knows</td></tr>
+<tr class="p-verbatim"><td>Explain treatment plan, risks, benefits and alternatives</td><td class="is-verbatim">100% documented</td><td>treating doctor</td><td class="mono">CLN-002</td><td class="">KuBi knows</td></tr>
+<tr class="p-cannot"><td>Generate estimate and obtain financial acceptance</td><td class="is-verbatim">Before treatment starts (except emergencies)</td><td>reception</td><td class="is-open">none — KuBi holds no money. There is no estimate, no invoice and no payment anywhere in the matrix or the schema.</td><td class="is-cannot">cannot be proved</td></tr>
+<tr class="p-cannot"><td>Maintain aseptic protocol during procedure</td><td class="is-verbatim">Zero protocol violations</td><td>dental assistant</td><td class="is-open">none — Nothing observes a procedure in progress. This can only be measured by audit or by a second person, so it needs an observation event first.</td><td class="is-cannot">cannot be proved</td></tr>
+<tr class="p-verbatim"><td>Record implant lot numbers/material batch numbers where applicable</td><td class="is-verbatim">100% traceability</td><td>dental assistant</td><td class="mono">IMP-005</td><td class="">a reading recorded</td></tr>
+<tr class="p-open"><td>Disinfect chair and operatory after patient leaves</td><td class="is-verbatim">Completed within 5 minutes</td><td>dental assistant</td><td class="is-open">none — OPN-002 governs readiness at opening, not between-patient turnaround. The busiest infection-control moment of the day is ungoverned.</td><td class="">somebody says so</td></tr>
+<tr class="p-cannot"><td>Raise invoice and collect payment</td><td class="is-verbatim">Before patient exits</td><td>reception</td><td class="is-open">none — KuBi holds no money — no invoice, no receipt, no payment record. This is the standard a patient notices missing first.</td><td class="is-cannot">cannot be proved</td></tr>
+<tr class="p-open"><td>Schedule next appointment before patient leaves</td><td class="is-verbatim">≥95% patients booked</td><td>reception</td><td class="is-open">none — Booking exists in the schema but no control requires the next visit to be booked before the patient leaves — which is where retention is won.</td><td class="">KuBi knows</td></tr>
+<tr class="p-verbatim"><td>Send prescription/instructions digitally if applicable</td><td class="is-verbatim">100% completed</td><td>reception</td><td class="mono">CLN-010</td><td class="">KuBi knows</td></tr>
+<tr class="p-verbatim"><td>Complete clinical notes</td><td class="is-verbatim">Before end of working day</td><td>treating doctor</td><td class="mono">CLN-011</td><td class="">KuBi knows</td></tr></tbody></table></div>
+<h3>Every hour <span class="n">2</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Your standard</th><th>Role</th><th>Control</th><th>How KuBi would know</th></tr></thead>
+<tbody><tr class="p-verbatim"><td>Review patient waiting time</td><td class="is-verbatim">Average waiting &lt;15 minutes</td><td>reception</td><td class="mono">APT-005</td><td class="">KuBi knows</td></tr>
+<tr class="p-verbatim"><td>Verify sterile instrument availability</td><td class="is-verbatim">No procedure delayed</td><td>dental assistant</td><td class="mono">STER-005</td><td class="">KuBi knows</td></tr></tbody></table></div>
+<h3>Every two hours <span class="n">2</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Your standard</th><th>Role</th><th>Control</th><th>How KuBi would know</th></tr></thead>
+<tbody><tr class="p-open"><td>Inspect and clean washroom</td><td class="is-verbatim">Checklist completed</td><td>housekeeping</td><td class="is-open">none — No housekeeping control exists in matrix v2.0.</td><td class="">somebody says so</td></tr>
+<tr class="p-open"><td>Disinfect high-touch surfaces (door handles, reception desk, POS machine, chairs)</td><td class="is-verbatim">100% completed</td><td>housekeeping</td><td class="is-open">none — No housekeeping control exists in matrix v2.0.</td><td class="">somebody says so</td></tr></tbody></table></div>
+<h3>Lunch time <span class="n">2</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Your standard</th><th>Role</th><th>Control</th><th>How KuBi would know</th></tr></thead>
+<tbody><tr class="p-verbatim"><td>Replenish consumables in all operatories</td><td class="is-verbatim">No stock shortage</td><td>dental assistant</td><td class="mono">INV-001</td><td class="">KuBi knows</td></tr>
+<tr class="p-verbatim"><td>Review afternoon appointments and reconfirm if required</td><td class="is-verbatim">100% completed</td><td>reception</td><td class="mono">APT-002</td><td class="">KuBi knows</td></tr></tbody></table></div>
+<h3>After the last patient <span class="n">1</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Your standard</th><th>Role</th><th>Control</th><th>How KuBi would know</th></tr></thead>
+<tbody><tr class="p-verbatim"><td>Start final sterilization cycle</td><td class="is-verbatim">All used instruments processed</td><td>dental assistant</td><td class="mono">STER-004</td><td class="">a reading recorded</td></tr></tbody></table></div>
+<h3>Closing <span class="n">13</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Your standard</th><th>Role</th><th>Control</th><th>How KuBi would know</th></tr></thead>
+<tbody><tr class="p-open"><td>Clean suction lines</td><td class="is-verbatim">Completed daily</td><td>dental assistant</td><td class="is-open">none — Suction line maintenance is absent from matrix v2.0.</td><td class="">somebody says so</td></tr>
+<tr class="p-open"><td>Flush dental unit waterlines</td><td class="is-verbatim">Completed daily</td><td>dental assistant</td><td class="is-open">none — Dental unit waterline management is absent from matrix v2.0.</td><td class="">somebody says so</td></tr>
+<tr class="p-verbatim"><td>Switch off compressor, suction and clinical equipment</td><td class="is-verbatim">Zero equipment left running</td><td>dental assistant</td><td class="mono">CLS-004</td><td class="">somebody says so</td></tr>
+<tr class="p-verbatim"><td>Store sterile instruments correctly</td><td class="is-verbatim">100% completed</td><td>dental assistant</td><td class="mono">STER-005</td><td class="">somebody says so</td></tr>
+<tr class="p-verbatim"><td>Verify all treatments entered in software</td><td class="is-verbatim">Zero missing entries</td><td>reception</td><td class="mono">CLS-001</td><td class="">KuBi knows</td></tr>
+<tr class="p-cannot"><td>Collect and reconcile all payments</td><td class="is-verbatim">Zero cash variance</td><td>reception</td><td class="is-open">none — KuBi holds no money, so there is nothing to reconcile against.</td><td class="is-cannot">cannot be proved</td></tr>
+<tr class="p-verbatim"><td>Complete daily patient register</td><td class="is-verbatim">100% completed</td><td>reception</td><td class="mono">CLS-001</td><td class="">KuBi knows</td></tr>
+<tr class="p-cannot"><td>Backup patient data (if required by system)</td><td class="is-verbatim">Completed daily</td><td>reception</td><td class="is-open">none — Backup is an infrastructure job, not a reception task, once KuBi is on a real database. It stays on the register so nobody assumes it is handled.</td><td class="is-cannot">cannot be proved</td></tr>
+<tr class="p-verbatim"><td>Verify attendance and duty completion</td><td class="is-verbatim">100% staff accounted for</td><td>clinic manager</td><td class="mono">ATT-002</td><td class="">KuBi knows</td></tr>
+<tr class="p-verbatim"><td>Review pending treatments and next day’s schedule</td><td class="is-verbatim">Completed before leaving</td><td>clinic manager</td><td class="mono">CLS-001</td><td class="">somebody says so</td></tr>
+<tr class="p-open"><td>Deep clean operatories, reception and washroom</td><td class="is-verbatim">100% completed</td><td>housekeeping</td><td class="is-open">none — No housekeeping control exists in matrix v2.0.</td><td class="">somebody says so</td></tr>
+<tr class="p-verbatim"><td>Dispose biomedical waste as per BMW rules and segregate waste correctly</td><td class="is-verbatim">100% compliant</td><td>housekeeping</td><td class="mono">STER-007</td><td class="">a reading recorded</td></tr>
+<tr class="p-verbatim"><td>Lock clinic after final security check</td><td class="is-verbatim">Zero security lapses</td><td>housekeeping</td><td class="mono">CLS-006</td><td class="">somebody says so</td></tr></tbody></table></div>
+</section>
+<section id="journey">
+  <p class="eyebrow">Library 2 of 6</p>
+  <h2>The patient journey</h2>
+  <p class="lede">Everything a patient raises. Thirteen stages from booking to case completion.</p>
+  <dl class="stats"><div><dt>96</dt><dd>tasks</dd></div><div><dt>14</dt><dd>have an owner</dd></div><div class="s-warn"><dt>82</dt><dd>have nobody assigned</dd></div><div><dt>49</dt><dd>sit under a control</dd></div></dl>
+  <h3>Appointment booked <span class="n">7</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Role</th><th>Your KPI</th><th>Control</th></tr></thead>
+<tbody><tr class="p-verbatim"><td>Verify patient details</td><td class="is-verbatim">reception</td><td class="is-verbatim">100%</td><td class="mono">APT-004</td></tr>
+<tr class="p-verbatim"><td>Verify doctor availability</td><td class="is-verbatim">reception</td><td class="is-verbatim">Before confirmation</td><td class="is-open">none yet</td></tr>
+<tr class="p-verbatim"><td>Allocate chair</td><td class="is-verbatim">reception</td><td class="is-verbatim">Before appointment</td><td class="is-open">none yet</td></tr>
+<tr class="p-verbatim"><td>Send appointment confirmation</td><td class="is-verbatim">reception</td><td class="is-verbatim">Within 5 minutes</td><td class="mono">APT-001</td></tr>
+<tr class="p-verbatim"><td>Share clinic location</td><td class="is-verbatim">reception</td><td class="is-verbatim">100% new patients</td><td class="is-open">none yet</td></tr>
+<tr class="p-verbatim"><td>Share pre-appointment instructions</td><td class="is-verbatim">reception</td><td class="is-verbatim">Applicable cases</td><td class="mono">CLN-007</td></tr>
+<tr class="p-verbatim"><td>Update appointment status</td><td class="is-verbatim">reception</td><td class="is-verbatim">Immediately</td><td class="is-open">none yet</td></tr></tbody></table></div>
+<h3>Patient arrives <span class="n">7</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Role</th><th>Your KPI</th><th>Control</th></tr></thead>
+<tbody><tr class="p-verbatim"><td>Welcome patient</td><td class="is-verbatim">reception</td><td class="is-verbatim">Immediately</td><td class="is-open">none yet</td></tr>
+<tr class="p-verbatim"><td>Mark arrival</td><td class="is-verbatim">reception</td><td class="is-verbatim">&lt;1 minute</td><td class="mono">APT-004</td></tr>
+<tr class="p-verbatim"><td>Verify appointment</td><td class="is-verbatim">reception</td><td class="is-verbatim">100%</td><td class="mono">APT-004</td></tr>
+<tr class="p-verbatim"><td>Collect pending forms</td><td class="is-verbatim">reception</td><td class="is-verbatim">100%</td><td class="is-open">none yet</td></tr>
+<tr class="p-verbatim"><td>Check medical history changes</td><td class="is-verbatim">reception</td><td class="is-verbatim">Every visit</td><td class="mono">CLN-001</td></tr>
+<tr class="p-verbatim"><td>Measure vitals (if required)</td><td class="is-verbatim">dental assistant</td><td class="is-verbatim">Before treatment</td><td class="is-open">none yet</td></tr>
+<tr class="p-verbatim"><td>Inform doctor</td><td class="is-verbatim">reception</td><td class="is-verbatim">Immediately</td><td class="is-open">none yet</td></tr></tbody></table></div>
+<h3>Before seating the patient <span class="n">8</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Role</th><th>Your KPI</th><th>Control</th></tr></thead>
+<tbody><tr class="p-open"><td>Prepare operatory</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">OPN-002</td></tr>
+<tr class="p-open"><td>Prepare treatment tray</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-005</td></tr>
+<tr class="p-open"><td>Prepare sterilized instruments</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">STER-005</td></tr>
+<tr class="p-open"><td>Prepare required materials</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-005</td></tr>
+<tr class="p-open"><td>Check equipment</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">EQP-001</td></tr>
+<tr class="p-open"><td>Prepare patient record</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Load digital radiographs</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-004</td></tr>
+<tr class="p-open"><td>Open treatment template</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr></tbody></table></div>
+<h3>Patient seated <span class="n">8</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Role</th><th>Your KPI</th><th>Control</th></tr></thead>
+<tbody><tr class="p-open"><td>Verify patient identity</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Confirm treatment</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Confirm tooth number</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Review allergies</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-001</td></tr>
+<tr class="p-open"><td>Review medical history</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-001</td></tr>
+<tr class="p-open"><td>Explain procedure</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-002</td></tr>
+<tr class="p-open"><td>Obtain consent</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-002</td></tr>
+<tr class="p-open"><td>Take pre-operative photographs (if applicable)</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-003</td></tr></tbody></table></div>
+<h3>Diagnosis <span class="n">8</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Role</th><th>Your KPI</th><th>Control</th></tr></thead>
+<tbody><tr class="p-open"><td>Clinical examination</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Radiographic examination</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-004</td></tr>
+<tr class="p-open"><td>Periodontal examination</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Occlusion evaluation</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Soft tissue examination</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Existing restoration evaluation</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Diagnosis entry</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-011</td></tr>
+<tr class="p-open"><td>ICD coding (optional)</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr></tbody></table></div>
+<h3>Treatment planning <span class="n">8</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Role</th><th>Your KPI</th><th>Control</th></tr></thead>
+<tbody><tr class="p-open"><td>Explain diagnosis</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Explain options</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-002</td></tr>
+<tr class="p-open"><td>Explain risks</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-002</td></tr>
+<tr class="p-open"><td>Explain benefits</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-002</td></tr>
+<tr class="p-open"><td>Estimate preparation</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Financial discussion</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Obtain treatment approval</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Schedule appointments</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">APT-003</td></tr></tbody></table></div>
+<h3>Before the procedure <span class="n">9</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Role</th><th>Your KPI</th><th>Control</th></tr></thead>
+<tbody><tr class="p-open"><td>PPE verification</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Sterile field preparation</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-005</td></tr>
+<tr class="p-open"><td>Instrument verification</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">STER-005</td></tr>
+<tr class="p-open"><td>Material verification</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-005</td></tr>
+<tr class="p-open"><td>Shade selection (if needed)</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Implant components verification</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">IMP-003</td></tr>
+<tr class="p-open"><td>Laboratory work verification</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">LAB-005</td></tr>
+<tr class="p-open"><td>Anaesthetic preparation</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Emergency kit availability</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">EMR-001</td></tr></tbody></table></div>
+<h3>During the procedure <span class="n">8</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Role</th><th>Your KPI</th><th>Control</th></tr></thead>
+<tbody><tr class="p-open"><td>Maintain asepsis</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Document materials used</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Record implant batch numbers</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">IMP-004</td></tr>
+<tr class="p-open"><td>Record anaesthetic details</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Clinical photographs</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Intra-operative notes</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-011</td></tr>
+<tr class="p-open"><td>Assistant checklist</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Complication recording</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">INC-001</td></tr></tbody></table></div>
+<h3>Immediately after the procedure <span class="n">8</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Role</th><th>Your KPI</th><th>Control</th></tr></thead>
+<tbody><tr class="p-open"><td>Final occlusion check</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Final polishing</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Clinical photographs</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-009</td></tr>
+<tr class="p-open"><td>Explain post-operative instructions</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-010</td></tr>
+<tr class="p-open"><td>Prescriptions</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-010</td></tr>
+<tr class="p-open"><td>Update treatment notes</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-011</td></tr>
+<tr class="p-open"><td>Schedule review</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">FUP-004</td></tr>
+<tr class="p-open"><td>Update treatment status</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr></tbody></table></div>
+<h3>Billing <span class="n">6</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Role</th><th>Your KPI</th><th>Control</th></tr></thead>
+<tbody><tr class="p-open"><td>Generate invoice</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Verify procedure codes</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Verify materials</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Collect payment</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Generate receipt</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Update outstanding balance</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr></tbody></table></div>
+<h3>Patient exit <span class="n">6</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Role</th><th>Your KPI</th><th>Control</th></tr></thead>
+<tbody><tr class="p-open"><td>Schedule next appointment</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">APT-003</td></tr>
+<tr class="p-open"><td>Provide instructions</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-010</td></tr>
+<tr class="p-open"><td>Deliver medicines</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Provide reports</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Provide warranty card (implant/crown)</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Thank patient</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr></tbody></table></div>
+<h3>Follow-up <span class="n">7</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Role</th><th>Your KPI</th><th>Control</th></tr></thead>
+<tbody><tr class="p-open"><td>Same-day follow-up (major surgery)</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">FUP-001</td></tr>
+<tr class="p-open"><td>24-hour follow-up</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">FUP-002</td></tr>
+<tr class="p-open"><td>3-day follow-up</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">FUP-004</td></tr>
+<tr class="p-open"><td>7-day follow-up</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">FUP-004</td></tr>
+<tr class="p-open"><td>Suture removal reminder</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">FUP-001</td></tr>
+<tr class="p-open"><td>Review appointment</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">FUP-004</td></tr>
+<tr class="p-open"><td>Complication documentation</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">INC-001</td></tr></tbody></table></div>
+<h3>Case completion <span class="n">6</span></h3><div class="scroll"><table>
+<thead><tr><th>Task</th><th>Role</th><th>Your KPI</th><th>Control</th></tr></thead>
+<tbody><tr class="p-open"><td>Final photographs</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">CLN-009</td></tr>
+<tr class="p-open"><td>Satisfaction feedback</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Google review request</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">FUP-005</td></tr>
+<tr class="p-open"><td>Before-after gallery permission</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr>
+<tr class="p-open"><td>Recall scheduling</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="mono">APT-003</td></tr>
+<tr class="p-open"><td>Close treatment plan</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-open">none yet</td></tr></tbody></table></div>
+</section>
+<section id="conditions">
+  <p class="eyebrow">Library 3 of 6</p>
+  <h2>Condition-based tasks</h2>
+  <p class="lede">Everything a fact raises. The exceptions, risks and missed steps nobody planned for.</p>
+  <dl class="stats"><div><dt>100</dt><dd>rules</dd></div><div><dt>40</dt><dd>KuBi can actually notice</dd></div><div class="s-stop"><dt>60</dt><dd>it cannot see at all</dd></div><div class="s-warn"><dt>84</dt><dd>would land on nobody</dd></div><div><dt>8</dt><dd>stop work rather than create it</dd></div></dl>
+  <h3>What KuBi would have to hold <span class="n">38</span></h3><div class="scroll"><table>
+<thead><tr><th>Capability</th><th>Rules it would switch on</th></tr></thead>
+<tbody><tr class="p-cannot"><td>a coded diagnosis on the record, not free-text clinical notes</td><td><b>8</b> — Caries diagnosed, Root canal advised, Extraction advised, Implant advised, Crown advised, Denture advised, Periodontal disease, Oral lesion detected</td></tr>
+<tr class="p-cannot"><td>a structured medical history — KuBi holds no allergies, conditions, medications or vitals as data</td><td><b>7</b> — Medical history changed, Diabetes declared, Cardiac history, Pregnancy declared, Latex allergy, Drug allergy, Infectious disease declared</td></tr>
+<tr class="p-cannot"><td>the billing domain — KuBi holds no estimates, invoices or payments</td><td><b>6</b> — Estimate approved, Estimate rejected, Advance pending, Payment overdue, EMI selected, Insurance patient</td></tr>
+<tr class="p-cannot"><td>a recall clock started by a completed procedure of a given type</td><td><b>3</b> — 6 months after scaling, 1 year after crown, Implant review due</td></tr>
+<tr class="p-cannot"><td>a delivery event distinct from procedure completion</td><td><b>2</b> — Crown delivered, Denture delivered</td></tr>
+<tr class="p-cannot"><td>a channel for a patient to report a symptom</td><td><b>2</b> — Swelling reported, Bleeding reported</td></tr>
+<tr class="p-cannot"><td>a confirmation-attempt record with an outcome</td><td><b>1</b> — Patient doesn’t answer confirmation</td></tr>
+<tr class="p-cannot"><td>a no-show event — the visit state has no such transition</td><td><b>1</b> — Patient no-show</td></tr>
+<tr class="p-cannot"><td>a no-show event, and a count of them per patient</td><td><b>1</b> — Patient no-show twice</td></tr>
+<tr class="p-cannot"><td>a running comparison of scheduled start against actual start</td><td><b>1</b> — Appointment delayed &gt;15 min</td></tr>
+<tr class="p-cannot"><td>a doctor availability calendar</td><td><b>1</b> — Doctor unavailable</td></tr>
+<tr class="p-cannot"><td>vitals recorded as numbers, and a configured clinic limit</td><td><b>1</b> — BP above clinic limit</td></tr>
+<tr class="p-cannot"><td>sedation recorded as a property of the procedure</td><td><b>1</b> — Sedation</td></tr>
+<tr class="p-cannot"><td>date of birth on the patient record</td><td><b>1</b> — Minor patient</td></tr>
+<tr class="p-cannot"><td>a photography flag on the procedure</td><td><b>1</b> — Photography required</td></tr>
+<tr class="p-cannot"><td>graft recorded as a consumable used in the procedure</td><td><b>1</b> — Bone graft used</td></tr>
+<tr class="p-cannot"><td>membrane recorded as a consumable used in the procedure</td><td><b>1</b> — Membrane used</td></tr>
+<tr class="p-cannot"><td>the centrifuge as a tracked asset with cycle records</td><td><b>1</b> — PRF prepared</td></tr>
+<tr class="p-cannot"><td>file storage — KuBi has no object store, so nothing can be uploaded</td><td><b>1</b> — Digital scan taken</td></tr>
+<tr class="p-cannot"><td>expected-return monitoring against the due date</td><td><b>1</b> — Case delayed</td></tr>
+<tr class="p-cannot"><td>a dispatch event with a carrier reference</td><td><b>1</b> — Prosthesis dispatched</td></tr>
+<tr class="p-cannot"><td>a shelf-life clock on each released pack</td><td><b>1</b> — Sterile pack expired</td></tr>
+<tr class="p-cannot"><td>expiry dates held per batch, and a clock watching them</td><td><b>1</b> — Material expired</td></tr>
+<tr class="p-cannot"><td>somebody to report it — no bag can tell KuBi it is full</td><td><b>1</b> — Biomedical waste bag full</td></tr>
+<tr class="p-cannot"><td>somebody to report it — no container can tell KuBi it is three-quarters full</td><td><b>1</b> — Sharps container 75% full</td></tr>
+<tr class="p-cannot"><td>a channel for a patient to report a symptom — KuBi has no patient-facing input</td><td><b>1</b> — Patient reports pain</td></tr>
+<tr class="p-cannot"><td>feedback captured as a score, not as a message</td><td><b>1</b> — Rating below 4/5</td></tr>
+<tr class="p-cannot"><td>a complaint intake — CMP-001 exists as a control with no event behind it</td><td><b>1</b> — Complaint registered</td></tr>
+<tr class="p-cannot"><td>a complaint intake, and a resolution clock running against it</td><td><b>1</b> — Complaint unresolved</td></tr>
+<tr class="p-cannot"><td>check-in times compared against a roster</td><td><b>1</b> — Late arrival</td></tr>
+<tr class="p-cannot"><td>a failure count per person over a window</td><td><b>1</b> — Repeated checklist failure</td></tr>
+<tr class="p-cannot"><td>prescriptions held as records with a signature state</td><td><b>1</b> — Prescription unsigned</td></tr>
+<tr class="p-cannot"><td>date of birth on the patient record, and a paediatric recall interval</td><td><b>1</b> — Child recall due</td></tr>
+<tr class="p-cannot"><td>a one-press emergency declaration, reachable from every screen</td><td><b>1</b> — Medical emergency declared</td></tr>
+<tr class="p-cannot"><td>an emergency declaration, and vitals held as numbers</td><td><b>1</b> — Syncope</td></tr>
+<tr class="p-cannot"><td>an emergency declaration, and a drug administration record</td><td><b>1</b> — Anaphylaxis</td></tr>
+<tr class="p-cannot"><td>a staff incident intake — INC-001 exists as a control with no event behind it</td><td><b>1</b> — Needle-stick injury</td></tr>
+<tr class="p-cannot"><td>a one-press emergency declaration</td><td><b>1</b> — Fire alarm</td></tr></tbody></table></div><h3>A. Appointment conditions <span class="n">8</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">New patient booked</td><td class="is-verbatim">Create patient file</td><td class="is-verbatim">reception</td><td class="is-verbatim">Immediately</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">APPOINTMENT_BOOKED</span></td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">New patient booked</td><td class="is-verbatim">Send welcome message</td><td class="is-verbatim">reception</td><td class="is-verbatim">Within 5 min</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">APPOINTMENT_BOOKED</span></td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Patient cancels</td><td class="is-verbatim">Contact for rescheduling</td><td class="is-verbatim">reception</td><td class="is-verbatim">Same day</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">APPOINTMENT_CANCELLED</span></td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Patient doesn’t answer confirmation</td><td class="is-verbatim">Retry confirmation</td><td class="is-verbatim">reception</td><td class="is-verbatim">2 hours</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a confirmation-attempt record with an outcome</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Patient no-show</td><td class="is-verbatim">Call patient</td><td class="is-verbatim">reception</td><td class="is-verbatim">Within 30 min</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a no-show event — the visit state has no such transition</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Patient no-show twice</td><td class="is-verbatim">Inform Clinic Manager</td><td class="is-verbatim">reception</td><td class="is-verbatim">Same day</td><td class="is-derived">tells somebody</td><td class="is-cannot">no — needs a no-show event, and a count of them per patient</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Appointment delayed &gt;15 min</td><td class="is-verbatim">Inform patient</td><td class="is-verbatim">reception</td><td class="is-verbatim">Immediately</td><td class="is-derived">tells somebody</td><td class="is-cannot">no — needs a running comparison of scheduled start against actual start</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Doctor unavailable</td><td class="is-verbatim">Reallocate appointment</td><td class="is-verbatim">reception</td><td class="is-verbatim">Immediately</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a doctor availability calendar</td></tr></tbody></table></div>
+<h3>B. Patient conditions <span class="n">8</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Medical history changed</td><td class="is-verbatim">Doctor review required</td><td class="is-verbatim">treating doctor</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a structured medical history — KuBi holds no allergies, conditions, medications or vitals as data</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">BP above clinic limit</td><td class="is-verbatim">Recheck BP</td><td class="is-verbatim">dental assistant</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs vitals recorded as numbers, and a configured clinic limit</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Diabetes declared</td><td class="is-verbatim">Record latest HbA1c</td><td class="is-verbatim">treating doctor</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a structured medical history — KuBi holds no allergies, conditions, medications or vitals as data</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Cardiac history</td><td class="is-verbatim">Verify physician clearance</td><td class="is-verbatim">treating doctor</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a structured medical history — KuBi holds no allergies, conditions, medications or vitals as data</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Pregnancy declared</td><td class="is-verbatim">Treatment protocol review</td><td class="is-verbatim">treating doctor</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a structured medical history — KuBi holds no allergies, conditions, medications or vitals as data</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Latex allergy</td><td class="is-verbatim">Prepare latex-free setup</td><td class="is-verbatim">dental assistant</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a structured medical history — KuBi holds no allergies, conditions, medications or vitals as data</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Drug allergy</td><td class="is-verbatim">Verify medications</td><td class="is-verbatim">treating doctor</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a structured medical history — KuBi holds no allergies, conditions, medications or vitals as data</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Infectious disease declared</td><td class="is-verbatim">Isolation precautions</td><td class="is-verbatim">dental assistant</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a structured medical history — KuBi holds no allergies, conditions, medications or vitals as data</td></tr></tbody></table></div>
+<h3>C. Diagnosis conditions <span class="n">8</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Caries diagnosed</td><td class="is-verbatim">Prepare treatment estimate</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a coded diagnosis on the record, not free-text clinical notes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Root canal advised</td><td class="is-verbatim">Schedule RCT</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a coded diagnosis on the record, not free-text clinical notes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Extraction advised</td><td class="is-verbatim">Explain extraction instructions</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a coded diagnosis on the record, not free-text clinical notes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Implant advised</td><td class="is-verbatim">CBCT consultation</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a coded diagnosis on the record, not free-text clinical notes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Crown advised</td><td class="is-verbatim">Shade planning</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a coded diagnosis on the record, not free-text clinical notes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Denture advised</td><td class="is-verbatim">Impression appointment</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a coded diagnosis on the record, not free-text clinical notes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Periodontal disease</td><td class="is-verbatim">Scaling appointment</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a coded diagnosis on the record, not free-text clinical notes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Oral lesion detected</td><td class="is-verbatim">Biopsy/Referral reminder</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a coded diagnosis on the record, not free-text clinical notes</td></tr></tbody></table></div>
+<h3>D. Consent conditions <span class="n">6</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-open"><td class="is-verbatim">Surgical procedure</td><td class="is-verbatim">Surgical consent mandatory</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">stops work</td><td>yes — <span class="mono">PROCEDURE_STARTED</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Implant treatment</td><td class="is-verbatim">Implant consent mandatory</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">stops work</td><td>yes — <span class="mono">PROCEDURE_STARTED</span></td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Sedation</td><td class="is-verbatim">Sedation consent</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">stops work</td><td class="is-cannot">no — needs sedation recorded as a property of the procedure</td></tr>
+<tr class="p-open"><td class="is-verbatim">Extraction</td><td class="is-verbatim">Extraction consent</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">stops work</td><td>yes — <span class="mono">PROCEDURE_STARTED</span></td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Minor patient</td><td class="is-verbatim">Parent consent</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">stops work</td><td class="is-cannot">no — needs date of birth on the patient record</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Photography required</td><td class="is-verbatim">Media consent</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">stops work</td><td class="is-cannot">no — needs a photography flag on the procedure</td></tr></tbody></table></div>
+<h3>E. Clinical procedure conditions <span class="n">8</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-open"><td class="is-verbatim">Implant placed</td><td class="is-verbatim">Record implant batch number</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">PROCEDURE_COMPLETED</span></td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Bone graft used</td><td class="is-verbatim">Record graft batch number</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs graft recorded as a consumable used in the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Membrane used</td><td class="is-verbatim">Record membrane batch</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs membrane recorded as a consumable used in the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">PRF prepared</td><td class="is-verbatim">Record centrifuge cycle</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs the centrifuge as a tracked asset with cycle records</td></tr>
+<tr class="p-open"><td class="is-verbatim">Crown preparation</td><td class="is-verbatim">Send lab prescription</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">PROCEDURE_COMPLETED</span></td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Digital scan taken</td><td class="is-verbatim">Upload STL</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded</td></tr>
+<tr class="p-open"><td class="is-verbatim">Impression taken</td><td class="is-verbatim">Dispatch to lab</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">PROCEDURE_COMPLETED</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Temporary crown placed</td><td class="is-verbatim">Review in 7 days</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">PROCEDURE_COMPLETED</span></td></tr></tbody></table></div>
+<h3>F. Laboratory conditions <span class="n">5</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-open"><td class="is-verbatim">Impression received</td><td class="is-verbatim">Lab work order</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">LAB_CASE_RECEIVED</span></td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Case delayed</td><td class="is-verbatim">Inform clinic</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">tells somebody</td><td class="is-cannot">no — needs expected-return monitoring against the due date</td></tr>
+<tr class="p-open"><td class="is-verbatim">Prosthesis ready</td><td class="is-verbatim">Schedule trial</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">LAB_QC_PASSED</span></td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Prosthesis dispatched</td><td class="is-verbatim">Track delivery</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a dispatch event with a carrier reference</td></tr>
+<tr class="p-open"><td class="is-verbatim">Case returned</td><td class="is-verbatim">Rework request</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">LAB_QC_FAILED</span></td></tr></tbody></table></div>
+<h3>G. Financial conditions <span class="n">6</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Estimate approved</td><td class="is-verbatim">Schedule treatment</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs the billing domain — KuBi holds no estimates, invoices or payments</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Estimate rejected</td><td class="is-verbatim">Follow-up after 3 days</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs the billing domain — KuBi holds no estimates, invoices or payments</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Advance pending</td><td class="is-verbatim">Reminder</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs the billing domain — KuBi holds no estimates, invoices or payments</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Payment overdue</td><td class="is-verbatim">Collection call</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs the billing domain — KuBi holds no estimates, invoices or payments</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">EMI selected</td><td class="is-verbatim">Finance verification</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs the billing domain — KuBi holds no estimates, invoices or payments</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Insurance patient</td><td class="is-verbatim">Submit documents</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs the billing domain — KuBi holds no estimates, invoices or payments</td></tr></tbody></table></div>
+<h3>H. Sterilization conditions <span class="n">4</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-open"><td class="is-verbatim">Sterilization failed</td><td class="is-verbatim">Re-sterilize instruments</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">AUTOCLAVE_CYCLE_FINISHED</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Biological test failed</td><td class="is-verbatim">Stop instrument usage</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">stops work</td><td>yes — <span class="mono">AUTOCLAVE_CYCLE_FINISHED</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Autoclave maintenance due</td><td class="is-verbatim">Maintenance reminder</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">ASSET_SERVICE_DUE</span></td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Sterile pack expired</td><td class="is-verbatim">Repack and sterilize</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a shelf-life clock on each released pack</td></tr></tbody></table></div>
+<h3>I. Equipment conditions <span class="n">6</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-open"><td class="is-verbatim">Compressor pressure low</td><td class="is-verbatim">Maintenance check</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">ASSET_CHECK_FAILED</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Suction failure</td><td class="is-verbatim">Inform technician</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">tells somebody</td><td>yes — <span class="mono">ASSET_CHECK_FAILED</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">RVG malfunction</td><td class="is-verbatim">Service request</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">ASSET_CHECK_FAILED</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Scanner calibration due</td><td class="is-verbatim">Calibration</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">ASSET_SERVICE_DUE</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Implant motor service due</td><td class="is-verbatim">Maintenance</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">ASSET_SERVICE_DUE</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Curing light intensity low</td><td class="is-verbatim">Replace battery/check output</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">ASSET_CHECK_FAILED</span></td></tr></tbody></table></div>
+<h3>J. Inventory conditions <span class="n">6</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-open"><td class="is-verbatim">Stock below minimum</td><td class="is-verbatim">Purchase request</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">STOCK_AT_OR_BELOW_MINIMUM</span></td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Material expired</td><td class="is-verbatim">Remove stock</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs expiry dates held per batch, and a clock watching them</td></tr>
+<tr class="p-open"><td class="is-verbatim">Implant inventory low</td><td class="is-verbatim">Reorder</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">STOCK_AT_OR_BELOW_MINIMUM</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Anaesthetic low</td><td class="is-verbatim">Purchase</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">STOCK_AT_OR_BELOW_MINIMUM</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Gloves below par level</td><td class="is-verbatim">Reorder</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">STOCK_AT_OR_BELOW_MINIMUM</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Cement finished</td><td class="is-verbatim">Emergency purchase</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">STOCK_AT_OR_BELOW_MINIMUM</span></td></tr></tbody></table></div>
+<h3>K. Infection control conditions <span class="n">4</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Biomedical waste bag full</td><td class="is-verbatim">Dispose immediately</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs somebody to report it — no bag can tell KuBi it is full</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Sharps container 75% full</td><td class="is-verbatim">Replace container</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs somebody to report it — no container can tell KuBi it is three-quarters full</td></tr>
+<tr class="p-open"><td class="is-verbatim">PPE stock low</td><td class="is-verbatim">Purchase</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">STOCK_AT_OR_BELOW_MINIMUM</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Surface disinfectant low</td><td class="is-verbatim">Refill</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">STOCK_AT_OR_BELOW_MINIMUM</span></td></tr></tbody></table></div>
+<h3>L. Treatment completion conditions <span class="n">5</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-open"><td class="is-verbatim">Implant surgery completed</td><td class="is-verbatim">Schedule 7-day review</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">PROCEDURE_COMPLETED</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Extraction completed</td><td class="is-verbatim">24-hour follow-up</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">PROCEDURE_COMPLETED</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">RCT completed</td><td class="is-verbatim">Crown reminder</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">PROCEDURE_COMPLETED</span></td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Crown delivered</td><td class="is-verbatim">Warranty documentation</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a delivery event distinct from procedure completion</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Denture delivered</td><td class="is-verbatim">48-hour adjustment visit</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a delivery event distinct from procedure completion</td></tr></tbody></table></div>
+<h3>M. Follow-up conditions <span class="n">5</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Patient reports pain</td><td class="is-verbatim">Urgent appointment</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a channel for a patient to report a symptom — KuBi has no patient-facing input</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Swelling reported</td><td class="is-verbatim">Doctor callback</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a channel for a patient to report a symptom</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Bleeding reported</td><td class="is-verbatim">Emergency review</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a channel for a patient to report a symptom</td></tr>
+<tr class="p-open"><td class="is-verbatim">Missed review</td><td class="is-verbatim">Follow-up call</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">TASK_OVERDUE</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Missed recall</td><td class="is-verbatim">Recall reminder</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">TASK_OVERDUE</span></td></tr></tbody></table></div>
+<h3>N. Patient satisfaction conditions <span class="n">4</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-open"><td class="is-verbatim">Treatment completed</td><td class="is-verbatim">Feedback request</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">PROCEDURE_COMPLETED</span></td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Rating below 4/5</td><td class="is-verbatim">Manager callback</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs feedback captured as a score, not as a message</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Complaint registered</td><td class="is-verbatim">Incident report</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a complaint intake — CMP-001 exists as a control with no event behind it</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Complaint unresolved</td><td class="is-verbatim">Owner escalation</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">escalates</td><td class="is-cannot">no — needs a complaint intake, and a resolution clock running against it</td></tr></tbody></table></div>
+<h3>O. Staff conditions <span class="n">4</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Late arrival</td><td class="is-verbatim">Attendance review</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs check-in times compared against a roster</td></tr>
+<tr class="p-open"><td class="is-verbatim">Checklist incomplete</td><td class="is-verbatim">Supervisor verification</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">TASK_OVERDUE</span></td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Repeated checklist failure</td><td class="is-verbatim">Training session</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a failure count per person over a window</td></tr>
+<tr class="p-open"><td class="is-verbatim">Missed sterilization</td><td class="is-verbatim">Incident report</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">TASK_OVERDUE</span></td></tr></tbody></table></div>
+<h3>P. Compliance conditions <span class="n">4</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-open"><td class="is-verbatim">Clinical note incomplete</td><td class="is-verbatim">Complete documentation</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">TASK_OVERDUE</span></td></tr>
+<tr class="p-open"><td class="is-verbatim">Consent missing</td><td class="is-verbatim">Obtain before next procedure</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">stops work</td><td>yes — <span class="mono">PROCEDURE_STARTED</span></td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Prescription unsigned</td><td class="is-verbatim">Doctor signature</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs prescriptions held as records with a signature state</td></tr>
+<tr class="p-open"><td class="is-verbatim">Lab form missing</td><td class="is-verbatim">Complete documentation</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td>yes — <span class="mono">LAB_CASE_RECEIVED</span></td></tr></tbody></table></div>
+<h3>Q. Recall conditions <span class="n">4</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">6 months after scaling</td><td class="is-verbatim">Recall appointment</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a recall clock started by a completed procedure of a given type</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">1 year after crown</td><td class="is-verbatim">Recall examination</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a recall clock started by a completed procedure of a given type</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Implant review due</td><td class="is-verbatim">Implant maintenance visit</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a recall clock started by a completed procedure of a given type</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Child recall due</td><td class="is-verbatim">Preventive visit</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs date of birth on the patient record, and a paediatric recall interval</td></tr></tbody></table></div>
+<h3>R. Emergency conditions <span class="n">5</span></h3><div class="scroll"><table>
+<thead><tr><th>Condition</th><th>Auto task</th><th>Role</th><th>Due</th><th>What it does</th><th>Can KuBi see it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Medical emergency declared</td><td class="is-verbatim">Activate emergency protocol</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a one-press emergency declaration, reachable from every screen</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Syncope</td><td class="is-verbatim">Record vitals and event</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs an emergency declaration, and vitals held as numbers</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Anaphylaxis</td><td class="is-verbatim">Drug administration log</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs an emergency declaration, and a drug administration record</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Needle-stick injury</td><td class="is-verbatim">Exposure protocol</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a staff incident intake — INC-001 exists as a control with no event behind it</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Fire alarm</td><td class="is-verbatim">Evacuation checklist</td><td class="is-open">not decided</td><td class="is-open">not decided</td><td class="is-derived">raises a task</td><td class="is-cannot">no — needs a one-press emergency declaration</td></tr></tbody></table></div>
+</section>
+<section id="gates">
+  <p class="eyebrow">Library 4 of 6</p>
+  <h2>Compliance gates</h2>
+  <p class="lede">The library that refuses work. Seventeen universal gates and twelve treatment sets, every one of them BLOCK_HARD — no override path exists.</p>
+  <dl class="stats"><div><dt>29</dt><dd>gates</dd></div><div><dt>181</dt><dd>requirements</dd></div><div><dt>46</dt><dd>KuBi can evaluate</dd></div><div class="s-stop"><dt>135</dt><dd>return UNKNOWN, so they refuse</dd></div><div class="s-stop"><dt>0</dt><dd>could be switched on today</dd></div></dl>
+  <h3>What KuBi would have to hold <span class="n">35</span></h3><div class="scroll"><table>
+<thead><tr><th>Capability</th><th>Requirements it would unlock</th></tr></thead>
+<tbody><tr class="p-cannot"><td>file storage — KuBi has no object store, so nothing can be uploaded</td><td><b>16</b> — Radiographs reviewed, Clinical photographs (if required), Medical clearance uploaded (if required), Digital scan uploaded, Attachments uploaded, Radiographs uploaded, Photos uploaded, Reports delivered, Obturation radiograph uploaded, Pre-operative radiograph available, CBCT approved, Post-operative radiograph uploaded, Diagnostic records complete, Cephalometric analysis approved, Smile design approved, Pre- and post-operative photographs documented</td></tr>
+<tr class="p-cannot"><td>a structured medical history — allergies, conditions, medications and habits held as fields rather than free text</td><td><b>13</b> — Outstanding alerts reviewed, Drug history, Allergy history, Pregnancy status, Diabetes status, Hypertension status, Cardiac history, Bleeding disorders, Current medications, Previous surgeries, Tobacco habit, Alcohol history, Medical fitness confirmed</td></tr>
+<tr class="p-cannot"><td>consent held per type, not as a single yes/no on the visit</td><td><b>11</b> — Consent for data storage, Privacy policy acknowledgement, Anaesthesia consent, Implant consent, Surgical consent, Photography consent, Parent consent, Sedation consent, Blood product consent, Surgical consent, Parent consent obtained</td></tr>
+<tr class="p-cannot"><td>the billing domain — no estimate, invoice, receipt or payment exists</td><td><b>10</b> — Estimated cost prepared, Estimate approved, Package selected, Payment plan chosen, Advance received (if required), Invoice generated, Discounts approved, Payment collected, Receipt generated, Cash reconciled</td></tr>
+<tr class="p-cannot"><td>the full demographic record — DOB, gender, occupation, emergency contact</td><td><b>8</b> — Demographic details complete, Address complete, DOB entered, Gender entered, Emergency contact, Occupation, Aadhaar/ID (if clinic policy), Emergency contact shared</td></tr>
+<tr class="p-cannot"><td>coded diagnosis and procedure fields, not free-text clinical notes</td><td><b>7</b> — Chief complaint, Clinical examination, Diagnosis entered, Treatment plan documented, Diagnosis coded, Procedures coded, Treatment objectives documented</td></tr>
+<tr class="p-cannot"><td>an odontogram — KuBi has no tooth-level chart</td><td><b>7</b> — Tooth number selected, Correct tooth verified, Correct side verified, Odontogram updated, Tooth preparation approved, Full periodontal charting completed, Pocket depths recorded</td></tr>
+<tr class="p-cannot"><td>a drug administration record</td><td><b>6</b> — Drug verified, Expiry checked, Batch number recorded, Dose recorded, Injection site documented, Time documented</td></tr>
+<tr class="p-cannot"><td>a surgical checklist on the procedure</td><td><b>6</b> — Haemostasis achieved, Socket inspected, Flap design documented, Bone removal documented, Suture details recorded, Dressing placed</td></tr>
+<tr class="p-cannot"><td>consumables recorded against the procedure</td><td><b>5</b> — Materials recorded, Graft batch, Membrane batch, Suture type, Materials documented</td></tr>
+<tr class="p-cannot"><td>a delivery checklist on the lab case</td><td><b>5</b> — Margins verified, Contacts verified, Occlusion verified, Patient approval, Cement/screw details recorded</td></tr>
+<tr class="p-cannot"><td>a prosthetic checklist on the procedure</td><td><b>5</b> — Retraction completed, Temporary restoration placed, Cementation documented, Impression accuracy verified, Occlusion verified</td></tr>
+<tr class="p-cannot"><td>implant placement measurements</td><td><b>4</b> — Insertion torque recorded, ISQ recorded (if applicable), Osseointegration confirmed, Prosthetic screw torque recorded</td></tr>
+<tr class="p-cannot"><td>a denture stage checklist</td><td><b>4</b> — Jaw relation approved, Try-in accepted, Aesthetics approved, Delivery checklist completed</td></tr>
+<tr class="p-cannot"><td>shade recorded on the procedure</td><td><b>3</b> — Correct shade verified, Shade selection, Shade accepted</td></tr>
+<tr class="p-cannot"><td>endodontic measurements on the procedure</td><td><b>3</b> — Working length verified, Irrigation protocol recorded, Master cone verified</td></tr>
+<tr class="p-cannot"><td>shade recorded on the lab case</td><td><b>2</b> — Shade selected, Bite recorded</td></tr>
+<tr class="p-cannot"><td>a recall clock per procedure type</td><td><b>2</b> — Recall entered, Maintenance schedule created</td></tr>
+<tr class="p-cannot"><td>a finishing checklist on the procedure</td><td><b>2</b> — Occlusion checked, Restoration finished and polished</td></tr>
+<tr class="p-cannot"><td>a verified-contact flag, not merely a stored number</td><td><b>1</b> — Mobile number verified</td></tr>
+<tr class="p-cannot"><td>prescriptions held as records</td><td><b>1</b> — Prescription issued</td></tr>
+<tr class="p-cannot"><td>feedback captured as a record with a score</td><td><b>1</b> — Feedback requested</td></tr>
+<tr class="p-cannot"><td>a warranty record on the prosthesis</td><td><b>1</b> — Warranty issued (if applicable)</td></tr>
+<tr class="p-cannot"><td>a signature state on the clinical note</td><td><b>1</b> — All notes signed</td></tr>
+<tr class="p-cannot"><td>prescriptions held as records with a signature state</td><td><b>1</b> — All prescriptions signed</td></tr>
+<tr class="p-cannot"><td>an isolation field on the procedure</td><td><b>1</b> — Isolation method documented</td></tr>
+<tr class="p-cannot"><td>an isolation field that accepts a documented reason for omission</td><td><b>1</b> — Rubber dam documented (or reason for omission)</td></tr>
+<tr class="p-cannot"><td>an acknowledgement from the patient, not merely an issued instruction</td><td><b>1</b> — Post-operative instructions acknowledged</td></tr>
+<tr class="p-cannot"><td>a surgical plan record with an approval state</td><td><b>1</b> — Surgical plan approved</td></tr>
+<tr class="p-cannot"><td>an implant passport document</td><td><b>1</b> — Implant passport generated</td></tr>
+<tr class="p-cannot"><td>an oral hygiene score per visit</td><td><b>1</b> — Oral hygiene assessed at each visit</td></tr>
+<tr class="p-cannot"><td>a paediatric assessment record</td><td><b>1</b> — Behaviour assessment documented</td></tr>
+<tr class="p-cannot"><td>vitals held as numbers</td><td><b>1</b> — Weight recorded when relevant</td></tr>
+<tr class="p-cannot"><td>an acknowledgement from the guardian</td><td><b>1</b> — Post-treatment instructions given to guardian</td></tr>
+<tr class="p-cannot"><td>a cosmetic stage checklist</td><td><b>1</b> — Mock-up approved</td></tr></tbody></table></div><h3>Gate 1 — Appointment verification <span class="n">7</span></h3><p class="blockif"><b>Blocks if:</b> Wrong patient · Duplicate patient · Missing records</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">Patient identity verified</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Mobile number verified</td><td class="is-cannot">no — needs a verified-contact flag, not merely a stored number. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Appointment verified</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Medical record available</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Previous records retrieved</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Outstanding alerts reviewed</td><td class="is-cannot">no — needs a structured medical history — allergies, conditions, medications and habits held as fields rather than free text. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Returning patient history opened</td><td>yes</td></tr></tbody></table></div>
+<h3>Gate 2 — Registration completion <span class="n">9</span></h3><p class="blockif"><b>Blocks if:</b> Mandatory demographic fields missing</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Demographic details complete</td><td class="is-cannot">no — needs the full demographic record — DOB, gender, occupation, emergency contact. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Address complete</td><td class="is-cannot">no — needs the full demographic record — DOB, gender, occupation, emergency contact. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">DOB entered</td><td class="is-cannot">no — needs the full demographic record — DOB, gender, occupation, emergency contact. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Gender entered</td><td class="is-cannot">no — needs the full demographic record — DOB, gender, occupation, emergency contact. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Emergency contact</td><td class="is-cannot">no — needs the full demographic record — DOB, gender, occupation, emergency contact. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Occupation</td><td class="is-cannot">no — needs the full demographic record — DOB, gender, occupation, emergency contact. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Aadhaar/ID (if clinic policy)</td><td class="is-cannot">no — needs the full demographic record — DOB, gender, occupation, emergency contact. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Consent for data storage</td><td class="is-cannot">no — needs consent held per type, not as a single yes/no on the visit. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Privacy policy acknowledgement</td><td class="is-cannot">no — needs consent held per type, not as a single yes/no on the visit. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr></tbody></table></div>
+<h3>Gate 3 — Medical safety <span class="n">12</span></h3><p class="blockif"><b>Blocks if:</b> Medical history incomplete</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">Medical history updated</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Drug history</td><td class="is-cannot">no — needs a structured medical history — allergies, conditions, medications and habits held as fields rather than free text. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Allergy history</td><td class="is-cannot">no — needs a structured medical history — allergies, conditions, medications and habits held as fields rather than free text. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Pregnancy status</td><td class="is-cannot">no — needs a structured medical history — allergies, conditions, medications and habits held as fields rather than free text. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Diabetes status</td><td class="is-cannot">no — needs a structured medical history — allergies, conditions, medications and habits held as fields rather than free text. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Hypertension status</td><td class="is-cannot">no — needs a structured medical history — allergies, conditions, medications and habits held as fields rather than free text. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Cardiac history</td><td class="is-cannot">no — needs a structured medical history — allergies, conditions, medications and habits held as fields rather than free text. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Bleeding disorders</td><td class="is-cannot">no — needs a structured medical history — allergies, conditions, medications and habits held as fields rather than free text. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Current medications</td><td class="is-cannot">no — needs a structured medical history — allergies, conditions, medications and habits held as fields rather than free text. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Previous surgeries</td><td class="is-cannot">no — needs a structured medical history — allergies, conditions, medications and habits held as fields rather than free text. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Tobacco habit</td><td class="is-cannot">no — needs a structured medical history — allergies, conditions, medications and habits held as fields rather than free text. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Alcohol history</td><td class="is-cannot">no — needs a structured medical history — allergies, conditions, medications and habits held as fields rather than free text. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr></tbody></table></div>
+<h3>Gate 4 — Clinical assessment <span class="n">6</span></h3><p class="blockif"><b>Blocks if:</b> Diagnosis missing</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Chief complaint</td><td class="is-cannot">no — needs coded diagnosis and procedure fields, not free-text clinical notes. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Clinical examination</td><td class="is-cannot">no — needs coded diagnosis and procedure fields, not free-text clinical notes. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Diagnosis entered</td><td class="is-cannot">no — needs coded diagnosis and procedure fields, not free-text clinical notes. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Tooth number selected</td><td class="is-cannot">no — needs an odontogram — KuBi has no tooth-level chart. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Radiographs reviewed</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Clinical photographs (if required)</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr></tbody></table></div>
+<h3>Gate 5 — Treatment planning <span class="n">6</span></h3><p class="blockif"><b>Blocks if:</b> Treatment plan missing</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Treatment plan documented</td><td class="is-cannot">no — needs coded diagnosis and procedure fields, not free-text clinical notes. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Alternative options explained</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Risks explained</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Benefits explained</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Estimated cost prepared</td><td class="is-cannot">no — needs the billing domain — no estimate, invoice, receipt or payment exists. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Patient questions answered</td><td>yes</td></tr></tbody></table></div>
+<h3>Gate 6 — Financial approval <span class="n">4</span></h3><p class="blockif"><b>Blocks if:</b> Financial approval pending</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Estimate approved</td><td class="is-cannot">no — needs the billing domain — no estimate, invoice, receipt or payment exists. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Package selected</td><td class="is-cannot">no — needs the billing domain — no estimate, invoice, receipt or payment exists. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Payment plan chosen</td><td class="is-cannot">no — needs the billing domain — no estimate, invoice, receipt or payment exists. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Advance received (if required)</td><td class="is-cannot">no — needs the billing domain — no estimate, invoice, receipt or payment exists. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr></tbody></table></div>
+<h3>Gate 7 — Consent <span class="n">10</span></h3><p class="blockif"><b>Blocks if:</b> Any required consent missing</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">General treatment consent</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Procedure-specific consent</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Anaesthesia consent</td><td class="is-cannot">no — needs consent held per type, not as a single yes/no on the visit. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Implant consent</td><td class="is-cannot">no — needs consent held per type, not as a single yes/no on the visit. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Surgical consent</td><td class="is-cannot">no — needs consent held per type, not as a single yes/no on the visit. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Photography consent</td><td class="is-cannot">no — needs consent held per type, not as a single yes/no on the visit. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Parent consent</td><td class="is-cannot">no — needs consent held per type, not as a single yes/no on the visit. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Sedation consent</td><td class="is-cannot">no — needs consent held per type, not as a single yes/no on the visit. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Blood product consent</td><td class="is-cannot">no — needs consent held per type, not as a single yes/no on the visit. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Medical clearance uploaded (if required)</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr></tbody></table></div>
+<h3>Gate 8 — Pre-operative safety <span class="n">11</span></h3><p class="blockif"><b>Blocks if:</b> Any verification fails</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">Patient identity confirmed</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Correct tooth verified</td><td class="is-cannot">no — needs an odontogram — KuBi has no tooth-level chart. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Correct treatment verified</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Correct side verified</td><td class="is-cannot">no — needs an odontogram — KuBi has no tooth-level chart. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Correct implant verified</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Correct shade verified</td><td class="is-cannot">no — needs shade recorded on the procedure. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Correct prosthesis verified</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Sterility confirmed</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Equipment functional</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Emergency drugs available</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Oxygen available</td><td>yes</td></tr></tbody></table></div>
+<h3>Gate 9 — Anaesthesia safety <span class="n">6</span></h3><p class="blockif"><b>Blocks if:</b> Drug documentation incomplete</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Drug verified</td><td class="is-cannot">no — needs a drug administration record. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Expiry checked</td><td class="is-cannot">no — needs a drug administration record. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Batch number recorded</td><td class="is-cannot">no — needs a drug administration record. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Dose recorded</td><td class="is-cannot">no — needs a drug administration record. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Injection site documented</td><td class="is-cannot">no — needs a drug administration record. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Time documented</td><td class="is-cannot">no — needs a drug administration record. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr></tbody></table></div>
+<h3>Gate 10 — Procedure documentation <span class="n">8</span></h3><p class="blockif"><b>Blocks if:</b> Traceability incomplete</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">Procedure started</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Materials recorded</td><td class="is-cannot">no — needs consumables recorded against the procedure. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Implant batch</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Graft batch</td><td class="is-cannot">no — needs consumables recorded against the procedure. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Membrane batch</td><td class="is-cannot">no — needs consumables recorded against the procedure. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Suture type</td><td class="is-cannot">no — needs consumables recorded against the procedure. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Lot numbers</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Clinical notes</td><td>yes</td></tr></tbody></table></div>
+<h3>Gate 11 — Laboratory <span class="n">6</span></h3><p class="blockif"><b>Blocks if:</b> Lab prescription incomplete</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">Impression verified</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Digital scan uploaded</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Shade selected</td><td class="is-cannot">no — needs shade recorded on the lab case. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Bite recorded</td><td class="is-cannot">no — needs shade recorded on the lab case. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Lab prescription generated</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Delivery date entered</td><td>yes</td></tr></tbody></table></div>
+<h3>Gate 12 — Prosthesis delivery <span class="n">7</span></h3><p class="blockif"><b>Blocks if:</b> Occlusion not verified</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">Trial approved</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Fit verified</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Margins verified</td><td class="is-cannot">no — needs a delivery checklist on the lab case. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Contacts verified</td><td class="is-cannot">no — needs a delivery checklist on the lab case. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Occlusion verified</td><td class="is-cannot">no — needs a delivery checklist on the lab case. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Patient approval</td><td class="is-cannot">no — needs a delivery checklist on the lab case. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Cement/screw details recorded</td><td class="is-cannot">no — needs a delivery checklist on the lab case. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr></tbody></table></div>
+<h3>Gate 13 — Post-operative care <span class="n">5</span></h3><p class="blockif"><b>Blocks if:</b> Instructions not documented</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">Instructions explained</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Written instructions issued</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Prescription issued</td><td class="is-cannot">no — needs prescriptions held as records. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Emergency contact shared</td><td class="is-cannot">no — needs the full demographic record — DOB, gender, occupation, emergency contact. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Follow-up appointment booked</td><td>yes</td></tr></tbody></table></div>
+<h3>Gate 14 — Billing closure <span class="n">5</span></h3><p class="blockif"><b>Blocks if:</b> Billing incomplete</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">Treatment entered</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Invoice generated</td><td class="is-cannot">no — needs the billing domain — no estimate, invoice, receipt or payment exists. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Discounts approved</td><td class="is-cannot">no — needs the billing domain — no estimate, invoice, receipt or payment exists. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Payment collected</td><td class="is-cannot">no — needs the billing domain — no estimate, invoice, receipt or payment exists. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Receipt generated</td><td class="is-cannot">no — needs the billing domain — no estimate, invoice, receipt or payment exists. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr></tbody></table></div>
+<h3>Gate 15 — Clinical documentation closure <span class="n">8</span></h3><p class="blockif"><b>Blocks if:</b> Clinical record incomplete</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">Clinical notes complete</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Odontogram updated</td><td class="is-cannot">no — needs an odontogram — KuBi has no tooth-level chart. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Diagnosis coded</td><td class="is-cannot">no — needs coded diagnosis and procedure fields, not free-text clinical notes. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Procedures coded</td><td class="is-cannot">no — needs coded diagnosis and procedure fields, not free-text clinical notes. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Materials documented</td><td class="is-cannot">no — needs consumables recorded against the procedure. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Attachments uploaded</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Radiographs uploaded</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Photos uploaded</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr></tbody></table></div>
+<h3>Gate 16 — Patient exit <span class="n">5</span></h3><p class="blockif"><b>Blocks if:</b> Recall not created</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">Next appointment booked</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Feedback requested</td><td class="is-cannot">no — needs feedback captured as a record with a score. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Recall entered</td><td class="is-cannot">no — needs a recall clock per procedure type. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Reports delivered</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Warranty issued (if applicable)</td><td class="is-cannot">no — needs a warranty record on the prosthesis. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr></tbody></table></div>
+<h3>Gate 17 — End-of-day clinical closure <span class="n">7</span></h3><p class="blockif"><b>Blocks if:</b> Day cannot be closed</p><div class="scroll"><table>
+<thead><tr><th>Must be completed</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">All notes signed</td><td class="is-cannot">no — needs a signature state on the clinical note. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">All prescriptions signed</td><td class="is-cannot">no — needs prescriptions held as records with a signature state. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">All laboratory cases dispatched</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Sterilization complete</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Biomedical waste logged</td><td>yes</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Equipment shut down</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Cash reconciled</td><td class="is-cannot">no — needs the billing domain — no estimate, invoice, receipt or payment exists. Returns UNKNOWN, and UNKNOWN is never PASS, so the gate refuses.</td></tr></tbody></table></div><h3>Treatment-specific gates <span class="n">12</span></h3><h4>Composite restoration</h4><div class="scroll"><table>
+<thead><tr><th>Additional gate</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Shade selection</td><td class="is-cannot">no — needs shade recorded on the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Isolation method documented</td><td class="is-cannot">no — needs an isolation field on the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Occlusion checked</td><td class="is-cannot">no — needs a finishing checklist on the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Restoration finished and polished</td><td class="is-cannot">no — needs a finishing checklist on the procedure</td></tr></tbody></table></div>
+<h4>Root canal treatment</h4><div class="scroll"><table>
+<thead><tr><th>Additional gate</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Working length verified</td><td class="is-cannot">no — needs endodontic measurements on the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Rubber dam documented (or reason for omission)</td><td class="is-cannot">no — needs an isolation field that accepts a documented reason for omission</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Irrigation protocol recorded</td><td class="is-cannot">no — needs endodontic measurements on the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Master cone verified</td><td class="is-cannot">no — needs endodontic measurements on the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Obturation radiograph uploaded</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded</td></tr></tbody></table></div>
+<h4>Crown &amp; bridge</h4><div class="scroll"><table>
+<thead><tr><th>Additional gate</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Tooth preparation approved</td><td class="is-cannot">no — needs an odontogram — KuBi has no tooth-level chart</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Retraction completed</td><td class="is-cannot">no — needs a prosthetic checklist on the procedure</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Impression/scan accepted</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Temporary restoration placed</td><td class="is-cannot">no — needs a prosthetic checklist on the procedure</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Lab prescription completed</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Cementation documented</td><td class="is-cannot">no — needs a prosthetic checklist on the procedure</td></tr></tbody></table></div>
+<h4>Extraction</h4><div class="scroll"><table>
+<thead><tr><th>Additional gate</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Medical fitness confirmed</td><td class="is-cannot">no — needs a structured medical history — allergies, conditions, medications and habits held as fields rather than free text</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Pre-operative radiograph available</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Haemostasis achieved</td><td class="is-cannot">no — needs a surgical checklist on the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Socket inspected</td><td class="is-cannot">no — needs a surgical checklist on the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Post-operative instructions acknowledged</td><td class="is-cannot">no — needs an acknowledgement from the patient, not merely an issued instruction</td></tr></tbody></table></div>
+<h4>Surgical extraction</h4><div class="scroll"><table>
+<thead><tr><th>Additional gate</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Surgical consent</td><td class="is-cannot">no — needs consent held per type, not as a single yes/no on the visit</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Flap design documented</td><td class="is-cannot">no — needs a surgical checklist on the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Bone removal documented</td><td class="is-cannot">no — needs a surgical checklist on the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Suture details recorded</td><td class="is-cannot">no — needs a surgical checklist on the procedure</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Review appointment scheduled</td><td>yes</td></tr></tbody></table></div>
+<h4>Implant surgery</h4><div class="scroll"><table>
+<thead><tr><th>Additional gate</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">CBCT approved</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Surgical plan approved</td><td class="is-cannot">no — needs a surgical plan record with an approval state</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Implant batch scanned</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Insertion torque recorded</td><td class="is-cannot">no — needs implant placement measurements</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">ISQ recorded (if applicable)</td><td class="is-cannot">no — needs implant placement measurements</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Post-operative radiograph uploaded</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Implant passport generated</td><td class="is-cannot">no — needs an implant passport document</td></tr></tbody></table></div>
+<h4>Implant prosthetics</h4><div class="scroll"><table>
+<thead><tr><th>Additional gate</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Osseointegration confirmed</td><td class="is-cannot">no — needs implant placement measurements</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Impression accuracy verified</td><td class="is-cannot">no — needs a prosthetic checklist on the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Prosthetic screw torque recorded</td><td class="is-cannot">no — needs implant placement measurements</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Occlusion verified</td><td class="is-cannot">no — needs a prosthetic checklist on the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Maintenance schedule created</td><td class="is-cannot">no — needs a recall clock per procedure type</td></tr></tbody></table></div>
+<h4>Complete denture</h4><div class="scroll"><table>
+<thead><tr><th>Additional gate</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Jaw relation approved</td><td class="is-cannot">no — needs a denture stage checklist</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Try-in accepted</td><td class="is-cannot">no — needs a denture stage checklist</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Aesthetics approved</td><td class="is-cannot">no — needs a denture stage checklist</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Delivery checklist completed</td><td class="is-cannot">no — needs a denture stage checklist</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Pressure point review scheduled</td><td>yes</td></tr></tbody></table></div>
+<h4>Orthodontics</h4><div class="scroll"><table>
+<thead><tr><th>Additional gate</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Diagnostic records complete</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Cephalometric analysis approved</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Treatment objectives documented</td><td class="is-cannot">no — needs coded diagnosis and procedure fields, not free-text clinical notes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Oral hygiene assessed at each visit</td><td class="is-cannot">no — needs an oral hygiene score per visit</td></tr></tbody></table></div>
+<h4>Pediatric dentistry</h4><div class="scroll"><table>
+<thead><tr><th>Additional gate</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Parent consent obtained</td><td class="is-cannot">no — needs consent held per type, not as a single yes/no on the visit</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Behaviour assessment documented</td><td class="is-cannot">no — needs a paediatric assessment record</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Weight recorded when relevant</td><td class="is-cannot">no — needs vitals held as numbers</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Post-treatment instructions given to guardian</td><td class="is-cannot">no — needs an acknowledgement from the guardian</td></tr></tbody></table></div>
+<h4>Periodontal surgery</h4><div class="scroll"><table>
+<thead><tr><th>Additional gate</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Full periodontal charting completed</td><td class="is-cannot">no — needs an odontogram — KuBi has no tooth-level chart</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Pocket depths recorded</td><td class="is-cannot">no — needs an odontogram — KuBi has no tooth-level chart</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Surgery notes documented</td><td>yes</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Dressing placed</td><td class="is-cannot">no — needs a surgical checklist on the procedure</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Suture review scheduled</td><td>yes</td></tr></tbody></table></div>
+<h4>Cosmetic dentistry</h4><div class="scroll"><table>
+<thead><tr><th>Additional gate</th><th>Can KuBi check it?</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Smile design approved</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Shade accepted</td><td class="is-cannot">no — needs shade recorded on the procedure</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Mock-up approved</td><td class="is-cannot">no — needs a cosmetic stage checklist</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Pre- and post-operative photographs documented</td><td class="is-cannot">no — needs file storage — KuBi has no object store, so nothing can be uploaded</td></tr></tbody></table></div>
+</section>
+<section id="exceptions">
+  <p class="eyebrow">Library 5 of 6</p>
+  <h2>Exceptions and the escalation matrix</h2>
+  <p class="lede">Everything a failure raises, and who hears about it. Three of your four severity levels escalate immediately — immediate is stored as zero, not as a small number.</p>
+  <dl class="stats"><div><dt>68</dt><dd>exceptions</dd></div><div class="s-stop"><dt>50</dt><dd>cannot wait a minute</dd></div><div><dt>12</dt><dd>stop work rather than create it</dd></div><div><dt>10</dt><dd>came with a severity you set</dd></div><div><dt>22</dt><dd>escalation targets, 6 with no role</dd></div></dl>
+  <h3>The escalation matrix</h3><div class="scroll"><table>
+<thead><tr><th>Level</th><th>Examples</th><th>Escalate within</th><th>Escalate to</th></tr></thead>
+<tbody><tr class="p-verbatim"><td><b>1 — Operational</b></td><td>Delay, missing stock, scheduling issue</td><td class="">15 minutes</td><td>Reception/Clinic Manager</td></tr>
+<tr class="p-verbatim"><td><b>2 — Clinical</b></td><td>High BP, incomplete records, treatment deviation</td><td class="is-cannot">immediate</td><td>Treating Dentist</td></tr>
+<tr class="p-verbatim"><td><b>3 — Safety</b></td><td>Sterilization failure, equipment failure, wrong patient identified</td><td class="is-cannot">immediate</td><td>Clinical Head</td></tr>
+<tr class="p-verbatim"><td><b>4 — Critical</b></td><td>Medical emergency, wrong-site surgery risk, severe adverse event, legal issue</td><td class="is-cannot">immediate</td><td>Owner + Clinical Director</td></tr></tbody></table></div><h3>Escalation targets KuBi has no role for <span class="n">22</span></h3><p class="blockif">Kept as you wrote them. Mapping these onto one of KuBi’s thirteen roles would name the wrong person at a critical moment.</p><div class="scroll"><table>
+<thead><tr><th>Job title</th></tr></thead>
+<tbody><tr class="p-open"><td>Assistant</td></tr>
+<tr class="p-open"><td>Clinic Head</td></tr>
+<tr class="p-open"><td>Clinic Manager</td></tr>
+<tr class="p-open"><td>Clinical Director</td></tr>
+<tr class="p-open"><td>Dentist</td></tr>
+<tr class="p-open"><td>Endodontist</td></tr>
+<tr class="p-open"><td>Front Office Manager</td></tr>
+<tr class="p-open"><td>HR</td></tr>
+<tr class="p-open"><td>HR/Owner</td></tr>
+<tr class="p-open"><td>IT/Admin</td></tr>
+<tr class="p-open"><td>Implantologist</td></tr>
+<tr class="p-open"><td>Infection Control Officer</td></tr>
+<tr class="p-open"><td>Lab Head</td></tr>
+<tr class="p-open"><td>Lab Manager</td></tr>
+<tr class="p-open"><td>Oral Surgeon</td></tr>
+<tr class="p-open"><td>Owner</td></tr>
+<tr class="p-open"><td>Owner/Clinical Head</td></tr>
+<tr class="p-open"><td>Reception + Dentist</td></tr>
+<tr class="p-open"><td>Reception Manager</td></tr>
+<tr class="p-open"><td>Senior Dentist</td></tr>
+<tr class="p-open"><td>Sterilization In-charge</td></tr>
+<tr class="p-open"><td>Treating Dentist</td></tr></tbody></table></div><h3>Clinical exceptions <span class="n">10</span></h3><div class="scroll"><table>
+<thead><tr><th>Exception</th><th>Auto task</th><th>Escalate to</th><th>Severity</th><th>What it does</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">Patient refused treatment</td><td class="is-verbatim">Record refusal, obtain refusal signature</td><td>Treating Dentist</td><td class="is-cannot">clinical · immediate</td><td class="is-derived">raises a task</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Patient refused X-ray</td><td class="is-verbatim">Record refusal and explain risks</td><td>Treating Dentist</td><td class="is-cannot">safety · immediate</td><td class="is-derived">raises a task</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Patient refused consent</td><td class="is-verbatim">Stop treatment and document</td><td>Clinic Head</td><td class="is-cannot">critical · immediate</td><td class="is-derived">stops work</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Patient refuses anesthesia</td><td class="is-verbatim">Clinical reassessment</td><td>Treating Dentist</td><td class="is-cannot">safety · immediate</td><td class="is-derived">raises a task</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Patient leaves before completion</td><td class="is-verbatim">Record unfinished treatment and contact patient</td><td>Reception + Dentist</td><td class="is-cannot">safety · immediate</td><td class="is-derived">raises a task</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Wrong tooth identified before treatment</td><td class="is-verbatim">Stop procedure immediately</td><td>Senior Dentist</td><td class="is-cannot">critical · immediate</td><td class="is-derived">stops work</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Wrong treatment planned</td><td class="is-verbatim">Verify diagnosis</td><td>Clinical Director</td><td class="is-cannot">critical · immediate</td><td class="is-derived">raises a task</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Medical history cannot be verified</td><td class="is-verbatim">Obtain clarification before treatment</td><td>Dentist</td><td class="is-cannot">critical · immediate</td><td class="is-derived">raises a task</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Allergy discovered during procedure</td><td class="is-verbatim">Activate allergy protocol</td><td>Clinical Director</td><td class="is-cannot">critical · immediate</td><td class="is-derived">raises a task</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Medical emergency</td><td class="is-verbatim">Activate emergency protocol</td><td>Owner/Clinical Head</td><td class="is-cannot">critical · immediate</td><td class="is-derived">raises a task</td></tr></tbody></table></div>
+<h3>Consent exceptions <span class="n">5</span></h3><div class="scroll"><table>
+<thead><tr><th>Exception</th><th>Auto task</th><th>Escalate to</th><th>Severity</th><th>What it does</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Consent not signed</td><td class="is-verbatim">Block procedure</td><td>Treating Dentist</td><td class="is-cannot">critical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">stops work</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Parent unavailable</td><td class="is-verbatim">Reschedule or verify guardian</td><td>Clinic Manager</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Implant consent incomplete</td><td class="is-verbatim">Hold implant surgery</td><td>Implantologist</td><td class="is-cannot">critical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">stops work</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Surgical consent missing</td><td class="is-verbatim">Stop surgery</td><td>Clinical Director</td><td class="is-cannot">critical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">stops work</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Photography consent refused</td><td class="is-verbatim">Disable photography module</td><td>Dentist</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">stops work</td></tr></tbody></table></div>
+<h3>Medical exceptions <span class="n">6</span></h3><div class="scroll"><table>
+<thead><tr><th>Exception</th><th>Auto task</th><th>Escalate to</th><th>Severity</th><th>What it does</th></tr></thead>
+<tbody><tr class="p-derived"><td class="is-verbatim">BP above clinic limit</td><td class="is-verbatim">Repeat BP, physician consultation</td><td>Dentist</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Random blood sugar above protocol</td><td class="is-verbatim">Review before treatment</td><td>Dentist</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">INR above acceptable level</td><td class="is-verbatim">Physician clearance</td><td>Oral Surgeon</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Active infection</td><td class="is-verbatim">Reassess treatment plan</td><td>Dentist</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Pregnancy discovered</td><td class="is-verbatim">Modify treatment plan</td><td>Senior Dentist</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Cardiac history without clearance</td><td class="is-verbatim">Obtain physician approval</td><td>Clinical Director</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr></tbody></table></div>
+<h3>Treatment exceptions <span class="n">7</span></h3><div class="scroll"><table>
+<thead><tr><th>Exception</th><th>Auto task</th><th>Escalate to</th><th>Severity</th><th>What it does</th></tr></thead>
+<tbody><tr class="p-derived"><td class="is-verbatim">Procedure taking longer than expected</td><td class="is-verbatim">Review treatment status</td><td>Clinic Manager</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Instrument fracture</td><td class="is-verbatim">Record incident</td><td>Clinical Director</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Perforation during RCT</td><td class="is-verbatim">Specialist review</td><td>Endodontist</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Implant instability</td><td class="is-verbatim">Suspend prosthetic phase</td><td>Implantologist</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">stops work</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Crown does not fit</td><td class="is-verbatim">Return to laboratory</td><td>Lab Manager</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Impression inaccurate</td><td class="is-verbatim">Repeat impression</td><td>Treating Dentist</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Occlusion unacceptable</td><td class="is-verbatim">Re-evaluate before discharge</td><td>Senior Dentist</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr></tbody></table></div>
+<h3>Laboratory exceptions <span class="n">5</span></h3><div class="scroll"><table>
+<thead><tr><th>Exception</th><th>Auto task</th><th>Escalate to</th><th>Severity</th><th>What it does</th></tr></thead>
+<tbody><tr class="p-derived"><td class="is-verbatim">Lab case delayed</td><td class="is-verbatim">Notify patient</td><td>Lab Manager</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">tells somebody</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Prosthesis damaged</td><td class="is-verbatim">Remake authorization</td><td>Lab Head</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Shade mismatch</td><td class="is-verbatim">Repeat shade selection</td><td>Dentist</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Impression damaged</td><td class="is-verbatim">Repeat impression</td><td>Treating Dentist</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">STL upload failed</td><td class="is-verbatim">Retry upload</td><td>IT/Admin</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr></tbody></table></div>
+<h3>Infection control exceptions <span class="n">5</span></h3><div class="scroll"><table>
+<thead><tr><th>Exception</th><th>Auto task</th><th>Escalate to</th><th>Severity</th><th>What it does</th></tr></thead>
+<tbody><tr class="p-derived"><td class="is-verbatim">Sterilization cycle failed</td><td class="is-verbatim">Re-sterilize all instruments</td><td>Sterilization In-charge</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Autoclave failure</td><td class="is-verbatim">Stop using affected instruments</td><td>Clinic Manager</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">stops work</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Biological indicator failure</td><td class="is-verbatim">Quarantine instrument sets</td><td>Owner</td><td class="is-cannot">critical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">stops work</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Cross-contamination suspected</td><td class="is-verbatim">Incident report</td><td>Infection Control Officer</td><td class="is-cannot">critical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Biomedical waste segregation error</td><td class="is-verbatim">Correct immediately</td><td>Clinic Manager</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr></tbody></table></div>
+<h3>Equipment exceptions <span class="n">5</span></h3><div class="scroll"><table>
+<thead><tr><th>Exception</th><th>Auto task</th><th>Escalate to</th><th>Severity</th><th>What it does</th></tr></thead>
+<tbody><tr class="p-derived"><td class="is-verbatim">Compressor failure</td><td class="is-verbatim">Shift patients if required</td><td>Clinic Manager</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">RVG failure</td><td class="is-verbatim">Arrange alternate imaging</td><td>Dentist</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Scanner malfunction</td><td class="is-verbatim">Switch to conventional impression</td><td>Clinic Manager</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Dental chair breakdown</td><td class="is-verbatim">Move patient to another operatory</td><td>Clinic Manager</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Suction failure</td><td class="is-verbatim">Suspend aerosol procedures</td><td>Owner</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">stops work</td></tr></tbody></table></div>
+<h3>Financial exceptions <span class="n">5</span></h3><div class="scroll"><table>
+<thead><tr><th>Exception</th><th>Auto task</th><th>Escalate to</th><th>Severity</th><th>What it does</th></tr></thead>
+<tbody><tr class="p-cannot"><td class="is-verbatim">Payment not received</td><td class="is-verbatim">Hold further elective treatment</td><td>Front Office Manager</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">stops work</td></tr>
+<tr class="p-cannot"><td class="is-verbatim">Unauthorized discount</td><td class="is-verbatim">Manager approval required</td><td>Owner</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">stops work</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Refund requested</td><td class="is-verbatim">Investigate and document</td><td>Clinic Manager</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Cash mismatch</td><td class="is-verbatim">Cash audit</td><td>Owner</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Estimate disputed</td><td class="is-verbatim">Clinical review</td><td>Treating Dentist</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr></tbody></table></div>
+<h3>Reception exceptions <span class="n">5</span></h3><div class="scroll"><table>
+<thead><tr><th>Exception</th><th>Auto task</th><th>Escalate to</th><th>Severity</th><th>What it does</th></tr></thead>
+<tbody><tr class="p-derived"><td class="is-verbatim">Duplicate patient record</td><td class="is-verbatim">Merge after verification</td><td>Clinic Manager</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Wrong appointment booked</td><td class="is-verbatim">Inform patient and reschedule</td><td>Reception Manager</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">tells somebody</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Patient waiting beyond standard</td><td class="is-verbatim">Inform patient and doctor</td><td>Clinic Manager</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">tells somebody</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Doctor absent</td><td class="is-verbatim">Rearrange appointments</td><td>Owner</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">No-show for surgery</td><td class="is-verbatim">Contact patient</td><td>Dentist</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr></tbody></table></div>
+<h3>Documentation exceptions <span class="n">5</span></h3><div class="scroll"><table>
+<thead><tr><th>Exception</th><th>Auto task</th><th>Escalate to</th><th>Severity</th><th>What it does</th></tr></thead>
+<tbody><tr class="p-derived"><td class="is-verbatim">Clinical notes incomplete</td><td class="is-verbatim">Complete before day closure</td><td>Treating Dentist</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Prescription unsigned</td><td class="is-verbatim">Obtain signature</td><td>Dentist</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Implant batch missing</td><td class="is-verbatim">Record before case closure</td><td>Implantologist</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Lab prescription missing</td><td class="is-verbatim">Generate immediately</td><td>Dentist</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Radiographs not uploaded</td><td class="is-verbatim">Upload before completion</td><td>Assistant</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr></tbody></table></div>
+<h3>Staff exceptions <span class="n">5</span></h3><div class="scroll"><table>
+<thead><tr><th>Exception</th><th>Auto task</th><th>Escalate to</th><th>Severity</th><th>What it does</th></tr></thead>
+<tbody><tr class="p-derived"><td class="is-verbatim">Staff absent</td><td class="is-verbatim">Arrange replacement</td><td>Clinic Manager</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Repeated checklist failures</td><td class="is-verbatim">Retraining</td><td>HR/Owner</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Unauthorized leave</td><td class="is-verbatim">Attendance review</td><td>HR</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">PPE violation</td><td class="is-verbatim">Immediate correction</td><td>Clinic Manager</td><td class="is-cannot">safety · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Infection control breach</td><td class="is-verbatim">Incident report</td><td>Infection Control Officer</td><td class="is-cannot">critical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr></tbody></table></div>
+<h3>Patient communication exceptions <span class="n">5</span></h3><div class="scroll"><table>
+<thead><tr><th>Exception</th><th>Auto task</th><th>Escalate to</th><th>Severity</th><th>What it does</th></tr></thead>
+<tbody><tr class="p-derived"><td class="is-verbatim">Patient complaint</td><td class="is-verbatim">Register complaint</td><td>Clinic Manager</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Negative Google review</td><td class="is-verbatim">Contact patient</td><td>Owner</td><td class="">operational · within 15 min <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Poor satisfaction score</td><td class="is-verbatim">Clinical review</td><td>Treating Dentist</td><td class="is-cannot">clinical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Legal notice received</td><td class="is-verbatim">Secure records and notify management</td><td>Owner</td><td class="is-cannot">critical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr>
+<tr class="p-derived"><td class="is-verbatim">Adverse event reported</td><td class="is-verbatim">Clinical investigation</td><td>Clinical Director</td><td class="is-cannot">critical · immediate <span class="tag">read off the matrix</span></td><td class="is-derived">raises a task</td></tr></tbody></table></div>
+</section>
+<section id="protocols">
+  <p class="eyebrow">Library 6 of 6</p>
+  <h2>Procedure protocols</h2>
+  <p class="lede">The only library that is a sequence rather than a set. A step has a position, and the system answers “what is next” rather than listing everything at once.</p>
+  <dl class="stats"><div><dt>17</dt><dd>protocols</dd></div><div><dt>164</dt><dd>steps</dd></div><div><dt>10</dt><dd>universal rules</dd></div><div class="s-warn"><dt>156</dt><dd>steps with nobody assigned</dd></div></dl>
+  <h3>New patient consultation <span class="n">8</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="mono">1</td><td class="is-verbatim">New patient registered <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Verify patient identity</td><td class="is-verbatim">reception</td></tr>
+<tr class="p-verbatim"><td class="mono">2</td><td class="is-verbatim">New patient <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Capture complete demographic details</td><td class="is-verbatim">reception</td></tr>
+<tr class="p-verbatim"><td class="mono">3</td><td class="is-verbatim">New patient <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Record medical history</td><td class="is-verbatim">dental assistant</td></tr>
+<tr class="p-verbatim"><td class="mono">4</td><td class="is-verbatim">New patient <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Record dental history</td><td class="is-verbatim">treating doctor</td></tr>
+<tr class="p-verbatim"><td class="mono">5</td><td class="is-verbatim">New patient <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Record chief complaint</td><td class="is-verbatim">treating doctor</td></tr>
+<tr class="p-verbatim"><td class="mono">6</td><td class="is-verbatim">New patient <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Record baseline photographs (if consented)</td><td class="is-verbatim">dental assistant</td></tr>
+<tr class="p-verbatim"><td class="mono">7</td><td class="is-verbatim">New patient <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Obtain General Treatment Consent</td><td class="is-verbatim">reception</td></tr>
+<tr class="p-verbatim"><td class="mono">8</td><td class="is-verbatim">New patient <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Create digital patient file</td><td class="is-verbatim">reception</td></tr></tbody></table></div>
+<h3>Oral examination <span class="n">12</span></h3><h4>During the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">Examination started <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Medical history review</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">Examination started <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Drug allergy verification</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">Examination started <span class="tag">phase read from the verb</span></td><td class="is-verbatim">BP recording (if indicated)</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">4</td><td class="is-verbatim">Examination started <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Extraoral examination</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">5</td><td class="is-verbatim">Examination started <span class="tag">phase read from the verb</span></td><td class="is-verbatim">TMJ examination</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">6</td><td class="is-verbatim">Examination started <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Soft tissue examination</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">7</td><td class="is-verbatim">Examination started <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Hard tissue examination</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">8</td><td class="is-verbatim">Examination started <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Periodontal charting</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">9</td><td class="is-verbatim">Examination started <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Existing restorations charting</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">10</td><td class="is-verbatim">Examination started <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Caries charting</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">11</td><td class="is-verbatim">Examination started <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Diagnosis entry</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">12</td><td class="is-verbatim">Examination completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Treatment planning</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Radiographs <span class="n">5</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">X-ray advised <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Verify indication</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">X-ray advised <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Pregnancy status confirmation</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">X-ray advised <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Radiation consent (if clinic policy)</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>During the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">4</td><td class="is-verbatim">X-ray taken</td><td class="is-verbatim">Upload image</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">5</td><td class="is-verbatim">X-ray taken</td><td class="is-verbatim">Doctor reporting</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>CBCT <span class="n">3</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">CBCT advised <span class="tag">phase read from the verb</span></td><td class="is-verbatim">CBCT consent</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">2</td><td class="is-verbatim">CBCT completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Upload DICOM</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">CBCT completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Review and document findings</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Scaling and polishing <span class="n">7</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">Scaling planned <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Scaling consent</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">Scaling planned <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Calculate periodontal indices</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">Scaling planned <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Pre-operative photographs</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">4</td><td class="is-verbatim">Scaling completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Oral hygiene instructions</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">5</td><td class="is-verbatim">Scaling completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Demonstrate brushing technique</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">6</td><td class="is-verbatim">Scaling completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Recommend interdental aids</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">7</td><td class="is-verbatim">Scaling completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Schedule recall</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Composite filling <span class="n">7</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">Filling planned <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Restoration consent</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">Filling planned <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Shade selection</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">Filling planned <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Rubber dam assessment</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>During the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">4</td><td class="is-verbatim">Filling started <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Isolation verification</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">5</td><td class="is-verbatim">Filling completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Check occlusion</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">6</td><td class="is-verbatim">Filling completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Polish restoration</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">7</td><td class="is-verbatim">Filling completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Update tooth chart</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Root canal treatment <span class="n">15</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">RCT advised</td><td class="is-verbatim">Endodontic consent</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">RCT advised</td><td class="is-verbatim">Explain multiple visit protocol</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">RCT advised</td><td class="is-verbatim">Explain crown requirement</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">4</td><td class="is-verbatim">RCT advised</td><td class="is-verbatim">Pre-operative radiograph</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">5</td><td class="is-verbatim">RCT advised</td><td class="is-verbatim">Rubber dam availability check</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>During the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">6</td><td class="is-verbatim">Access started</td><td class="is-verbatim">Working length radiograph</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">7</td><td class="is-verbatim">Canal preparation</td><td class="is-verbatim">Irrigation protocol</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">8</td><td class="is-verbatim">Canal preparation</td><td class="is-verbatim">Instrument log</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">9</td><td class="is-verbatim">Visit completed</td><td class="is-verbatim">Temporary restoration</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">10</td><td class="is-verbatim">Visit completed</td><td class="is-verbatim">Next appointment</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">11</td><td class="is-verbatim">Obturation planned</td><td class="is-verbatim">Master cone radiograph</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">12</td><td class="is-verbatim">Obturation completed</td><td class="is-verbatim">Final radiograph</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">13</td><td class="is-verbatim">Obturation completed</td><td class="is-verbatim">Clinical notes</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">14</td><td class="is-verbatim">RCT completed</td><td class="is-verbatim">Crown reminder</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">15</td><td class="is-verbatim">RCT completed</td><td class="is-verbatim">Follow-up review</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Crown and bridge <span class="n">11</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">Crown advised <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Crown consent</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">Crown advised <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Shade selection</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>During the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">3</td><td class="is-verbatim">Tooth prepared</td><td class="is-verbatim">Gingival retraction</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">4</td><td class="is-verbatim">Tooth prepared</td><td class="is-verbatim">Digital scan/impression</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">5</td><td class="is-verbatim">Impression completed</td><td class="is-verbatim">Laboratory prescription</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">6</td><td class="is-verbatim">Temporary crown placed</td><td class="is-verbatim">Temporary cement instructions</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">7</td><td class="is-verbatim">Lab case received</td><td class="is-verbatim">Trial appointment</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">8</td><td class="is-verbatim">Crown delivery</td><td class="is-verbatim">Occlusion check</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">9</td><td class="is-verbatim">Crown delivery</td><td class="is-verbatim">Cementation record</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">10</td><td class="is-verbatim">Crown delivery</td><td class="is-verbatim">Warranty card</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">11</td><td class="is-verbatim">Crown delivery</td><td class="is-verbatim">Post-operative instructions</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Extraction <span class="n">16</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">Extraction advised</td><td class="is-verbatim">Extraction consent</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">Extraction advised</td><td class="is-verbatim">Medical clearance verification</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">Extraction advised</td><td class="is-verbatim">Drug allergy verification</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">4</td><td class="is-verbatim">Extraction advised</td><td class="is-verbatim">Bleeding disorder assessment</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">5</td><td class="is-verbatim">Extraction advised</td><td class="is-verbatim">Anticoagulant assessment</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">6</td><td class="is-verbatim">Extraction advised</td><td class="is-verbatim">Pregnancy assessment</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">7</td><td class="is-verbatim">Extraction advised</td><td class="is-verbatim">Pre-operative radiograph</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>During the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">8</td><td class="is-verbatim">Extraction started</td><td class="is-verbatim">Anaesthetic recording</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">9</td><td class="is-verbatim">Extraction completed</td><td class="is-verbatim">Tooth count verification</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">10</td><td class="is-verbatim">Extraction completed</td><td class="is-verbatim">Socket inspection</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">11</td><td class="is-verbatim">Extraction completed</td><td class="is-verbatim">Hemostasis verification</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">12</td><td class="is-verbatim">Extraction completed</td><td class="is-verbatim">Sutures recorded</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">13</td><td class="is-verbatim">Extraction completed</td><td class="is-verbatim">Post-operative instructions</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">14</td><td class="is-verbatim">Extraction completed</td><td class="is-verbatim">Prescription</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">15</td><td class="is-verbatim">Extraction completed</td><td class="is-verbatim">Schedule review</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">16</td><td class="is-verbatim">Sutures placed</td><td class="is-verbatim">Suture removal appointment</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Surgical extraction / wisdom tooth <span class="n">10</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">Surgery planned <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Surgical consent</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">Surgery planned <span class="tag">phase read from the verb</span></td><td class="is-verbatim">OPG review</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">Surgery planned <span class="tag">phase read from the verb</span></td><td class="is-verbatim">CBCT review (if required)</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">4</td><td class="is-verbatim">Surgery planned <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Sterile surgical setup</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>During the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">5</td><td class="is-verbatim">Bone removal</td><td class="is-verbatim">Record bur used</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">6</td><td class="is-verbatim">Flap raised</td><td class="is-verbatim">Record flap type</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">7</td><td class="is-verbatim">Surgery completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Irrigation completed</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">8</td><td class="is-verbatim">Surgery completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Sutures documented</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">9</td><td class="is-verbatim">Surgery completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Ice pack instructions</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">10</td><td class="is-verbatim">Surgery completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Review after 7 days</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Implant surgery <span class="n">25</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">Implant treatment accepted</td><td class="is-verbatim">Implant informed consent</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">Implant treatment accepted</td><td class="is-verbatim">Financial approval</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">Implant treatment accepted</td><td class="is-verbatim">Medical fitness review</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">4</td><td class="is-verbatim">Implant treatment accepted</td><td class="is-verbatim">Smoking assessment</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">5</td><td class="is-verbatim">Implant treatment accepted</td><td class="is-verbatim">HbA1c review (if diabetic)</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">6</td><td class="is-verbatim">Implant treatment accepted</td><td class="is-verbatim">CBCT evaluation</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">7</td><td class="is-verbatim">Implant treatment accepted</td><td class="is-verbatim">Surgical planning approval</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">8</td><td class="is-verbatim">Implant treatment accepted</td><td class="is-verbatim">Implant inventory verification</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">9</td><td class="is-verbatim">Implant treatment accepted</td><td class="is-verbatim">Sterile implant kit verification</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>During the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">10</td><td class="is-verbatim">Implant opened</td><td class="is-verbatim">Record implant batch number</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">11</td><td class="is-verbatim">Implant opened</td><td class="is-verbatim">Record expiry date</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">12</td><td class="is-verbatim">Implant placed</td><td class="is-verbatim">Record implant size</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">13</td><td class="is-verbatim">Implant placed</td><td class="is-verbatim">Record insertion torque</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">14</td><td class="is-verbatim">Implant placed</td><td class="is-verbatim">Record ISQ value</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">15</td><td class="is-verbatim">Bone graft used</td><td class="is-verbatim">Record graft batch</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">16</td><td class="is-verbatim">Membrane used</td><td class="is-verbatim">Record membrane batch</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">17</td><td class="is-verbatim">PRF prepared</td><td class="is-verbatim">Record centrifuge cycle</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">18</td><td class="is-verbatim">Healing abutment placed</td><td class="is-verbatim">Record size</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">19</td><td class="is-verbatim">Surgery completed</td><td class="is-verbatim">Post-operative radiograph</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">20</td><td class="is-verbatim">Surgery completed</td><td class="is-verbatim">Implant passport generated</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">21</td><td class="is-verbatim">Surgery completed</td><td class="is-verbatim">Post-operative instructions</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">22</td><td class="is-verbatim">Surgery completed</td><td class="is-verbatim">Antibiotic protocol</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">23</td><td class="is-verbatim">Surgery completed</td><td class="is-verbatim">24-hour follow-up</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">24</td><td class="is-verbatim">Surgery completed</td><td class="is-verbatim">7-day review</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">25</td><td class="is-verbatim">Surgery completed</td><td class="is-verbatim">3-month osseointegration review</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Implant prosthetics <span class="n">9</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">Implant healed</td><td class="is-verbatim">Implant stability assessment</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">Impression planned</td><td class="is-verbatim">Impression coping verification</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>During the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">3</td><td class="is-verbatim">Impression completed</td><td class="is-verbatim">Lab work order</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">4</td><td class="is-verbatim">Crown trial</td><td class="is-verbatim">Passive fit verification</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">5</td><td class="is-verbatim">Crown delivery</td><td class="is-verbatim">Torque prosthetic screw</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">6</td><td class="is-verbatim">Crown delivery</td><td class="is-verbatim">Occlusion verification</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">7</td><td class="is-verbatim">Crown delivery</td><td class="is-verbatim">Screw access sealing</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">8</td><td class="is-verbatim">Crown delivery</td><td class="is-verbatim">Maintenance instructions</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">9</td><td class="is-verbatim">Crown delivery</td><td class="is-verbatim">Annual recall</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Complete denture <span class="n">8</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">Denture accepted <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Denture consent</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>During the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">2</td><td class="is-verbatim">Primary impression</td><td class="is-verbatim">Material recorded</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">Secondary impression</td><td class="is-verbatim">Border moulding completed</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">4</td><td class="is-verbatim">Jaw relation</td><td class="is-verbatim">Vertical dimension verified</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">5</td><td class="is-verbatim">Try-in</td><td class="is-verbatim">Aesthetics approved</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">6</td><td class="is-verbatim">Delivery</td><td class="is-verbatim">Pressure spot evaluation</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">7</td><td class="is-verbatim">Delivery</td><td class="is-verbatim">Denture care instructions</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">8</td><td class="is-verbatim">Delivery</td><td class="is-verbatim">24-hour adjustment appointment</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Orthodontics <span class="n">8</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">Braces accepted <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Orthodontic consent</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">Braces accepted <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Pre-treatment photographs</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">Braces accepted <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Study models/scan</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">4</td><td class="is-verbatim">Braces accepted <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Cephalometric analysis</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>During the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">5</td><td class="is-verbatim">Every visit</td><td class="is-verbatim">Oral hygiene score</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">6</td><td class="is-verbatim">Every visit</td><td class="is-verbatim">Archwire details</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">7</td><td class="is-verbatim">Every visit</td><td class="is-verbatim">Elastics instructions</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">8</td><td class="is-verbatim">Every visit</td><td class="is-verbatim">Next appointment</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Pediatric dentistry <span class="n">7</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">Child patient <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Parent consent</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">Child patient <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Behaviour assessment</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">Child patient <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Caries risk assessment</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">4</td><td class="is-verbatim">Fluoride planned <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Fluoride consent</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">5</td><td class="is-verbatim">Pulp therapy</td><td class="is-verbatim">Pulp treatment consent</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">6</td><td class="is-verbatim">SSC planned <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Stainless steel crown consent</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">7</td><td class="is-verbatim">Visit completed</td><td class="is-verbatim">Parent instructions</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Periodontal surgery <span class="n">6</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">Surgery advised <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Periodontal surgery consent</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">Surgery advised <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Full-mouth charting verified</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">Surgery planned <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Medical clearance</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">4</td><td class="is-verbatim">Surgery completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Dressing placement</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">5</td><td class="is-verbatim">Surgery completed <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Chlorhexidine instructions</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">6</td><td class="is-verbatim">Sutures placed</td><td class="is-verbatim">Suture removal appointment</td><td class="is-open">not decided</td></tr></tbody></table></div>
+<h3>Cosmetic dentistry / veneers <span class="n">7</span></h3><h4>Before the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">1</td><td class="is-verbatim">Veneers accepted <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Cosmetic treatment consent</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">2</td><td class="is-verbatim">Veneers accepted <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Smile photographs</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">3</td><td class="is-verbatim">Veneers accepted <span class="tag">phase read from the verb</span></td><td class="is-verbatim">Digital Smile Design approval</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>During the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">4</td><td class="is-verbatim">Mock-up completed</td><td class="is-verbatim">Patient approval</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">5</td><td class="is-verbatim">Tooth preparation</td><td class="is-verbatim">Shade verification</td><td class="is-open">not decided</td></tr></tbody></table></div><h4>After the procedure</h4><div class="scroll"><table>
+<thead><tr><th>#</th><th>Raised by</th><th>Step</th><th>Role</th></tr></thead>
+<tbody><tr class="p-open"><td class="mono">6</td><td class="is-verbatim">Delivery</td><td class="is-verbatim">Final photography</td><td class="is-open">not decided</td></tr>
+<tr class="p-open"><td class="mono">7</td><td class="is-verbatim">Delivery</td><td class="is-verbatim">Maintenance instructions</td><td class="is-open">not decided</td></tr></tbody></table></div><h3>Applies to every treatment <span class="n">10</span></h3><p class="blockif">Held once rather than copied into all seventeen protocols.</p><div class="scroll"><table>
+<thead><tr><th>Raised by</th><th>Step</th></tr></thead>
+<tbody><tr class="p-verbatim"><td class="is-verbatim">Local anaesthetic planned</td><td class="is-verbatim">Record anaesthetic drug, concentration, batch number, expiry, dose, site, and operator</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Prescription generated</td><td class="is-verbatim">Check allergy interactions and obtain doctor approval</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Laboratory work involved</td><td class="is-verbatim">Generate digital lab prescription and track dispatch/return</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Clinical photographs taken</td><td class="is-verbatim">Verify photography consent and upload to patient record</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Medical history modified</td><td class="is-verbatim">Flag dentist for review before treatment</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Patient refuses treatment</td><td class="is-verbatim">Record refusal, reason, counselling, and obtain refusal signature</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Treatment interrupted</td><td class="is-verbatim">Record reason, current status, and reschedule</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Complication occurs</td><td class="is-verbatim">Generate incident report and notify Clinic Manager</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Referral required</td><td class="is-verbatim">Generate referral letter and schedule follow-up</td></tr>
+<tr class="p-verbatim"><td class="is-verbatim">Treatment completed</td><td class="is-verbatim">Complete clinical notes, update odontogram, issue instructions, collect feedback, and schedule recall</td></tr></tbody></table></div>
+</section>
+
+<footer>
+  Generated by <span class="mono">scripts/render-libraries.mjs</span> from
+  <span class="mono">packages/contracts/src/</span>. Every count on this page is computed at
+  build time, not written down — so it cannot drift from the code. Synthetic and
+  specification data only; no patient record appears here.
+</footer>
+</main>
+</div>
