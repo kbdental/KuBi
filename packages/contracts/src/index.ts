@@ -15,3 +15,4 @@ export * from './patient-journey.js';
 export * from './condition-library.js';
 export * from './compliance-gates.js';
 export * from './exception-library.js';
+export * from './procedure-protocols.js';

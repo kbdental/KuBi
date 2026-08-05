@@ -19,6 +19,8 @@ import {
   COMPLIANCE_GATES, TREATMENT_GATES, evaluateGate, gateCoverage, missingForGates,
   theExceptions, stopsWork, immediate, ESCALATION_MATRIX, unmappedRoles,
   exceptionCoverage, isImmediate, ActionKind,
+  procedures, protocolOf, runProtocol, stepsFor, protocolCoverage,
+  UNIVERSAL_PROTOCOL, PHASE_LABEL,
   type ConditionRule, type ExceptionRule,
 } from '@kubi/contracts';
 import { Screen, Title, Answer, Group, Row, Tag, Switch, type Tone } from '../ui.js';
@@ -31,7 +33,7 @@ const ACTION_WORD: Record<string, string> = {
 };
 
 export function Rules() {
-  const [view, setView] = useState<'CONDITIONS' | 'GATES' | 'EXCEPTIONS'>('CONDITIONS');
+  const [view, setView] = useState<'CONDITIONS' | 'GATES' | 'EXCEPTIONS' | 'PROTOCOLS'>('CONDITIONS');
 
   return (
     <Screen wide>
@@ -46,12 +48,14 @@ export function Rules() {
           { value: 'CONDITIONS', label: 'Conditions' },
           { value: 'GATES', label: 'Gates' },
           { value: 'EXCEPTIONS', label: 'Exceptions' },
+          { value: 'PROTOCOLS', label: 'Protocols' },
         ]}
       />
 
       {view === 'CONDITIONS' && <Conditions />}
       {view === 'GATES' && <Gates />}
       {view === 'EXCEPTIONS' && <Exceptions />}
+      {view === 'PROTOCOLS' && <Protocols />}
     </Screen>
   );
 }
@@ -286,5 +290,98 @@ function Exception({ e }: { e: ExceptionRule }) {
         </>
       )}
     />
+  );
+}
+
+/* ---- protocols ----------------------------------------------------------
+ *
+ * The one library that is a sequence rather than a set, so this is the one
+ * view with a position on it. Pick a procedure, and the screen answers "what
+ * is next" instead of listing twenty-five things that are all equally true.
+ * ---------------------------------------------------------------------- */
+
+function Protocols() {
+  const [procedure, setProcedure] = useState(procedures()[0]!);
+  const [done, setDone] = useState<ReadonlySet<string>>(new Set());
+  const cov = protocolCoverage();
+  const run = runProtocol(procedure, done);
+
+  const pick = (p: string) => { setProcedure(p); setDone(new Set()); };
+
+  return (
+    <>
+      <Answer
+        verdict={run.next ? run.next.task : `${procedure} complete`}
+        why={run.next
+          ? `${PHASE_LABEL[run.next.phase]} the procedure · raised by "${run.next.when}" · `
+            + `step ${run.doneCount + 1} of ${run.totalCount}`
+          : `All ${run.totalCount} steps recorded.`}
+        tone={run.next ? 'warn' : 'good'}
+        {...(run.next
+          ? { action: { label: 'Record it and move on', onClick: () => setDone(new Set([...done, run.next!.id])) } }
+          : {})}
+      />
+
+      {run.outOfOrder.length > 0 && (
+        <Group
+          title="Recorded out of sequence"
+          count={run.outOfOrder.length}
+          note="Not rejected — refusing is a gate's job. But a clinic working around the
+                protocol is telling you something about the protocol."
+          tone="warn"
+        >
+          {run.outOfOrder.map((s) => <Row key={s.id} title={s.task} note={`should follow "${s.when}"`} tone="warn" />)}
+        </Group>
+      )}
+
+      <Group title="Pick a procedure" count={cov.procedures}>
+        {procedures().map((p) => (
+          <Row
+            key={p}
+            title={p}
+            note={`${stepsFor(p).length} steps`}
+            {...(p === procedure ? { tone: 'good' as const } : {})}
+            onOpen={() => pick(p)}
+          />
+        ))}
+      </Group>
+
+      {protocolOf(procedure).map((phase) => (
+        <Group key={phase.phase} title={`${phase.label} — ${procedure}`} count={phase.steps.length}>
+          {phase.steps.map((s) => (
+            <Row
+              key={s.id}
+              title={s.task}
+              note={`raised by "${s.when}"`}
+              {...(done.has(s.id)
+                ? { tone: 'good' as const }
+                : s.id === run.next?.id ? { tone: 'warn' as const } : {})}
+              tags={(
+                <>
+                  <Tag>step {s.order}</Tag>
+                  {s.role
+                    ? <Tag>{s.role.replace(/_/g, ' ').toLowerCase()}</Tag>
+                    : <Tag tone="warn">nobody assigned</Tag>}
+                  {s.mandatory && <Tag tone="stop">mandatory</Tag>}
+                  {!s.phaseStated && <Tag tone="warn">phase inferred</Tag>}
+                  {done.has(s.id) && <Tag tone="good">recorded</Tag>}
+                </>
+              )}
+              onOpen={() => setDone(new Set([...done, s.id]))}
+            />
+          ))}
+        </Group>
+      ))}
+
+      <Group
+        title="Applies to every treatment"
+        count={cov.universal}
+        note="Held once rather than copied into all seventeen protocols."
+      >
+        {UNIVERSAL_PROTOCOL.map((u) => (
+          <Row key={u.id} title={u.task} note={`raised by "${u.when}"`} />
+        ))}
+      </Group>
+    </>
   );
 }
