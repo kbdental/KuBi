@@ -301,3 +301,69 @@ export function estimateLoad(staff: number, pollSeconds: number): LoadEstimate {
     maxStaff: Math.floor(limit / perPersonPerMinute),
   };
 }
+
+/* -------------------------------------------------------------------------
+ * The hybrid split
+ *
+ * The owner's decision: the clinic runs on Sheets, except the audit trail and
+ * anything a gate reads, which stay in PostgreSQL.
+ *
+ * It is the right line and it is worth saying why in one sentence each.
+ * An audit trail that a second writer can silently overwrite is not evidence,
+ * it is a claim — and "append-only by this adapter's good manners" is not the
+ * same as append-only by database grant, because anybody who can open the
+ * spreadsheet can retype a completion time. A gate decides whether an implant
+ * surgery may start; it must not read from a file that anybody can edit while
+ * the patient is in the chair.
+ *
+ * Enforced rather than documented. `assertHomeIsCorrect` throws at startup if
+ * a sheet is configured for something that belongs in PostgreSQL, so the split
+ * cannot drift the way a line in a README drifts.
+ * ---------------------------------------------------------------------- */
+
+/** What a piece of data is, for the purpose of deciding where it lives. */
+export const DataKind = {
+  /** The standard: what should happen. Read-mostly, edited by the owner. */
+  STANDARD: 'STANDARD',
+  /** The operational record: today's tasks, readings, schedule. */
+  RECORD: 'RECORD',
+  /** Append-only evidence. Never Sheets. */
+  AUDIT: 'AUDIT',
+  /** Anything a BLOCK_HARD gate reads to decide. Never Sheets. */
+  GATE_INPUT: 'GATE_INPUT',
+} as const;
+export type DataKind = (typeof DataKind)[keyof typeof DataKind];
+
+export const HOME: Record<DataKind, 'SHEETS' | 'POSTGRES'> = {
+  STANDARD: 'SHEETS',
+  RECORD: 'SHEETS',
+  AUDIT: 'POSTGRES',
+  GATE_INPUT: 'POSTGRES',
+};
+
+export class WrongHomeError extends Error {
+  constructor(sheet: string, kind: DataKind) {
+    super(
+      `"${sheet}" holds ${kind} data, which lives in PostgreSQL, not Google Sheets.\n`
+      + (kind === 'AUDIT'
+        ? 'An audit trail anybody with the spreadsheet can retype is a claim, not evidence. '
+          + 'In PostgreSQL it is append-only by database grant — not even the application can '
+          + 'rewrite it.'
+        : 'A gate decides whether a procedure may start. It must not read from a file that '
+          + 'can be edited while the patient is in the chair.'),
+    );
+    this.name = 'WrongHomeError';
+  }
+}
+
+/**
+ * Refuse a misconfigured store at startup rather than at 3pm on a Tuesday.
+ *
+ * Called from the composition root. A split that is only written down is a
+ * split that drifts; this one cannot be got wrong quietly.
+ */
+export function assertHomeIsCorrect(sheets: Array<SheetSpec & { kind: DataKind }>): void {
+  for (const s of sheets) {
+    if (HOME[s.kind] !== 'SHEETS') throw new WrongHomeError(s.name, s.kind);
+  }
+}

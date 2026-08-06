@@ -16,6 +16,7 @@ import { describe, it, expect } from 'vitest';
 import {
   SheetsStore, Quota, SHEETS_QUOTA, estimateLoad,
   QuotaExceededError, ConcurrentWriteError, AppendOnlyError,
+  assertHomeIsCorrect, DataKind, WrongHomeError,
   type SheetsTransport, type SheetSpec,
 } from '../../apps/api/src/platform/sheets/sheets-store.js';
 
@@ -194,5 +195,39 @@ describe('what Sheets cannot give you: room for a clinic', () => {
     expect(estimateLoad(30, 30).maxStaff).toBe(30);
     // Two clinics on one spreadsheet halve it, because the limit is the key's.
     expect(estimateLoad(60, 30).overBudget).toBe(true);
+  });
+});
+
+describe('the hybrid split, enforced rather than documented', () => {
+  it('lets the standard and the daily record live in Sheets', () => {
+    expect(() => assertHomeIsCorrect([
+      { name: 'Daily standard', headers: ['id'], kind: DataKind.STANDARD },
+      { name: 'Tasks', headers: ['id'], kind: DataKind.RECORD },
+    ])).not.toThrow();
+  });
+
+  it('refuses to put the audit trail in a spreadsheet', () => {
+    expect(() => assertHomeIsCorrect([
+      { name: 'Audit', headers: ['at'], kind: DataKind.AUDIT },
+    ])).toThrow(WrongHomeError);
+  });
+
+  it('refuses to let a gate read from a spreadsheet', () => {
+    expect(() => assertHomeIsCorrect([
+      { name: 'Consent', headers: ['id'], kind: DataKind.GATE_INPUT },
+    ])).toThrow(WrongHomeError);
+  });
+
+  it('says why, in words somebody deciding this would want', () => {
+    try {
+      assertHomeIsCorrect([{ name: 'Audit', headers: ['at'], kind: DataKind.AUDIT }]);
+    } catch (e) {
+      expect((e as Error).message).toContain('append-only by database grant');
+    }
+    try {
+      assertHomeIsCorrect([{ name: 'Consent', headers: ['id'], kind: DataKind.GATE_INPUT }]);
+    } catch (e) {
+      expect((e as Error).message).toContain('while the patient is in the chair');
+    }
   });
 });
