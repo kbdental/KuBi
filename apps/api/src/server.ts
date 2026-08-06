@@ -40,7 +40,7 @@ import {
 import { RetentionService, RetentionError } from './domains/clinical/retention.service.js';
 import {
   ActivityStatus, ExceptionStatus, DAILY_STANDARD,
-  DORMANT_AFTER_DAYS, type OutreachOutcome,
+  DORMANT_AFTER_DAYS, type OutreachOutcome, headlineFor,
 } from '@kubi/contracts';
 
 
@@ -513,19 +513,12 @@ export async function buildServer(): Promise<FastifyInstance> {
       ];
 
       // The answer is derived from the sections, never authored, so a headline
-      // cannot claim something its own content does not support.
-      const live = sections.filter((x) => x.items.length > 0);
-      const worst = live.find((x) => x.tone === 'RED') ?? live.find((x) => x.tone === 'AMBER') ?? null;
-      const headline = worst
-        ? {
-          verdict: worst.label,
-          why: worst.items.length === 1
-            ? worst.items[0]!.text
-            : `${worst.items.length} things — ${worst.items[0]!.text} and ${worst.items.length - 1} more`,
-          tone: worst.tone,
-          action: worst.key,
-        }
-        : { verdict: 'All clear', why: 'Nothing needs you right now.', tone: 'GREEN', action: null };
+      // cannot claim something its own content does not support — including
+      // the claim that something can be done about it. Shared with the demo
+      // backend, because both copies of this had the same bug: "Take me to it"
+      // was offered for whichever section was worst, whether or not it held
+      // anything a person could press.
+      const headline = headlineFor(sections);
 
       void now;
       return {

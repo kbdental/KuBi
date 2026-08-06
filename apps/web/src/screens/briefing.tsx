@@ -75,6 +75,12 @@ export function BriefingScreen({
       {/* The answer, before any of the detail that explains it. Every screen
           used to open at level 2 — six sections of equal weight and nothing
           telling the eye where to go first. */}
+      {/* "Take me to it" appears only when there is something to press when
+          you get there. The owner found the alternative by using the app: it
+          scrolled an assistant to a red sterilisation section owned by
+          somebody else and left them there. The server decides this now — the
+          headline carries no action at all when nothing in that section is
+          theirs — so the button cannot outrun the content. */}
       <Answer
         verdict={data.headline.verdict}
         why={data.headline.why}
@@ -140,11 +146,18 @@ function Line({
 
   // A fact is not a button. It carries the tone it was given, because "three
   // batches unfinished" is a different colour of true from "all sterile".
+  //
+  // When it belongs to somebody else, it says whose. A row you cannot act on
+  // and that does not tell you who can is the thing that made the assistant's
+  // sterilisation section feel broken — there was nothing wrong with it being
+  // read-only, only with it being silent about that.
   if (item.kind === 'fact') {
     return (
       <Row
         title={item.text}
-        {...(item.detail ? { note: item.detail } : {})}
+        {...(item.detail || item.owner
+          ? { note: [item.detail, item.owner && `with the ${item.owner}`].filter(Boolean).join(' · ') }
+          : {})}
         {...(item.tone ? { tone: toneOf(item.tone) } : {})}
         tags={tags}
       />

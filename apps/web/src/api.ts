@@ -493,6 +493,12 @@ export interface BriefingItem {
   blockedBy: string | null;
   /** The activity this traces back to. Constitution rule 5. */
   activityCode: string | null;
+  /**
+   * Whose work this is, when it is not the reader's. A job title, never a
+   * name. Set on rows a person can see but not act on, so the screen can say
+   * who to chase instead of showing a dead row.
+   */
+  owner?: string | null;
 }
 
 export interface BriefingSection {

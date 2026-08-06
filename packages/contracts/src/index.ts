@@ -18,3 +18,4 @@ export * from './compliance-gates.js';
 export * from './exception-library.js';
 export * from './procedure-protocols.js';
 export * from './retention.js';
+export * from './briefing-headline.js';

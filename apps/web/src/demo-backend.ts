@@ -32,7 +32,7 @@ import {
   type Responsibility, type EscalationRung,
   DAILY_STANDARD, provenanceOf, minutesFromOpening, standardById,
   type WorkProvenance,
-  retentionOrder, DORMANT_AFTER_DAYS, CLOSING_OUTCOMES,
+  retentionOrder, DORMANT_AFTER_DAYS, CLOSING_OUTCOMES, headlineFor,
 } from '@kubi/contracts';
 
 type Role =
@@ -1289,6 +1289,8 @@ interface BriefItem {
   origin: TaskOrigin;
   taskId: string | null; priority: string | null; tone: string | null;
   blockedBy: string | null; activityCode: string | null;
+  /** Whose work it is, when it is not the reader's. Job title, never a name. */
+  owner?: string | null;
 }
 
 function section(
@@ -1305,26 +1307,10 @@ function briefing(
 ) {
   // One answer, then one action, then everything else. Derived from the
   // sections rather than authored, so a screen can never claim a headline its
-  // own content does not support.
-  //
-  // The rule: the most serious section that actually has something in it. RED
-  // beats AMBER; within a tone, the earlier section wins, because the sections
-  // are already ordered by how much they matter to this role.
-  const live = sections.filter((s) => s.items.length > 0);
-  const worst = live.find((s) => s.tone === 'RED') ?? live.find((s) => s.tone === 'AMBER') ?? null;
-
-  const headline = worst
-    ? {
-      verdict: worst.label,
-      why: worst.items.length === 1
-        ? worst.items[0]!.text
-        : `${worst.items.length} things — ${worst.items[0]!.text} and ${worst.items.length - 1} more`,
-      tone: worst.tone,
-      // The one thing to do about it. Never more than one.
-      action: worst.key,
-    }
-    : { verdict: 'All clear', why: 'Nothing needs you right now.', tone: 'GREEN', action: null };
-
+  // own content does not support — including the claim that something can be
+  // done about it. headlineFor() is shared with the real API precisely because
+  // this logic was duplicated and both copies had the same bug.
+  const headline = headlineFor(sections);
   return { roleLabel, question, work, headline, sections };
 }
 
@@ -3002,15 +2988,18 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     const fact = (
       id: string, text: string, detail: string | null = null, tone: string | null = null,
       origin: TaskOrigin = TaskOrigin.CONDITION,
+      // Whose work this is, when it is not the reader's. A job title, never a
+      // name: "with the sterilisation technician" survives that person leaving.
+      owner: string | null = null,
     ): BriefItem => ({
       id, kind: 'fact', text, detail, tone, origin,
-      taskId: null, priority: null, blockedBy: null, activityCode: null,
+      taskId: null, priority: null, blockedBy: null, activityCode: null, owner,
     });
     const task = (t: Task, origin: TaskOrigin = TaskOrigin.RECURRING): BriefItem => ({
       id: t.id, kind: 'task', text: t.title,
       detail: t.status === 'IN_PROGRESS' ? 'started' : null,
       taskId: t.id, priority: priorityOf(t), tone: null, origin,
-      blockedBy: t.blockedBy, activityCode: t.code,
+      blockedBy: t.blockedBy, activityCode: t.code, owner: null,
     });
     // Work raised by the cascade, for whichever role it belongs to.
     const spawned = (roleName: string): BriefItem[] => (db.cascadeFired
@@ -3231,6 +3220,9 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     );
     const toPrepare = db.visits.filter((v) => v.status === 'BOOKED' || v.status === 'ARRIVED');
     const sterPending = db.batches.filter((b) => b.stage !== 'RELEASED');
+    // In progress is not the same as wrong. Only a quarantined batch means
+    // somebody has to do something about it.
+    const sterQuarantined = sterPending.filter((b) => b.stage === 'QUARANTINED');
     const toDispatch = db.labCases.filter((l) => l.status === 'QC_PENDING');
 
     return json(briefing(
@@ -3248,11 +3240,20 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
           'Chairside setup and scans.', 'Nobody left to prepare.',
           toPrepare.map((v) => fact(v.id, v.patientLabel,
             `${v.visitType} · ${v.chairLabel}`, v.status === 'ARRIVED' ? 'AMBER' : null))),
-        section('ster', 'Sterilisation pending', sterPending.length ? 'RED' : 'GREEN',
-          'No used instrument may remain overnight.', 'The loop is clear.',
+        // Toned by what is actually wrong, not by what is merely unfinished.
+        // A batch in the ultrasonic at ten in the morning is the loop working;
+        // marking it RED made sterilisation the assistant's alarm every single
+        // day, and made every real alarm look the same as it. Only a
+        // quarantined batch is a problem here.
+        section('ster', 'Sterilisation in the loop', sterQuarantined.length ? 'RED' : 'GREEN',
+          'No used instrument may remain overnight. The technician runs the loop; '
+          + 'this is here so you know what is coming back.',
+          'The loop is clear.',
           sterPending.map((b) => fact(b.id, b.batchRef,
             `${b.stage.toLowerCase()} · ${b.packCount} packs`,
-            b.stage === 'QUARANTINED' ? 'RED' : 'AMBER'))),
+            b.stage === 'QUARANTINED' ? 'RED' : null,
+            TaskOrigin.CONDITION,
+            'sterilisation technician'))),
         section('lab', 'Lab cases to dispatch', toDispatch.length ? 'AMBER' : 'GREEN',
           null, 'Nothing to send.',
           toDispatch.map((l) => fact(l.id, `${l.patientLabel} · ${l.workType}`,

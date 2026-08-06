@@ -150,7 +150,12 @@ describe('the assistant gets the facts a task list would drop', () => {
 });
 
 describe('shape rules that hold for every role', () => {
-  const keys = ['mehta', 'priya', 'suresh', 'lakshmi'];
+  // Every persona, not a sample. The sterilisation dead end the owner hit was
+  // on the assistant's screen, which WAS in the old list of four — what was
+  // missing was not a role, it was the rule below. Widened anyway, because
+  // "shape rules that hold for every role" should be checked against every
+  // role rather than against the four somebody thought of.
+  const keys = PEOPLE.map((p) => p.key);
 
   it('keeps a satisfied section visible and says what empty means', async () => {
     for (const k of keys) {
@@ -175,6 +180,37 @@ describe('shape rules that hold for every role', () => {
         if (i.kind === 'fact') expect(i.taskId).toBeNull();
         else expect(i.taskId).toBeTruthy();
       }
+    }
+  });
+
+  it('never offers "Take me to it" where there is nothing to press', async () => {
+    // The owner, using the app: "if there is something missing in
+    // sterilization and it says take me to it, it goes there but cannot do
+    // anything." This is that, checked for all nine people.
+    for (const k of keys) {
+      const b = await briefingFor(k);
+      if (!b.headline.action) continue;
+      const target = b.sections.find((s) => s.key === b.headline.action);
+      expect(target, `${k}: headline points at section "${b.headline.action}", which does not exist`)
+        .toBeDefined();
+      expect(
+        target!.items.some((i) => i.kind === 'task' && i.taskId && !i.blockedBy),
+        `${k}: "Take me to it" scrolls to "${target!.label}", where nothing can be opened`,
+      ).toBe(true);
+    }
+  });
+
+  it('says who owns a red row that is not the reader\'s to act on', async () => {
+    // A read-only row is fine. A read-only row that does not say whose it is
+    // is the thing that reads as broken.
+    for (const k of keys) {
+      const b = await briefingFor(k);
+      if (b.headline.action) continue;
+      if (b.headline.verdict === 'All clear') continue;
+      expect(
+        b.headline.waitingOn ?? b.headline.why,
+        `${k}: headline "${b.headline.verdict}" offers nothing and explains nothing`,
+      ).toBeTruthy();
     }
   });
 
