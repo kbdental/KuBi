@@ -134,9 +134,13 @@ function Standard({ s, showGap }: { s: DailyStandard; showGap?: boolean }) {
           {showGap && <Tag>{RHYTHM_LABEL[s.rhythm].toLowerCase()}</Tag>}
           {/* Which control governs it, or that none does. Never blank: blank
               would read as "fine" rather than as "nobody owns this". */}
+          {/* A drafted control is shown as drafted. Reading it as governance
+              would be the exact lie the library was built to prevent. */}
           {s.covers
             ? <Tag mono>{s.covers}</Tag>
-            : <Tag tone="warn">no control yet</Tag>}
+            : s.proposed
+              ? <Tag tone="warn">{s.proposed} proposed</Tag>
+              : <Tag tone="warn">no control yet</Tag>}
           <Tag tone={PROOF_TONE[s.proof] ?? 'calm'}>{PROOF_WORD[s.proof] ?? s.proof}</Tag>
         </>
       )}

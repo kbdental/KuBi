@@ -212,3 +212,31 @@ describe('how much of the day rests on somebody’s word', () => {
     expect(worst?.[1]).toBe(6);
   });
 });
+
+describe('a proposal is not governance', () => {
+  it('leaves every proposed standard ungoverned, and says so twice', () => {
+    // The distinction this whole file turns on, and the one the tests caught
+    // me blurring: pointing `covers` at a drafted control would have made ten
+    // rows read as governed when nothing escalates and no KPI moves.
+    const proposed = DAILY_STANDARD.filter((s) => s.proposed);
+    expect(proposed.length).toBeGreaterThan(0);
+    for (const s of proposed) {
+      expect(s.covers, `${s.id} claims a frozen control`).toBeNull();
+      expect(s.gap, `${s.id} is proposed but stops explaining the gap`).toBeTruthy();
+    }
+  });
+
+  it('still counts them among the ungoverned', () => {
+    expect(ungoverned().length).toBe(17);
+    expect(ungoverned().filter((s) => s.proposed).length).toBe(10);
+  });
+
+  it('names a proposal that is not in the frozen matrix, deliberately', () => {
+    for (const s of DAILY_STANDARD) {
+      if (!s.proposed) continue;
+      // If one of these ever passes, the matrix has been unfrozen and `covers`
+      // should have been set instead.
+      expect(isKnownActivity(s.proposed), `${s.proposed} is now frozen`).toBe(false);
+    }
+  });
+});

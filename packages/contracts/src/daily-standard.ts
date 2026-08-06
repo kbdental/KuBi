@@ -166,9 +166,18 @@ export interface DailyStandard {
   proof: Proof;
   /**
    * The frozen matrix control this sits under, or null when nothing governs
-   * it yet. Null is a v3.0 proposal, not an omission.
+   * it yet.
    */
   covers: string | null;
+  /**
+   * A control drafted for matrix v3.0 that would govern this, once accepted.
+   *
+   * Deliberately a separate field from `covers`, and the tests would not let
+   * it be otherwise. A proposal is not governance: nothing escalates, no KPI
+   * moves, and an auditor is told "we intend to control this", which is not
+   * the same claim. It stays ungoverned until the matrix is unfrozen.
+   */
+  proposed?: string;
   /** Required whenever proof is NOT_YET or covers is null. Never empty. */
   gap?: string;
 }
@@ -196,22 +205,25 @@ export const DAILY_STANDARD: readonly DailyStandard[] = [
     task: 'Clean reception, waiting area, washroom, doctor’s room, operatories',
     standard: '100% checklist completed', target: pct(100),
     proof: Proof.CONFIRMATION, covers: null,
+    proposed: 'HK-001',
     gap: 'No housekeeping control exists in matrix v2.0 — there is no HK- prefix at all.',
-  },
+      },
   {
     id: 'DOS-03', rhythm: Rhythm.BEFORE_OPENING, role: RoleCode.HOUSEKEEPING,
     task: 'Mop floors with disinfectant',
     standard: '100% completed', target: pct(100),
     proof: Proof.CONFIRMATION, covers: null,
+    proposed: 'HK-005',
     gap: 'No housekeeping control exists in matrix v2.0.',
-  },
+      },
   {
     id: 'DOS-04', rhythm: Rhythm.BEFORE_OPENING, role: RoleCode.HOUSEKEEPING,
     task: 'Empty all waste bins and place fresh liners',
     standard: '100% completed', target: pct(100),
     proof: Proof.CONFIRMATION, covers: null,
+    proposed: 'IC-003',
     gap: 'General waste is not STER-007, which governs biomedical waste only.',
-  },
+      },
   {
     id: 'DOS-05', rhythm: Rhythm.BEFORE_OPENING, role: RoleCode.DENTAL_ASSISTANT,
     task: 'Start compressor, suction, autoclave, X-ray/RVG, scanner, intraoral camera '
@@ -225,9 +237,9 @@ export const DAILY_STANDARD: readonly DailyStandard[] = [
     task: 'Flush dental unit waterlines',
     standard: 'As per protocol', target: daily,
     proof: Proof.CONFIRMATION, covers: null,
-    gap: 'Dental unit waterline management is absent from matrix v2.0 — a named '
-      + 'NABH infection-control item, and flushed twice daily in this standard.',
-  },
+    proposed: 'IC-001',
+    gap: 'Dental unit waterline management is absent from matrix v2.0 — a named NABH infection-control item, and flushed twice daily in this standard.',
+      },
   {
     id: 'DOS-07', rhythm: Rhythm.BEFORE_OPENING, role: RoleCode.DENTAL_ASSISTANT,
     task: 'Disinfect all chairs, trays, light handles and work surfaces',
@@ -275,9 +287,9 @@ export const DAILY_STANDARD: readonly DailyStandard[] = [
     task: 'Conduct morning huddle with team',
     standard: 'Completed within 10 minutes', target: mins(10),
     proof: Proof.CONFIRMATION, covers: null,
-    gap: 'The huddle has no control in matrix v2.0. It is the one place the day '
-      + 'is set verbally, so its absence is felt everywhere else.',
-  },
+    proposed: 'OPN-006',
+    gap: 'The huddle has no control in matrix v2.0. It is the one place the day is set verbally, so its absence is felt everywhere else.',
+      },
 
   /* ---- Every patient --------------------------------------------------- */
   {
@@ -390,15 +402,17 @@ export const DAILY_STANDARD: readonly DailyStandard[] = [
     task: 'Inspect and clean washroom',
     standard: 'Checklist completed', target: daily,
     proof: Proof.CONFIRMATION, covers: null,
+    proposed: 'HK-009',
     gap: 'No housekeeping control exists in matrix v2.0.',
-  },
+      },
   {
     id: 'DOS-31', rhythm: Rhythm.TWO_HOURLY, role: RoleCode.HOUSEKEEPING,
     task: 'Disinfect high-touch surfaces (door handles, reception desk, POS machine, chairs)',
     standard: '100% completed', target: pct(100),
     proof: Proof.CONFIRMATION, covers: null,
+    proposed: 'HK-007',
     gap: 'No housekeeping control exists in matrix v2.0.',
-  },
+      },
 
   /* ---- Lunch ------------------------------------------------------------ */
   {
@@ -428,15 +442,17 @@ export const DAILY_STANDARD: readonly DailyStandard[] = [
     task: 'Clean suction lines',
     standard: 'Completed daily', target: daily,
     proof: Proof.CONFIRMATION, covers: null,
+    proposed: 'IC-002',
     gap: 'Suction line maintenance is absent from matrix v2.0.',
-  },
+      },
   {
     id: 'DOS-36', rhythm: Rhythm.CLOSING, role: RoleCode.DENTAL_ASSISTANT,
     task: 'Flush dental unit waterlines',
     standard: 'Completed daily', target: daily,
     proof: Proof.CONFIRMATION, covers: null,
+    proposed: 'IC-001',
     gap: 'Dental unit waterline management is absent from matrix v2.0.',
-  },
+      },
   {
     id: 'DOS-37', rhythm: Rhythm.CLOSING, role: RoleCode.DENTAL_ASSISTANT,
     task: 'Switch off compressor, suction and clinical equipment',
@@ -493,8 +509,9 @@ export const DAILY_STANDARD: readonly DailyStandard[] = [
     task: 'Deep clean operatories, reception and washroom',
     standard: '100% completed', target: pct(100),
     proof: Proof.CONFIRMATION, covers: null,
+    proposed: 'HK-001',
     gap: 'No housekeeping control exists in matrix v2.0.',
-  },
+      },
   {
     id: 'DOS-46', rhythm: Rhythm.CLOSING, role: RoleCode.HOUSEKEEPING,
     task: 'Dispose biomedical waste as per BMW rules and segregate waste correctly',
