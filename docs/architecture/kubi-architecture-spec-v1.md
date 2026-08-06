@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status** | DRAFT — for owner review. Nothing is frozen until §16 says so. |
+| **Status** | **COMPLETE — awaiting owner acceptance.** No further sections will be added; see §18. |
 | **Date** | 2026-08-06 |
 | **Supersedes** | The event/workflow model in `packages/contracts/src/engine.ts` |
 | **Authority** | The owner's brief of 2026-08-06 and the analysis that followed it |
@@ -19,22 +19,22 @@ checked rather than trusted:
 
 | Asked for | Section |
 |---|---|
-| 1. Core domain entities | §3 |
-| 2. Events | §4 |
-| 3. Workflows | §5 |
-| 4. Ownership rules | §6 |
-| 5. Decision rules | §10 |
-| 6. Resource rules | §8 |
-| 7. Escalation rules | §7.4 |
-| 8. State transition rules | §5.3 |
-| 9. APIs between engines | §13 |
-| 10. Database / event-log schema | §14 |
+| 1. Core domain entities | §4 |
+| 2. Events | §5 |
+| 3. Workflows | §6 |
+| 4. Ownership rules | §7 |
+| 5. Decision rules | §12 |
+| 6. Resource rules | §9 |
+| 7. Escalation rules | §8.4 |
+| 8. State transition rules | §6.3 |
+| 9. APIs between engines | §17 |
+| 10. Database / event-log schema | §16 |
 
 Three conventions run throughout:
 
 - **DECIDED** — settled, and implementable as written.
 - **DECISION_REQUIRED** — the specification deliberately carries no value.
-  Every one is listed in §15. None is guessed, and none may be filled in by
+  Every one is listed in §17. None is guessed, and none may be filled in by
   whoever implements the section.
 - **DERIVED** — computed, never stored. If something is marked DERIVED and you
   find a column for it, that is a defect.
@@ -148,12 +148,140 @@ is defensible and inconvenient.
 
 ---
 
-## 3. Domain entities
+### 2.3 Design philosophy — the constraints that stop the drift
+
+The owner asked for this section by name, and gave the reason: *"These
+principles are not implementation details — they are architectural
+constraints. They ensure that future development doesn't gradually drift back
+toward a traditional dashboard or checklist application."*
+
+That drift is not hypothetical. It happened three times in this project's first
+week, each time by a small reasonable step. So each principle below is given
+the **drift test** that detects the violation, because a principle nobody can
+check is a principle that gets argued away at the fourth sprint.
+
+| # | Principle | What it looks like when it has been violated |
+|---|---|---|
+| P-1 | Users never navigate a workflow; the engine moves work | A screen offers "next step", "advance", "move to…". Any control naming a workflow position. |
+| P-2 | Users never search for information; the system presents it | A decision needs a record the screen did not already carry. A search box that is the only route to something. |
+| P-3 | Users never decide ownership; ownership is derived | An assign, reassign, claim or hand-over control exists anywhere. |
+| P-4 | Users never monitor compliance; governance runs silently | A compliance list, a requirements screen, a "checks" tab. Governance appears anywhere except a refusal. |
+| P-5 | Every click corresponds to a real-world event | A control whose name is not a past-tense event a person could describe to a colleague. |
+| P-6 | Every screen answers one question: what do I need to do now? | A screen whose title is a noun — Patients, Reports, Inventory — with no question under it. |
+| P-7 | Every event produces measurable operational consequences | An event with an empty consequence list, or one contributing to no objective. |
+| P-8 | Only decisions relevant to the current role are shown | Any role seeing a count, list or badge for work it neither holds nor is escalated. |
+
+> **P-3 is the one that will be argued with**, because every practice
+> management system on the market has an assign button. The answer is that an
+> assign button is how work becomes nobody's: two people assign, one unassigns,
+> and the audit trail says a person moved it rather than saying why it moved.
+> Ownership derived from the node cannot be gamed and cannot be forgotten.
+
+> **P-5 has one honest limit.** A person recording an event still presses
+> something. The constraint is on *what the press means*: "Patient arrived" is
+> an event; "Next" is a workflow position, and the difference is the whole
+> specification.
+
+**Violating any principle in §2.3 requires an ADR.** Not a code review comment,
+not a "just for this screen" — a written decision with a reason, in
+`docs/adr/`. That is what makes these architectural rather than aspirational.
+
+
+## 3. Business domains
+
+The owner: *"Right now the specification is centred around events, decisions and
+workflows. It is not centred around dentistry."*
+
+That is a fair reading and it is the most important criticism in this document's
+history, because a workflow engine with no domain is a workflow engine that will
+be built for a courier company by mistake. The seven domains below are the
+language. Every flow, event and decision belongs to exactly one, and a thing
+that belongs to none does not belong in KuBi.
+
+### 3.1 The seven
+
+| # | Domain | Spans | Timescale |
+|---|---|---|---|
+| B-1 | **Patient relationship** | Lead → enquiry → appointment → visit → treatment → recall → membership → referral → lifetime | Years |
+| B-2 | **Clinical care** | Chief complaint → examination → diagnosis → options → consent → procedure → review → outcome → maintenance | Weeks to years |
+| B-3 | **Practice operations** | Opening → clinical operations → sterilisation → housekeeping → inventory → lab → closing | Hours |
+| B-4 | **Business** | Revenue · receivables · expenses · chair utilisation · doctor productivity · case acceptance · conversion · collections | Days to months |
+| B-5 | **Growth** | Marketing · leads · conversions · reviews · referrals · corporate · memberships | Months |
+| B-6 | **Quality** | Audit · NABH · incidents · CAPA · feedback · complaints · training | Continuous |
+| B-7 | **Learning** | Training · competency · skill matrix · credentialing · assessment · re-certification | Careers |
+
+### 3.2 The finding this produces
+
+Mapping the seven flows of §5 onto the seven domains is uncomfortable, and the
+discomfort is the point:
+
+| Domain | Covered by | Honest state |
+|---|---|---|
+| B-1 Patient relationship | `PATIENT` flow, retention (30-day rule) | **A quarter.** KuBi begins at arrival. Lead, enquiry, membership, referral and the lifetime view do not exist. |
+| B-2 Clinical care | `PATIENT`, `CLINICAL` flows; 17 procedure protocols | **Half.** Chief complaint, options and outcome are not modelled; the 100-rule condition library is not wired to the engine. |
+| B-3 Practice operations | `CLINIC`, `STERILIZATION`, `LAB`, `INVENTORY` flows | **Most of it.** The strongest domain, and it is the one a clinic feels least. |
+| B-4 Business | `BILLING` flow, three metrics | **A tenth.** Case acceptance, conversion, receivables ageing and doctor productivity are absent. |
+| B-5 Growth | Nothing | **None.** |
+| B-6 Quality | The CAPA service, 68 exceptions, the frozen matrix | **Built but unconnected.** It exists in the codebase and no event reaches it. |
+| B-7 Learning | Competency enums; nobody holds one | **A skeleton.** |
+
+> **Three of seven domains are essentially absent, and one is built but
+> unconnected.** That is not a gap to hide in a roadmap. It is the reason the
+> owner keeps saying KuBi feels like software rather than like running a clinic:
+> the clinic's day is well covered and the clinic's *business* is not.
+
+### 3.3 Financial intelligence, which is B-4 and not billing
+
+The owner's example is the whole distinction:
+
+```
+Patient accepted ₹8,00,000 of treatment
+   → paid ₹2,00,000
+   → balance ₹6,00,000
+   → on EMI
+   → risk: two instalments missed
+   → follow-up owned by Accounts, due today
+```
+
+Billing records what was charged. B-4 asks whether the *case* completes: what
+was accepted, what has been delivered, what has been collected, what is at
+risk, and who is chasing it. An accepted plan that stalls at 25 % paid is a
+clinical problem before it is a financial one — the remaining treatment is not
+happening.
+
+This makes `case acceptance` and `treatment conversion` first-class, not
+report columns. Both are open until the domain model of Phase 2 defines a
+treatment plan properly.
+
+### 3.4 The rule the domains impose
+
+1. **Every flow declares its domain.** A flow belonging to none is rejected at
+   startup.
+2. **Every event declares its domain.** Same rule.
+3. **A domain may be absent, but never implied.** B-5 has no flows, and the
+   specification says so rather than scattering half a lead-tracker through
+   B-1.
+4. **Domains do not nest and do not overlap.** Where something seems to belong
+   to two — a recall is relationship *and* clinical — it belongs to the one
+   whose objective it serves, by §2.1 order.
+
+### 3.5 What is deliberately NOT here
+
+The **Dental Practice Domain Model** — the full entity language of patients,
+appointments, clinical records, treatment plans, procedures, lab cases,
+imaging, billing, inventory, equipment, staff, knowledge, communication and
+documents.
+
+That is Phase 2 of the owner's own roadmap and it belongs in its own document.
+Putting it here would double this specification's length and delay the freeze,
+which is the exact thing the owner warned against.
+
+## 4. Domain entities
 
 Entities are nouns the clinic already talks about. Anything invented for the
 software's convenience is marked as such.
 
-### 3.1 People and identity
+### 4.1 People and identity
 
 | Entity | Key fields | Notes |
 |---|---|---|
@@ -161,7 +289,7 @@ software's convenience is marked as such.
 | `Employee` | id, roles[], competencies[] | Exists. Distinct from `User` — authority has seven axes, never collapsed. |
 | `Role` | code | Exists, 14 codes. §6 uses these and never a person. |
 
-### 3.2 The clinical record
+### 4.2 The clinical record
 
 | Entity | Key fields | Notes |
 |---|---|---|
@@ -172,7 +300,7 @@ software's convenience is marked as such.
 | `Consent` | patientProcedureId, signedAt, version | Exists. Immutable once signed. |
 | `Radiograph` | patientId, takenAt, kind | **NEW.** Referenced by L-2 and currently a boolean fact. |
 
-### 3.3 Resources — the layer that was missing
+### 4.3 Resources — the layer that was missing
 
 | Entity | Key fields | Notes |
 |---|---|---|
@@ -187,31 +315,31 @@ software's convenience is marked as such.
 > available at 10:15 and what are you holding*. Collapsing them is how
 > rostering ends up inside the permission system.
 
-### 3.4 Operations
+### 4.4 Operations
 
 | Entity | Key fields | Notes |
 |---|---|---|
 | `SterilizationBatch` | ref, stage, operatorId, releasedBy | Exists. L-3's separation of duties lives here. |
 | `LabCase` | ref, patientId, vendor, dispatchedAt, expectedReturnAt, qcResult | Exists. |
 | `StockItem` | code, onHand, minimum, unit | Exists. |
-| `Equipment` | assetId, nextServiceAt, state | Exists as `Asset`. Also a `Resource` (§3.3). |
+| `Equipment` | assetId, nextServiceAt, state | Exists as `Asset`. Also a `Resource` (§4.3). |
 | `Invoice` | visitId, amount, settledAt | **NEW.** Billing is a flow with no table today. |
 
-### 3.5 The operating model itself
+### 4.5 The operating model itself
 
 | Entity | Key fields | Notes |
 |---|---|---|
 | `Event` | seq, type, subjectId, at, byEmployeeId, byRole, payload | **The only writable table.** §14. |
 | `Flow` | id, kind, subjectId, at, heldSince, done | DERIVED from events. Never written directly. |
-| `Decision` | see §10 | DERIVED. Never stored at all. |
+| `Decision` | see §12 | DERIVED. Never stored at all. |
 | `Objective` | code | §2.1. Static. |
 | `Exception` | id, kind, subjectId, raisedAt, flowId | **NEW.** §9. |
 
 ---
 
-## 4. Events
+## 5. Events
 
-### 4.1 Rules
+### 5.1 Rules
 
 1. **Past tense, always.** `PATIENT_ARRIVED`, never `SEAT_PATIENT`. An
    imperative in the catalogue means a button crept into the model. Enforced by
@@ -223,7 +351,7 @@ software's convenience is marked as such.
 4. **Every event names its objective(s)** (Invariant O-1).
 5. **An event is refused or admitted, never partially applied.**
 
-### 4.2 Catalogue
+### 5.2 Catalogue
 
 Twenty-seven events exist today across seven flows. v1.0 adds the exception
 events of §9. The full catalogue lives in
@@ -231,7 +359,7 @@ events of §9. The full catalogue lives in
 not duplicated here, because a specification that restates a catalogue is a
 specification that will disagree with it by Thursday.
 
-### 4.3 Objective mapping
+### 5.3 Objective mapping
 
 Each event declares the objectives it serves. Illustrative, not exhaustive:
 
@@ -248,28 +376,28 @@ Each event declares the objectives it serves. Illustrative, not exhaustive:
 
 ---
 
-## 5. Workflows
+## 6. Workflows
 
-### 5.1 The seven, concurrent
+### 6.1 The seven, concurrent
 
 `CLINIC · PATIENT · CLINICAL · STERILIZATION · LAB · INVENTORY · BILLING`
 
 They run simultaneously and never queue behind one another. Implemented and
 tested.
 
-### 5.2 A node
+### 6.2 A node
 
 | Field | Meaning |
 |---|---|
 | `id`, `label` | What the holder is doing, in their words |
 | `owner` | A role. Never a person. |
 | `completedBy` | The single event that ends it |
-| `expectMinutes` | §7 |
-| `escalateTo` | §7.4 |
+| `expectMinutes` | §8 |
+| `escalateTo` | §8.4 |
 | `requires` | **NEW.** Resources that must be claimable. §8 |
 | `objectives` | **NEW.** What this node is for |
 
-### 5.3 State transition rules
+### 6.3 State transition rules
 
 1. A node advances **only** when its `completedBy` event is admitted.
 2. There is **no** phase field. Position is derived from the event log.
@@ -288,7 +416,7 @@ recall.
 
 ---
 
-## 6. Ownership rules
+## 7. Ownership rules
 
 1. **Ownership is derived, never assigned.** It is the `owner` of the current
    node. There is no field to set and no handover action to skip.
@@ -310,28 +438,28 @@ only one employee holds that role on shift. Cheap to add, and changes what
 
 ---
 
-## 7. Time
+## 8. Time
 
 Time is an object, not a timestamp.
 
-### 7.1 The five times
+### 8.1 The five times
 
 | Time | Meaning | Source |
 |---|---|---|
 | `expectedAt` | When this should be finished | `heldSince + expectMinutes` |
 | `currentAt` | Now, clinic-local | Injected clock. Never `Date.now()`. |
 | `lateBy` | `max(0, currentAt − expectedAt)` | DERIVED |
-| `escalateAt` | When somebody else is told | §7.4 |
+| `escalateAt` | When somebody else is told | §8.4 |
 | `predictedAt` | When it will *actually* finish | §11. **UNKNOWN until there is history.** |
 
-### 7.2 The clinic clock drives the system
+### 8.2 The clinic clock drives the system
 
 Events are not the only thing that changes the world. The passage of time
 changes it too — work goes late, decisions become escalations, and the owner's
 screen changes with nobody having opened the app. This is `sweep(world, now)`
 and it is not optional garnish; it is half the system.
 
-### 7.3 Expected times
+### 8.3 Expected times
 
 Every node carries one. **All current values are estimates and none is the
 owner's.**
@@ -340,7 +468,7 @@ owner's.**
 worth arguing about: chair wait 15 min, treatment 50 min, lab QC 60 min,
 day-after call 1440 min.
 
-### 7.4 Escalation rules
+### 8.4 Escalation rules
 
 1. Escalation fires at `expectedAt + escalationDelay`, not at a fixed clock time.
 2. The ladder is three rungs, from `work-model.ts`: doer's level at +15,
@@ -354,7 +482,7 @@ day-after call 1440 min.
 
 ---
 
-## 8. Resource rules
+## 9. Resource rules
 
 The layer the owner said was missing entirely.
 
@@ -379,9 +507,37 @@ Nothing here can be built without it.
 **DECISION_REQUIRED (D-08):** whether a doctor may hold two chairs at once. This
 is real dentistry and the answer changes the whole capacity model.
 
+### 9.1 Resource intelligence
+
+The owner's point is that *"chair available"* is not the question. The question
+is whether **everything** is available:
+
+```
+Implant surgery, 11:30
+   chair 3          free
+   doctor 2         free from 11:15
+   assistant        free
+   implant kit      in stock, correct platform
+   motor            checked this morning
+   CBCT             taken, reported
+   lab case         not applicable
+   ──────────────────────────────────────
+   → PROCEED
+```
+
+A decision therefore evaluates its **whole** requirement set and reports the
+first missing item, never a partial readiness score. *"Ready, 6 of 7"* is the
+most dangerous thing this system could display: it reads as nearly ready and it
+means not ready at all. The same rule as UNKNOWN never passing, applied to
+resources.
+
+**DECISION_REQUIRED (D-15):** whether a decision waits for every resource or
+may proceed on a critical subset. Waiting for all is safer and will sometimes
+be wrong — a treatment that does not need the motor should not queue behind it.
+
 ---
 
-## 9. Capacity rules
+## 10. Capacity rules
 
 Continuous, derived, and never stored:
 
@@ -402,7 +558,7 @@ moves a patient away from the doctor who knows their case.
 
 ---
 
-## 10. Exceptions
+## 11. Exceptions
 
 Not `if/else`. Every exception is an event that opens its own flow with its own
 owner, clock and escalation.
@@ -434,11 +590,11 @@ owner, clock and escalation.
 
 ---
 
-## 11. The Decision Engine
+## 12. The Decision Engine
 
 The centre. Everything above is input to this.
 
-### 11.1 A decision
+### 16.1 A decision
 
 | Field | Meaning |
 |---|---|
@@ -451,9 +607,9 @@ The centre. Everything above is input to this.
 | `verdict` | `PROCEED` · `WAIT` · `ESCALATE` · `BLOCKED` |
 | `because` | One sentence. Only when not `PROCEED`. |
 | `fix` | One action. Only when not `PROCEED`. |
-| `dueAt`, `lateBy` | §7 |
+| `dueAt`, `lateBy` | §8 |
 
-### 11.2 The four questions, answered every minute
+### 16.2 The four questions, answered every minute
 
 > *What decision must be made? Who should make it? Is enough information
 > available? If yes, execute. If no, wait. If overdue, escalate.*
@@ -471,16 +627,16 @@ decisions(world, now):
   order by: objective rank (§2.1), then lateBy, then dueAt
 ```
 
-### 11.3 Verdicts
+### 16.3 Verdicts
 
 - **PROCEED** — the person can act now. One action, named.
 - **WAIT** — nothing is wrong; a resource is busy. Says what and for how long.
-- **ESCALATE** — overdue. Still owned by the holder (§6.4), and now visible to
+- **ESCALATE** — overdue. Still owned by the holder (§7, rule 4), and now visible to
   the escalation role.
 - **BLOCKED** — would be unsafe or non-compliant. One reason, one fix. The
   words *gate, requirement, compliance, validation, rule* never appear.
 
-### 11.4 Why every screen becomes trivial
+### 16.4 Why every screen becomes trivial
 
 | Screen | Is |
 |---|---|
@@ -494,7 +650,128 @@ right.
 
 ---
 
-## 12. Prediction and the Command Centre
+---
+
+## 13. What a decision carries with it
+
+Three engines the owner named, and one property. They are grouped because they
+all answer the same question: **a decision arrives complete, or the person has
+to go and find things.** That is law L-6 and principle P-2, and neither survives
+if these are bolted on afterwards.
+
+### 13.1 Knowledge engine
+
+> *"Every decision should know: how should I do this? Where is the SOP? Which
+> video? Which checklist? Which form?"*
+
+**Knowledge is attached to work, never searched for.** There is no library, no
+search box and no "documents" tab. A node declares what a person needs to do it:
+
+```
+KNOWLEDGE[node] = {
+  sop?:       reference,   // the written procedure
+  video?:     reference,   // how it is actually done here
+  checklist?: reference,   // what must be true when finished
+  form?:      reference,   // what is filled in
+}
+```
+
+The owner's own example, as the engine would run it:
+
+```
+BATCH_QUARANTINED
+   → decision "Re-run STER-0911", owner Sterilisation
+      carrying  SOP: instrument reprocessing
+                video: loading the autoclave
+                form:  sterilisation incident
+      and       NOTIFY Clinic Manager
+```
+
+Four things arrive with the decision. Nobody opens anything to find them.
+
+**DECISION_REQUIRED (D-12):** which SOPs exist in written form today, and where
+they live. If the answer is "in people's heads", that is the finding, and the
+knowledge engine's first job is to say which nodes have nothing attached rather
+than to pretend they do.
+
+### 13.2 Communication engine
+
+> *"Every event should generate communication."*
+
+A declarative map from event to messages. Not code, so that a clinic can change
+what a patient hears without changing what the clinic does:
+
+| Event | Goes out |
+|---|---|
+| `APPOINTMENT_BOOKED` | Confirmation · calendar invitation · reminder scheduled |
+| `PATIENT_ARRIVED` | — (nothing; the person is standing there) |
+| `TREATMENT_FINISHED` | Post-operative instructions · prescription |
+| `PAYMENT_RECEIVED` | Receipt |
+| `RECALL_BOOKED` | Reminder scheduled |
+| `LAB_ARRIVED` | Appointment offer |
+
+**Rules**
+
+1. Communication is a **consequence**, returned as data, never sent by an
+   engine (§15.2 rule 3).
+2. **A patient's contact consent is checked before anything is sent**, and a
+   withheld consent produces no message and no error.
+3. **Silence is a valid entry.** The table above has one deliberately, because
+   messaging somebody who is standing at the desk is how a clinic teaches its
+   patients to ignore its messages.
+
+**DECISION_REQUIRED (D-13):** which channels, and who owns contact consent.
+WhatsApp, SMS and email have different regulatory weight in India and the
+answer is not a technical one.
+
+### 13.3 Document engine
+
+> *"Every event should know which documents. No searching."*
+
+Each event declares the documents it **requires** and the documents it
+**produces**:
+
+| Event | Requires | Produces |
+|---|---|---|
+| `CONSENT_SIGNED` | Estimate | Signed consent |
+| `TREATMENT_FINISHED` | Consent, radiograph | Clinical note, photographs |
+| `PAYMENT_RECEIVED` | Invoice | Receipt |
+| `LAB_DISPATCHED` | Prescription | Lab slip |
+
+A required document that is absent is a **governance refusal** (§12.3
+`BLOCKED`), in one sentence, with the one button that produces it. A produced
+document is attached to the event and is thereafter found by following the
+event — never by searching a folder.
+
+**DECISION_REQUIRED (D-14):** which documents are legally required per
+procedure in this jurisdiction. Getting this wrong is a regulatory matter, not
+a design preference, and it needs the owner and probably their advisor.
+
+### 13.4 Decision quality — the property, not an engine
+
+> *"Right now the engine answers: what should happen? It should also answer:
+> why? what evidence? what protocol? what happens if ignored?"*
+
+This is the difference between a system that instructs and a system that can be
+argued with. Every `Decision` (§12.1) therefore carries four more fields:
+
+| Field | Answers | Source |
+|---|---|---|
+| `why` | Why this, now | The objective it serves (§2.1) |
+| `evidence` | What the system is going by | The events that produced it, by sequence number |
+| `protocol` | What says so | The SOP, control or standard — §13.1, the frozen matrix |
+| `ifIgnored` | What happens if nobody acts | The escalation ladder and the objective put at risk |
+
+> **Invariant Q-1.** A decision that cannot state all four is not shown. If the
+> system cannot say why it is asking, it has no business asking.
+
+This is also the only honest route to anything called AI later: an explanation
+assembled from the event log and the standard is checkable. One generated
+afterwards to justify a decision already made is not, and would be worse than
+no explanation at all.
+
+
+## 14. Prediction and the Command Centre
 
 ### 12.1 The honest constraint, first
 
@@ -534,7 +811,7 @@ Next failure       Sterilisation delayed in ~18 min
 Suggested action   Move assistant 2 to the sterile bay
 ```
 
-Every line above is a function of `decisions()` and §12.2. None of it is
+Every line above is a function of `decisions()` and §14.2. None of it is
 stored, and none of it is a report of the past.
 
 ### 12.4 The pattern layer
@@ -549,9 +826,9 @@ be specifying a guess.
 
 ---
 
-## 13. Engine APIs
+## 15. Engine APIs
 
-### 13.1 Layering
+### 15.1 Layering
 
 Strict. An engine may only call downward.
 
@@ -563,6 +840,9 @@ Strict. An engine may only call downward.
        │
   L3  RESOURCE      claimable() · claim() · release() · onFree()
       GOVERNANCE    admit(world, event) → Refusal | null
+      KNOWLEDGE     knowledgeFor(node) → { sop?, video?, checklist?, form? }
+      DOCUMENT      requires(event) · produces(event)
+      COMMUNICATION messagesFor(event) → Message[]   (returned, never sent)
        │
   L2  WORKFLOW      record(world, event) → EventOutcome
       OWNERSHIP     ownerOf(flow) · deskOf(world, role)
@@ -573,7 +853,7 @@ Strict. An engine may only call downward.
   L0  OBJECTIVES    rank(objective) → 1..7
 ```
 
-### 13.2 Rules
+### 15.2 Rules
 
 1. **Every engine is a pure function of `(world, …, now)`.** No clock, no
    database, no I/O. This is what lets a test stand at 09:14 and again at 09:16.
@@ -585,7 +865,7 @@ Strict. An engine may only call downward.
    engine anything.
 5. **One write path.** `record()`. Everything else reads.
 
-### 13.3 Ports
+### 15.3 Ports
 
 The impure edges, injected:
 
@@ -598,7 +878,7 @@ The impure edges, injected:
 
 ---
 
-## 14. Event log and schema
+## 16. Event log and schema
 
 ### 14.1 The principle
 
@@ -657,7 +937,7 @@ timestamps that never happened.
 
 ---
 
-## 15. Open decisions
+## 17. Open decisions
 
 Nothing below has been guessed. Each blocks the section it belongs to.
 
@@ -665,19 +945,23 @@ Nothing below has been guessed. Each blocks the section it belongs to.
 |---|---|---|
 | D-01 | §2.1 | May patient safety ever be traded against waiting time? |
 | D-02 | §2.2 | Does an unpaid bill block closing the day, or escalate? |
-| D-03 | §5.3 | What happens when a patient leaves mid-treatment? |
+| D-03 | §6.3 | What happens when a patient leaves mid-treatment? |
 | D-04 | §6 | Does ownership resolve to a person when one employee holds the role? |
-| D-05 | §7.3 | Expected time for all 27 nodes |
-| D-06 | §7.4 | The patient-safety escalation ladder |
+| D-05 | §8.3 | Expected time for all 27 nodes |
+| D-06 | §8.4 | The patient-safety escalation ladder |
 | D-07 | §8 | The clinic's real resource inventory |
 | D-08 | §8 | May one doctor hold two chairs? |
-| D-09 | §9 | The overload threshold |
-| D-10 | §12.1 | Minimum history before a prediction is shown |
-| D-11 | §14.4 | Backfill existing rows, or start the log empty? |
+| D-09 | §12 | The overload threshold |
+| D-10 | §14.1 | Minimum history before a prediction is shown |
+| D-11 | §16.4 | Backfill existing rows, or start the log empty? |
+| D-12 | §13.1 | Which SOPs exist in writing today, and where do they live? |
+| D-13 | §13.2 | Which communication channels, and who owns contact consent? |
+| D-14 | §13.3 | Which documents are legally required per procedure here? |
+| D-15 | §9 | Does a decision wait for *every* resource, or proceed on the critical few? |
 
 ---
 
-## 16. Status: built, specified, deferred
+## 18. Status: built, specified, deferred
 
 | Part | Status |
 |---|---|
@@ -690,12 +974,12 @@ Nothing below has been guessed. Each blocks the section it belongs to.
 | Board derived from flow | **BUILT**, tested |
 | Objectives and ranking | **SPECIFIED** §2.1 |
 | Laws as invariants | **SPECIFIED** §2.2 |
-| Resources and claims | **SPECIFIED** §3.3, §8 |
-| Capacity | **SPECIFIED** §9 |
-| Exceptions | **SPECIFIED** §10 |
-| Decision engine | **SPECIFIED** §11 |
+| Resources and claims | **SPECIFIED** §4.3, §8 |
+| Capacity | **SPECIFIED** §12 |
+| Exceptions | **SPECIFIED** §12 |
+| Decision engine | **SPECIFIED** §12 |
 | Prediction, command centre | **SPECIFIED** §12 |
-| Event log persistence | **SPECIFIED** §14 |
+| Event log persistence | **SPECIFIED** §16 |
 | Pattern layer | **DEFERRED** to v1.1 |
 | UI | **NOT SPECIFIED.** Deliberately. |
 
@@ -707,7 +991,22 @@ v1.0 freezes when the owner accepts it. After that:
 - No engine is implemented before its section is frozen.
 - An implementation that needs a decision from §15 stops and asks.
 
-### Build order, once frozen
+### The roadmap, as the owner set it
+
+| Phase | What | Gate to the next |
+|---|---|---|
+| **1 — Freeze** | Answer the fifteen decisions in §17; lock v1.0 | Owner acceptance |
+| **2 — Dental domain** | A separate *Dental Practice Domain Model*: patients, appointments, clinical records, treatment plans, procedures, lab cases, imaging, billing, inventory, equipment, staff, knowledge, communication, documents | That document frozen too |
+| **3 — Engines** | Event log, workflow, decision, resource, governance, capacity — exactly as specified | Every engine tested against §2.2 laws |
+| **4 — Role UI** | Eight screens, each rendering `decisions(world, role, now)` and containing no business logic | §2.3 drift tests pass |
+
+**This specification stops expanding here.** The owner's warning is recorded as
+a rule: *"I would not let Claude continue expanding this architecture
+indefinitely."* Anything raised after this point goes to a v1.1 register and
+waits, exactly as Matrix v2.0 corrections do. A specification that keeps
+growing is a specification nothing is ever built from.
+
+### Build order within Phase 3
 
 1. **Objectives and laws** — nothing else can be ordered without them.
 2. **Event log persistence** — the truth needs somewhere to live.
