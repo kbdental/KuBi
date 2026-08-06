@@ -24,6 +24,14 @@
  *    file — it is the finding, made visible. A run that quietly escalated them
  *    to a plausible-looking manager would hide the exact thing the owner needs
  *    to decide about.
+ * 3. **A decision the owner has made is shown as made, and still not acted on.**
+ *    The owner has since said missed housekeeping rounds should reach the
+ *    Clinic Manager, and the v3.0 register carries that ladder. So those rows
+ *    now read *"would reach the Clinic Manager once HK-001 is accepted"*
+ *    rather than *"nobody hears"*, which had stopped being true. What has not
+ *    changed: nothing escalates. `escalatedTo` stays null, `unsupervised`
+ *    stays true, and no notification is sent, because a proposal is not a
+ *    control and matrix v2.0 is frozen.
  *
  * Pure and total: same clock and same completed set in, same day out. No
  * `Date.now()`, so a test can stand at 11:20 and stay there.
@@ -34,6 +42,7 @@ import type { RoleCode } from './enums.js';
 import {
   DAILY_STANDARD, Rhythm, RHYTHM_LABEL, type DailyStandard, type Proof,
 } from './daily-standard.js';
+import { proposalById, type ProposedControl } from './proposed-controls.js';
 
 /* -------------------------------------------------------------------------
  * The clock
@@ -131,6 +140,49 @@ export function ladderFor(s: DailyStandard): EscalationRung[] | null {
   return ladder(r);
 }
 
+/**
+ * Who *would* hear about it, under a control that has been drafted but not
+ * accepted.
+ *
+ * Separate function, separate return type, and never merged into `ladderFor`.
+ * The merge is the tempting move and it is the wrong one: every caller of
+ * `ladderFor` treats a non-null result as "this is supervised", and one of
+ * them decides whether to send a notification. Returning a proposal's rungs
+ * from there would page the Clinic Manager about a control the clinic has not
+ * adopted.
+ *
+ * Returns null when the standard has no proposal — which is the case for the
+ * seven that still escalate to nobody at all.
+ */
+export interface ProposedLadder {
+  /** The drafted control this comes from. */
+  proposal: ProposedControl;
+  /** Who it would reach, in the register's own words: "Clinic Manager". */
+  rungs: EscalationRung[];
+  /**
+   * What still has to be decided before it can be accepted, by register column
+   * name. Empty means the only thing standing between this and enforcement is
+   * unfreezing the matrix.
+   */
+  blockedBy: string[];
+}
+
+export function proposedLadderFor(s: DailyStandard): ProposedLadder | null {
+  if (s.covers) return null;                    // governed for real; no proposal applies
+  if (!s.proposed) return null;
+  const proposal = proposalById(s.proposed);
+  if (!proposal || proposal.escalation.length === 0) return null;
+
+  const [l1, l2, l3] = proposal.escalation;
+  const r: Responsibility = {
+    doer: (l1 ?? 'Employee') as RoleCode,
+    checker: (l2 ?? null) as RoleCode | null,
+    owner: (l2 ?? l3 ?? 'Clinic Head') as RoleCode,
+    escalation: (l3 ?? l2 ?? 'Clinic Head') as RoleCode,
+  };
+  return { proposal, rungs: ladder(r), blockedBy: [...proposal.openDecisions] };
+}
+
 /* -------------------------------------------------------------------------
  * The run
  * ---------------------------------------------------------------------- */
@@ -149,6 +201,14 @@ export interface RunItem {
   level: 1 | 2 | 3 | null;
   /** Nothing governs this, so there is nobody for it to reach. */
   unsupervised: boolean;
+  /**
+   * Who would have heard, had the drafted control been accepted. Set only when
+   * `unsupervised` is true — it is an explanation of the gap, not a route out
+   * of it. Nothing is sent to this person.
+   */
+  wouldReach: string | null;
+  /** The proposal that would do it: "HK-001". Null when there is none. */
+  wouldReachUnder: string | null;
 }
 
 export type ClinicState = 'LOCKED' | 'PREPARING' | 'OPEN' | 'CLOSING' | 'CLOSED';
@@ -180,6 +240,9 @@ export function runDay(now: number, done: ReadonlySet<string> = new Set()): DayR
 
   for (const s of DAILY_STANDARD) {
     const rungs = ladderFor(s);
+    // Read once per standard, not per occurrence: the same washroom round due
+    // at 11:00 and 13:00 shares one drafted control.
+    const draft = rungs === null ? proposedLadderFor(s) : null;
     for (const dueAt of dueTimes(s)) {
       const key = `${s.id}@${dueAt}`;
       const minutesLate = Math.max(0, now - dueAt);
@@ -199,6 +262,11 @@ export function runDay(now: number, done: ReadonlySet<string> = new Set()): DayR
         escalatedTo: rung ? String(rung.to) : null,
         level: rung ? rung.level : null,
         unsupervised: rungs === null,
+        // The first rung of the drafted ladder — who would be told first, not
+        // who would be told eventually. Stated whatever the item's state, so a
+        // person reading a standard before it is late can still see the answer.
+        wouldReach: draft && draft.rungs[0] ? String(draft.rungs[0].to) : null,
+        wouldReachUnder: draft ? draft.proposal.id : null,
       });
     }
   }
@@ -316,6 +384,12 @@ export interface WorkProvenance {
   escalatesTo: string | null;
   /** True when there is no ladder at all — nobody hears, ever. */
   unsupervised: boolean;
+  /** The control drafted for v3.0 that would govern this, or null. */
+  proposed: string | null;
+  /** Who that drafted control would tell first. Never anybody KuBi tells today. */
+  wouldEscalateTo: string | null;
+  /** Register columns still open on that proposal. Empty when only the freeze remains. */
+  blockedBy: string[];
 }
 
 const PROOF_WORD: Record<Proof, string> = {
@@ -327,6 +401,7 @@ const PROOF_WORD: Record<Proof, string> = {
 
 export function provenanceOf(s: DailyStandard): WorkProvenance {
   const rungs = ladderFor(s);
+  const draft = rungs === null ? proposedLadderFor(s) : null;
   return {
     standardId: s.id,
     standard: s.standard,
@@ -336,6 +411,9 @@ export function provenanceOf(s: DailyStandard): WorkProvenance {
     gap: s.gap ?? null,
     escalatesTo: rungs && rungs[0] ? String(rungs[0].to) : null,
     unsupervised: rungs === null,
+    proposed: draft ? draft.proposal.id : null,
+    wouldEscalateTo: draft && draft.rungs[0] ? String(draft.rungs[0].to) : null,
+    blockedBy: draft ? draft.blockedBy : [],
   };
 }
 

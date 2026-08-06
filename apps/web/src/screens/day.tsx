@@ -250,8 +250,11 @@ function Run() {
         <Group
           title="Late, and reaching nobody"
           count={day.unsupervised.length}
-          note="No control governs these, so there is no ladder for them to climb.
-                This is the decision waiting on you."
+          note={`No control governs these, so nothing was sent. ${
+            day.unsupervised.filter((i) => i.wouldReach).length
+          } of them have a control drafted for v3.0 — you have said where those should go,
+                and they will go there once the matrix is unfrozen. The rest are still
+                waiting on you.`}
           tone="stop"
         >
           {day.unsupervised.map((i) => <RunRow key={i.key} i={i} onDo={() => tick(i.key)} />)}
@@ -281,9 +284,15 @@ function RunRow({ i, onDo }: { i: RunItem; onDo: () => void }) {
       tags={(
         <>
           <Tag>{role(i.standard.role)}</Tag>
-          {/* Where it has climbed to — or that there is nowhere for it to go. */}
+          {/* Where it has climbed to — or that there is nowhere for it to go.
+              "Escalates to nobody" stays the words for a row with no drafted
+              control. Where one exists the owner has already decided who it
+              would reach, and saying "nobody" would misreport their decision
+              back to them. Neither tag means anybody was told. */}
           {i.unsupervised
-            ? <Tag tone="stop">escalates to nobody</Tag>
+            ? i.wouldReach
+              ? <Tag tone="warn">would reach {role(i.wouldReach)} · {i.wouldReachUnder} not accepted</Tag>
+              : <Tag tone="stop">escalates to nobody</Tag>
             : i.escalatedTo
               ? <Tag tone="warn">L{i.level} · {role(i.escalatedTo)}</Tag>
               : <Tag>not escalated yet</Tag>}
