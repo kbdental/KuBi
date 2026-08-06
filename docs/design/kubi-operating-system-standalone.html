@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body style="margin:0">
+<title>KuBi — Clinic Operating System</title>
+
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   Tokens. Neutrals are slate biased toward the teal, never a flat grey.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  --ink: #101a22;
+  --ink-soft: #55636f;
+  --ink-faint: #8593a0;
+  --line: #e2e8ed;
+  --line-soft: #eef2f5;
+  --page: #f1f4f7;
+  --card: #ffffff;
+  --raise: 0 1px 2px rgba(16,26,34,.05), 0 8px 24px -12px rgba(16,26,34,.16);
+
+  --accent: #0d6e5e;
+  --accent-soft: #e6f2ef;
+  --accent-line: #b2dbd2;
+
+  --stop: #a81f28;
+  --stop-soft: #fdf0f0;
+  --stop-line: #f0c4c6;
+
+  --warn: #8a5a06;
+  --warn-soft: #fdf4e5;
+  --warn-line: #ecd7ad;
+
+  --r: 14px;
+  --gap: 14px;
+  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  --sans: system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI',
+          Roboto, 'Helvetica Neue', sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e9eff3; --ink-soft: #9dacb8; --ink-faint: #6f7f8c;
+    --line: #24313b; --line-soft: #1b262e;
+    --page: #0d151b; --card: #141f27;
+    --raise: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    --accent: #4cc0a8; --accent-soft: #10302b; --accent-line: #1f5449;
+    --stop: #ff8b8b; --stop-soft: #2e1618; --stop-line: #5c2a2d;
+    --warn: #e5b869; --warn-soft: #2b2113; --warn-line: #554423;
+  }
+}
+:root[data-theme="light"] {
+  --ink: #101a22; --ink-soft: #55636f; --ink-faint: #8593a0;
+  --line: #e2e8ed; --line-soft: #eef2f5;
+  --page: #f1f4f7; --card: #ffffff;
+  --raise: 0 1px 2px rgba(16,26,34,.05), 0 8px 24px -12px rgba(16,26,34,.16);
+  --accent: #0d6e5e; --accent-soft: #e6f2ef; --accent-line: #b2dbd2;
+  --stop: #a81f28; --stop-soft: #fdf0f0; --stop-line: #f0c4c6;
+  --warn: #8a5a06; --warn-soft: #fdf4e5; --warn-line: #ecd7ad;
+}
+:root[data-theme="dark"] {
+  --ink: #e9eff3; --ink-soft: #9dacb8; --ink-faint: #6f7f8c;
+  --line: #24313b; --line-soft: #1b262e;
+  --page: #0d151b; --card: #141f27;
+  --raise: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  --accent: #4cc0a8; --accent-soft: #10302b; --accent-line: #1f5449;
+  --stop: #ff8b8b; --stop-soft: #2e1618; --stop-line: #5c2a2d;
+  --warn: #e5b869; --warn-soft: #2b2113; --warn-line: #554423;
+}
+
+* { box-sizing: border-box; }
+#root {
+  min-height: 100vh; background: var(--page); color: var(--ink);
+  font: 16.5px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ═══ shell ═══════════════════════════════════════════════════════════ */
+.shell { display: grid; grid-template-columns: 1fr; min-height: 100vh; }
+.main { padding: 18px 16px 96px; max-width: 1180px; width: 100%; margin: 0 auto; }
+
+.nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  background: var(--card); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.nav button {
+  background: none; border: 0; padding: 10px 1px 12px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-size: 10.5px; letter-spacing: 0; color: var(--ink-faint); font-weight: 640;
+  min-width: 0; overflow: hidden;
+}
+.w-lg { display: none; }
+.w-sm { display: block; }
+.nav button[aria-current="page"] { color: var(--accent); }
+.nav .glyph { font-size: 17px; line-height: 1; }
+
+@media (min-width: 900px) {
+  .shell { grid-template-columns: 232px 1fr; }
+  .nav {
+    position: sticky; top: 0; bottom: auto; height: 100vh;
+    grid-template-columns: 1fr; grid-auto-rows: max-content; align-content: start;
+    border-top: 0; border-right: 1px solid var(--line); padding: 20px 12px; gap: 2px;
+  }
+  .nav button {
+    flex-direction: row; gap: 11px; justify-content: flex-start;
+    padding: 11px 13px; border-radius: 10px; font-size: 14px;
+    text-transform: none; letter-spacing: 0;
+  }
+  .nav button[aria-current="page"] { background: var(--accent-soft); }
+  .w-lg { display: block; }
+  .w-sm { display: none; }
+  .nav .glyph { font-size: 15px; width: 18px; text-align: center; }
+  .main { padding: 30px 34px 60px; }
+  .brand { display: block; }
+}
+.brand {
+  display: none; padding: 4px 13px 20px;
+  font-weight: 700; letter-spacing: -.02em; font-size: 19px;
+}
+.brand span { color: var(--accent); }
+
+/* ═══ the state banner — level 0 ══════════════════════════════════════ */
+.state {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 20px 20px 18px; box-shadow: var(--raise); margin-bottom: var(--gap);
+  position: relative; overflow: hidden;
+}
+.state::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--accent);
+}
+.state[data-tone="stop"]::before { background: var(--stop); }
+.state[data-tone="warn"]::before { background: var(--warn); }
+
+.state-eyebrow {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-faint); display: flex; gap: 10px; align-items: center;
+}
+.state-now {
+  font-size: clamp(26px, 5.4vw, 34px); font-weight: 680; letter-spacing: -.025em;
+  margin: 7px 0 0; text-wrap: balance; line-height: 1.12;
+}
+.state-why { color: var(--ink-soft); margin: 7px 0 0; max-width: 62ch; }
+
+.rail { display: flex; gap: 5px; margin: 16px 0 0; flex-wrap: wrap; }
+.rail i {
+  height: 4px; flex: 1 1 22px; border-radius: 3px; background: var(--line);
+  min-width: 14px; transition: background .3s;
+}
+.rail i[data-on="past"] { background: var(--accent-line); }
+.rail i[data-on="now"] { background: var(--accent); }
+
+/* ═══ the one action ══════════════════════════════════════════════════ */
+.go {
+  display: inline-flex; align-items: center; gap: 9px; margin-top: 17px;
+  background: var(--ink); color: var(--card); border: 0; border-radius: 10px;
+  padding: 13px 20px; font-weight: 620; font-size: 16px; cursor: pointer;
+  letter-spacing: -.01em; transition: transform .12s, opacity .12s;
+}
+.go:hover { transform: translateY(-1px); }
+.go:active { transform: translateY(0); opacity: .85; }
+.go[disabled] { opacity: .45; cursor: default; transform: none; }
+.go .arw { opacity: .55; }
+
+/* ═══ the block — the only time governance is ever seen ═══════════════ */
+.block {
+  margin-top: 15px; border: 1px solid var(--stop-line); background: var(--stop-soft);
+  border-radius: 11px; padding: 15px 16px;
+}
+.block-h {
+  font-weight: 700; color: var(--stop); font-size: 15px;
+  display: flex; align-items: center; gap: 8px;
+}
+.block-w { margin: 5px 0 0; color: var(--ink); font-size: 16.5px; }
+.block-fix {
+  margin-top: 12px; background: var(--stop); color: #fff; border: 0;
+  border-radius: 9px; padding: 10px 16px; font-weight: 620; cursor: pointer;
+}
+.block-fix:hover { filter: brightness(1.08); }
+
+/* ═══ groups & cards ══════════════════════════════════════════════════ */
+.grid { display: grid; gap: var(--gap); }
+@media (min-width: 1040px) { .grid-2 { grid-template-columns: 1.55fr 1fr; align-items: start; } }
+
+.grp { margin-bottom: var(--gap); }
+.grp-h {
+  display: flex; align-items: baseline; gap: 9px; margin: 0 0 9px; padding: 0 2px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.grp-h b { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: var(--raise); overflow: hidden;
+}
+.card + .card { margin-top: 10px; }
+
+.item {
+  display: flex; gap: 13px; align-items: flex-start; width: 100%; text-align: left;
+  padding: 15px 16px; background: none; border: 0; border-left: 3px solid transparent;
+  cursor: default;
+}
+button.item { cursor: pointer; }
+button.item:hover { background: var(--line-soft); }
+.item[data-tone="stop"] { border-left-color: var(--stop); }
+.item[data-tone="warn"] { border-left-color: var(--warn); }
+.item[data-tone="good"] { border-left-color: var(--accent); }
+.item + .item { border-top: 1px solid var(--line-soft); }
+
+.item-b { flex: 1; min-width: 0; }
+.item-t { display: block; font-weight: 570; letter-spacing: -.01em; }
+.item-n { display: block; color: var(--ink-soft); font-size: 14px; margin-top: 2px; }
+.item-go { color: var(--ink-faint); font-size: 19px; line-height: 1; align-self: center; }
+
+.pill {
+  display: inline-block; font-size: 11.5px; font-weight: 650; letter-spacing: .04em;
+  padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line);
+  color: var(--ink-soft); background: var(--card); white-space: nowrap;
+}
+.pill[data-tone="stop"] { color: var(--stop); border-color: var(--stop-line); background: var(--stop-soft); }
+.pill[data-tone="warn"] { color: var(--warn); border-color: var(--warn-line); background: var(--warn-soft); }
+.pill[data-tone="good"] { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+.pill.mono { font-family: var(--mono); font-size: 11px; letter-spacing: 0; }
+
+/* ═══ the patient in the chair ════════════════════════════════════════ */
+.pt { padding: 18px 18px 16px; }
+.pt-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.pt-name { font-size: 20px; font-weight: 640; letter-spacing: -.02em; }
+.pt-sub { color: var(--ink-soft); font-size: 14px; margin-top: 2px; }
+
+.jrny { display: flex; gap: 0; margin: 18px 0 4px; overflow-x: auto; padding-bottom: 6px; }
+.jrny::-webkit-scrollbar { height: 4px; }
+.jrny::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+.step { flex: 0 0 auto; display: flex; align-items: center; gap: 0; }
+.step-d {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--line);
+  border: 2px solid var(--card); flex: 0 0 auto;
+}
+.step[data-on="past"] .step-d { background: var(--accent-line); }
+.step[data-on="now"] .step-d {
+  background: var(--accent); width: 13px; height: 13px;
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.step-l {
+  font-size: 11px; color: var(--ink-faint); padding: 0 9px; white-space: nowrap;
+  letter-spacing: .01em;
+}
+.step[data-on="now"] .step-l { color: var(--accent); font-weight: 700; }
+.step[data-on="past"] .step-l { color: var(--ink-soft); }
+
+/* ═══ health ══════════════════════════════════════════════════════════ */
+.hz { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line-soft); }
+@media (min-width: 560px) and (max-width: 1039px) { .hz { grid-template-columns: repeat(4, 1fr); } }
+.hz > div { background: var(--card); padding: 15px 14px; }
+.hz .v {
+  font-size: 25px; font-weight: 660; letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+.hz .v[data-tone="stop"] { color: var(--stop); }
+.hz .v[data-tone="warn"] { color: var(--warn); }
+.hz .v[data-tone="good"] { color: var(--accent); }
+.hz .k { font-size: 12px; color: var(--ink-faint); margin-top: 3px; letter-spacing: .01em; text-wrap: balance; }
+
+/* ═══ empty & secondary ═══════════════════════════════════════════════ */
+.empty { padding: 26px 18px; text-align: center; color: var(--ink-soft); }
+.empty b { display: block; color: var(--ink); font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+
+.head { margin: 0 0 4px; font-size: 25px; font-weight: 660; letter-spacing: -.025em; }
+.head-q { color: var(--ink-soft); margin: 0 0 20px; }
+
+.log { font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft); }
+.log div { padding: 7px 0; border-bottom: 1px solid var(--line-soft); display: flex; gap: 12px; }
+.log time { color: var(--ink-faint); flex: 0 0 46px; }
+
+.tiny { font-size: 13px; color: var(--ink-faint); }
+.rowbtn {
+  background: none; border: 1px solid var(--line); border-radius: 9px;
+  padding: 8px 13px; font-size: 14px; font-weight: 560; cursor: pointer; color: var(--ink-soft);
+}
+.rowbtn:hover { border-color: var(--ink-faint); color: var(--ink); }
+</style>
+
+<div id="root"></div>
+
+<script type="module">
+/* ═══════════════════════════════════════════════════════════════════════
+   THE CLINIC, AS A STATE MACHINE
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const CLINIC = [
+  { id:'CLOSED',  label:'Clinic closed',      why:'Nobody has opened up yet.',
+    act:'Open the clinic',        next:'OPENING' },
+  { id:'OPENING', label:'Opening',            why:'Rooms, instruments and equipment are being made ready.',
+    act:'Mark the clinic ready',  next:'READY',   gate:'OPEN_READY' },
+  { id:'READY',   label:'Ready',              why:'Everything is set. The team has not met yet.',
+    act:'Hold the morning huddle', next:'HUDDLE' },
+  { id:'HUDDLE',  label:'Morning huddle',     why:'The day is being set with the team.',
+    act:'Start seeing patients',  next:'RUNNING' },
+  { id:'RUNNING', label:'Seeing patients',    why:'The clinic is running.',
+    act:'Break for lunch',        next:'LUNCH',   gate:'CHAIR_EMPTY' },
+  { id:'LUNCH',   label:'Lunch',              why:'Cover is held at reception. No patient is in a chair.',
+    act:'Resume patients',        next:'RUNNING' },
+  { id:'CLOSING', label:'Closing',            why:'The day is being shut down.',
+    act:'Lock up',                next:'CLOSED',  gate:'CLOSE_LOCK' },
+];
+const clinicAt = id => CLINIC.find(s => s.id === id);
+
+/* ═══ THE PATIENT, AS A JOURNEY ═════════════════════════════════════════ */
+
+const JOURNEY = [
+  { id:'APPOINTMENT', label:'Appointment', act:'Mark arrived',        short:'Booked' },
+  { id:'ARRIVAL',     label:'Arrival',     act:'Send to reception',   short:'Arrived' },
+  { id:'RECEPTION',   label:'Reception',   act:'Take vitals',         short:'Reception' },
+  { id:'VITALS',      label:'Vitals',      act:'Send in to the doctor', short:'Vitals' },
+  { id:'DOCTOR',      label:'Doctor',      act:'Record diagnosis',    short:'Doctor' },
+  { id:'DIAGNOSIS',   label:'Diagnosis',   act:'Build the treatment plan', short:'Diagnosis' },
+  { id:'PLAN',        label:'Plan',        act:'Take consent',        short:'Plan' },
+  { id:'CONSENT',     label:'Consent',     act:'Start treatment',     short:'Consent', gate:'TREATMENT' },
+  { id:'TREATMENT',   label:'Treatment',   act:'Finish treatment',    short:'Treatment' },
+  { id:'PAYMENT',     label:'Payment',     act:'Take payment',        short:'Payment' },
+  { id:'INSTRUCTIONS',label:'Instructions',act:'Give instructions',   short:'Instructions' },
+  { id:'RECALL',      label:'Recall',      act:'Book the recall',     short:'Recall' },
+  { id:'CLOSED',      label:'Case closed', act:null,                  short:'Closed' },
+];
+const stepIndex = id => JOURNEY.findIndex(s => s.id === id);
+
+/* ═══════════════════════════════════════════════════════════════════════
+   THE GOVERNANCE ENGINE
+
+   It never has a screen. It runs when somebody presses a button, and it
+   speaks only to say one thing: the single reason this cannot happen, and
+   the one button that fixes it.
+
+   UNKNOWN is never a pass. A requirement nobody has answered blocks
+   exactly as hard as one that failed.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const GATES = {
+  OPEN_READY: [
+    { need:'Every treatment room cleaned and set',    key:'rooms',   fix:'Open room checklist' },
+    { need:'A sterile pack released for today',       key:'sterile', fix:'Release a batch' },
+    { need:'Emergency kit checked',                   key:'kit',     fix:'Check the kit' },
+  ],
+  TREATMENT: [
+    { need:'Medical history is current',              key:'history', fix:'Update medical history' },
+    { need:'A signed consent for this procedure',     key:'consent', fix:'Open consent form' },
+    { need:'The radiograph this treatment needs',     key:'xray',    fix:'Attach radiograph' },
+    { need:'An estimate the patient has accepted',    key:'estimate',fix:'Open the estimate' },
+  ],
+  CHAIR_EMPTY: [
+    { need:'No patient part-way through treatment',   key:'chairFree', fix:'Go to the patient' },
+  ],
+  CLOSE_LOCK: [
+    { need:'No instrument left unprocessed overnight',key:'sterClosed', fix:'Open sterilisation' },
+    { need:'Every visit reconciled',                  key:'reconciled', fix:'Open today’s visits' },
+  ],
+};
+
+/** The first unmet requirement, or null. First — never a list. */
+function firstBlock(gateId, facts) {
+  if (!gateId) return null;
+  for (const g of (GATES[gateId] || [])) {
+    if (facts[g.key] !== true) return g;   // false OR undefined. Unknown never passes.
+  }
+  return null;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   THE DAY — synthetic throughout
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const startState = () => ({
+  clock: 8 * 60 + 40,
+  clinic: 'CLOSED',
+  where: 'TODAY',
+
+  facts: {
+    rooms:false, sterile:false, kit:false,
+    history:true, consent:false, xray:true, estimate:true,
+    chairFree:true, sterClosed:false, reconciled:false,
+  },
+
+  lunchTaken: false,
+  chair: null,
+  queue: [
+    { id:'p1', name:'SYNTHETIC Arjun P.', uhid:'SYN-1002', at:'09:30', visit:'Root canal, upper left 6', phase:'APPOINTMENT' },
+    { id:'p2', name:'SYNTHETIC Meera R.', uhid:'SYN-1041', at:'10:15', visit:'Crown delivery',           phase:'APPOINTMENT' },
+    { id:'p3', name:'SYNTHETIC Kabir S.', uhid:'SYN-1077', at:'10:45', visit:'Scaling and polish',       phase:'APPOINTMENT' },
+    { id:'p4', name:'SYNTHETIC Devika N.',uhid:'SYN-1108', at:'11:30', visit:'Implant review',           phase:'APPOINTMENT' },
+  ],
+  done: [],
+
+  raised: [
+    { id:'a1', tone:'stop', t:'Autoclave batch STER-0911 quarantined',
+      n:'Biological indicator inconclusive · with the sterilisation technician', go:'Operations' },
+    { id:'a2', tone:'warn', t:'Lab case for Meera R. not confirmed received',
+      n:'Crown delivery booked 10:15 · confirm before she is seated', go:'Clinical' },
+    { id:'a3', tone:'warn', t:'Gauze below minimum',
+      n:'4 packs left · reorder level is 12', go:'Operations' },
+  ],
+
+  revenue: 0,
+  waits: [],
+  log: [],
+});
+
+let S = startState();
+
+const hhmm = m => String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
+function tick(mins) { S.clock += mins; }
+function note(text) { S.log.unshift({ at: hhmm(S.clock), text }); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   WHAT THE CLINIC NEEDS RIGHT NOW — one answer, derived, never authored
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function theAnswer() {
+  // A patient part-way through outranks the clinic's own state. The chair is
+  // where the clinic actually is.
+  if (S.chair) {
+    const step = JOURNEY[stepIndex(S.chair.phase)];
+    if (step && step.act) {
+      return {
+        tone: 'good',
+        eyebrow: ['In the chair', S.chair.uhid],
+        now: step.act,
+        why: `${S.chair.name} — ${S.chair.visit}. ${step.label} is where this visit has reached.`,
+        run: () => advancePatient(),
+        gate: step.gate,
+      };
+    }
+  }
+
+  const st = clinicAt(S.clinic);
+
+  // Lunch, when the chair is free and the hour has come. Never while somebody
+  // is part-way through: the clinic breaks between patients, not during one.
+  if (S.clinic === 'RUNNING' && !S.chair && !S.lunchTaken && S.clock >= 13 * 60) {
+    return {
+      tone: 'good',
+      eyebrow: ['Seeing patients', hhmm(S.clock)],
+      now: 'Break for lunch',
+      why: 'The chair is free and it is past one. Reception holds cover.',
+      run: () => { S.clinic = 'LUNCH'; S.lunchTaken = true; note('Lunch'); tick(35); },
+      gate: 'CHAIR_EMPTY',
+    };
+  }
+
+  if (S.clinic === 'RUNNING' && !S.chair && S.queue.length > 0) {
+    const nxt = S.queue[0];
+    return {
+      tone: 'good',
+      eyebrow: ['Next patient', nxt.at],
+      now: `Bring ${nxt.name.replace('SYNTHETIC ','')} through`,
+      why: `${nxt.visit}. The chair is free.`,
+      run: () => { S.chair = S.queue.shift(); S.facts.chairFree = false; S.facts.consent = false;
+                   note(`${S.chair.name} brought through`); },
+    };
+  }
+
+  if (S.clinic === 'RUNNING' && !S.chair && S.queue.length === 0) {
+    return {
+      tone: 'good',
+      eyebrow: ['Seeing patients'],
+      now: 'Everybody has been seen',
+      why: 'No patient is waiting and the chair is free. The day can be closed down.',
+      run: () => { S.clinic = 'CLOSING'; note('Closing started'); },
+      actLabel: 'Start closing',
+    };
+  }
+
+  // The banner's colour is about the state of the clinic, and nothing else.
+  // It used to borrow amber from the attention list, which made "Clinic closed"
+  // at half past eight read as a warning. The red rail on the attention card
+  // below already says something is serious; two things saying it in different
+  // words is how a screen stops being trusted.
+  return {
+    tone: 'good',
+    eyebrow: [st.label, hhmm(S.clock)],
+    now: st.act,
+    why: st.why,
+    run: () => { S.clinic = st.next; note(st.act); tick(st.id === 'OPENING' ? 12 : 4); },
+    gate: st.gate,
+  };
+}
+
+function advancePatient() {
+  const i = stepIndex(S.chair.phase);
+  const step = JOURNEY[i];
+  const next = JOURNEY[i + 1];
+
+  if (step.id === 'PAYMENT') S.revenue += 4500 + Math.round(Math.random() * 3500);
+  if (step.id === 'ARRIVAL') S.waits.push(4 + Math.round(Math.random() * 14));
+
+  note(`${S.chair.name}: ${step.act}`);
+  tick(step.id === 'TREATMENT' ? 35 : 6);
+
+  if (!next || next.id === 'CLOSED') {
+    S.done.push({ ...S.chair, phase: 'CLOSED' });
+    S.chair = null;
+    S.facts.chairFree = true;
+    return;
+  }
+  S.chair.phase = next.id;
+}
+
+/* Attention, capped at five. Never a sixth, whatever else is true. */
+function attention() {
+  const out = [...S.raised];
+  if (S.clinic === 'RUNNING' && S.queue.length && !S.chair) {
+    out.unshift({ id:'w', tone:'warn', t:`${S.queue[0].name.replace('SYNTHETIC ','')} is waiting`,
+                  n:`Due ${S.queue[0].at} · nobody has brought them through`, go:'TODAY' });
+  }
+  return out.slice(0, 5);
+}
+
+function health() {
+  const total = Object.keys(S.facts).length;
+  const met = Object.values(S.facts).filter(Boolean).length;
+  const compliance = Math.round((met / total) * 100);
+  const wait = S.waits.length
+    ? Math.round(S.waits.reduce((a,b) => a+b, 0) / S.waits.length) : null;
+  return {
+    compliance,
+    revenue: S.revenue,
+    wait,
+    pending: S.raised.length + S.queue.length,
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RENDER
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const root = document.getElementById('root');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let blocked = null;   // the one requirement in the way, if any
+
+/**
+ * Six places, and no seventh. `tab` is the phone word: at 390px a sixth of the
+ * screen is 65px, and "Operations" collided with its neighbours there.
+ */
+const NAV = [
+  { id:'TODAY',      glyph:'◈', label:'Today',      tab:'Today' },
+  { id:'Patients',   glyph:'○', label:'Patients',   tab:'People' },
+  { id:'Clinical',   glyph:'◐', label:'Clinical',   tab:'Clinical' },
+  { id:'Operations', glyph:'◇', label:'Operations', tab:'Ops' },
+  { id:'Reports',    glyph:'▤', label:'Reports',    tab:'Reports' },
+  { id:'Settings',   glyph:'⚙', label:'Settings',   tab:'Setup' },
+];
+
+function draw() {
+  const a = theAnswer();
+
+  root.innerHTML = `
+    <div class="shell">
+      <nav class="nav" aria-label="Sections">
+        <div class="brand">Ku<span>Bi</span></div>
+        ${NAV.map(n => `
+          <button data-nav="${n.id}" ${S.where === n.id ? 'aria-current="page"' : ''}>
+            <span class="glyph" aria-hidden="true">${n.glyph}</span>
+            <span class="w-lg">${esc(n.label)}</span><span class="w-sm">${esc(n.tab)}</span>
+          </button>`).join('')}
+      </nav>
+      <div class="main">${S.where === 'TODAY' ? today(a) : secondary()}</div>
+    </div>`;
+
+  root.querySelectorAll('[data-nav]').forEach(b =>
+    b.onclick = () => { S.where = b.dataset.nav; blocked = null; draw(); });
+
+  const go = root.querySelector('[data-go]');
+  if (go) go.onclick = () => {
+    const stop = firstBlock(a.gate, S.facts);
+    if (stop) { blocked = stop; draw(); return; }
+    blocked = null;
+    a.run();
+    draw();
+  };
+
+  const fix = root.querySelector('[data-fix]');
+  if (fix) fix.onclick = () => {
+    S.facts[blocked.key] = true;
+    note(`Resolved — ${blocked.need.toLowerCase()}`);
+    blocked = null;
+    draw();
+  };
+
+  const rs = root.querySelector('[data-restart]');
+  if (rs) rs.onclick = () => { S = startState(); blocked = null; draw(); };
+
+  root.querySelectorAll('[data-jump]').forEach(b =>
+    b.onclick = () => { S.where = b.dataset.jump; blocked = null; draw(); });
+}
+
+/* ─── TODAY: five sections, nothing else ────────────────────────────── */
+
+function today(a) {
+  const cl = clinicAt(S.clinic);
+  const at = CLINIC.findIndex(s => s.id === S.clinic);
+  const cards = attention();
+  const h = health();
+
+  return `
+    <!-- 1 · CLINIC STATUS -->
+    <section class="state" data-tone="${blocked ? 'stop' : a.tone}">
+      <div class="state-eyebrow">${a.eyebrow.map(e => `<span>${esc(e)}</span>`).join('<span aria-hidden="true">·</span>')}</div>
+      <h1 class="state-now">${esc(a.now)}</h1>
+      <p class="state-why">${esc(a.why)}</p>
+      <div class="rail" aria-hidden="true">
+        ${CLINIC.map((_, i) => `<i data-on="${i < at ? 'past' : i === at ? 'now' : ''}"></i>`).join('')}
+      </div>
+      ${blocked ? `
+        <div class="block" role="alert">
+          <div class="block-h"><span aria-hidden="true">■</span> Cannot do this yet</div>
+          <p class="block-w">${esc(blocked.need)} — and it is not.</p>
+          <button class="block-fix" data-fix>${esc(blocked.fix)}</button>
+        </div>`
+      : a.run ? `<button class="go" data-go>${esc(a.actLabel || a.now)}<span class="arw" aria-hidden="true">→</span></button>` : ''}
+    </section>
+
+    <div class="grid grid-2">
+      <div>
+        <!-- 2 · WHAT NEEDS ATTENTION NOW -->
+        <section class="grp">
+          <h2 class="grp-h">Needs attention now <b>${cards.length}</b></h2>
+          <div class="card">
+            ${cards.length === 0
+              ? `<div class="empty"><b>Nothing is waiting</b>Every open item has somebody on it.</div>`
+              : cards.map(c => `
+                <button class="item" data-tone="${c.tone}" data-jump="${c.go}">
+                  <span class="item-b">
+                    <span class="item-t">${esc(c.t)}</span>
+                    <span class="item-n">${esc(c.n)}</span>
+                  </span>
+                  <span class="item-go" aria-hidden="true">›</span>
+                </button>`).join('')}
+          </div>
+        </section>
+
+        <!-- 3 · CURRENT PATIENT -->
+        <section class="grp">
+          <h2 class="grp-h">In the chair</h2>
+          <div class="card">
+            ${S.chair ? patient(S.chair) : `
+              <div class="empty">
+                <b>The chair is free</b>
+                ${S.queue.length ? `${esc(S.queue[0].name.replace('SYNTHETIC ',''))} is next, at ${esc(S.queue[0].at)}.`
+                                 : 'Nobody is left to see today.'}
+              </div>`}
+          </div>
+        </section>
+      </div>
+
+      <div>
+        <!-- 4 · NEXT QUEUE -->
+        <section class="grp">
+          <h2 class="grp-h">Next <b>${S.queue.length}</b></h2>
+          <div class="card">
+            ${S.queue.length === 0
+              ? `<div class="empty"><b>Nobody waiting</b>The list is clear.</div>`
+              : S.queue.map(p => `
+                <div class="item">
+                  <span class="item-b">
+                    <span class="item-t">${esc(p.name.replace('SYNTHETIC ',''))}</span>
+                    <span class="item-n">${esc(p.visit)}</span>
+                  </span>
+                  <span class="pill mono">${esc(p.at)}</span>
+                </div>`).join('')}
+          </div>
+        </section>
+
+        <!-- 5 · CLINIC HEALTH -->
+        <section class="grp">
+          <h2 class="grp-h">Clinic health</h2>
+          <div class="card">
+            <div class="hz">
+              <div>
+                <div class="v" data-tone="${h.compliance >= 90 ? 'good' : h.compliance >= 70 ? 'warn' : 'stop'}">${h.compliance}%</div>
+                <div class="k">Compliance</div>
+              </div>
+              <div>
+                <div class="v">${h.revenue ? '₹' + h.revenue.toLocaleString('en-IN') : '—'}</div>
+                <div class="k">Collected</div>
+              </div>
+              <div>
+                <div class="v" data-tone="${h.wait === null ? '' : h.wait <= 10 ? 'good' : 'warn'}">${h.wait === null ? '—' : h.wait + 'm'}</div>
+                <div class="k">Average wait</div>
+              </div>
+              <div>
+                <div class="v" data-tone="${h.pending > 6 ? 'warn' : ''}">${h.pending}</div>
+                <div class="k">Open items</div>
+              </div>
+            </div>
+          </div>
+          <p class="tiny" style="margin:10px 2px 0">
+            ${esc(cl.label)} · ${esc(hhmm(S.clock))} · ${S.done.length} seen today
+            <button class="rowbtn" style="float:right;padding:4px 10px;font-size:12px" data-restart>Restart the day</button>
+          </p>
+        </section>
+      </div>
+    </div>`;
+}
+
+function patient(p) {
+  const at = stepIndex(p.phase);
+  return `
+    <div class="pt">
+      <div class="pt-top">
+        <div>
+          <div class="pt-name">${esc(p.name.replace('SYNTHETIC ',''))}</div>
+          <div class="pt-sub">${esc(p.visit)}</div>
+        </div>
+        <span class="pill mono">${esc(p.uhid)}</span>
+      </div>
+      <div class="jrny" role="list" aria-label="Where this visit has reached">
+        ${JOURNEY.map((s, i) => `
+          <span class="step" role="listitem" data-on="${i < at ? 'past' : i === at ? 'now' : ''}">
+            <span class="step-d" aria-hidden="true"></span>
+            <span class="step-l">${esc(s.short)}</span>
+          </span>`).join('')}
+      </div>
+    </div>`;
+}
+
+/* ─── Everything else. Secondary by design, and small on purpose. ────── */
+
+function secondary() {
+  const h = health();
+  const body = {
+    Patients: () => `
+      <h1 class="head">Patients</h1><p class="head-q">Who is in the building, and who has been seen.</p>
+      <div class="card">
+        ${[...(S.chair ? [S.chair] : []), ...S.queue, ...S.done].map(p => `
+          <div class="item" data-tone="${p.phase === 'CLOSED' ? '' : 'good'}">
+            <span class="item-b">
+              <span class="item-t">${esc(p.name.replace('SYNTHETIC ',''))}</span>
+              <span class="item-n">${esc(p.visit)}</span>
+            </span>
+            <span class="pill" data-tone="${p.phase === 'CLOSED' ? 'good' : ''}">${esc(JOURNEY[stepIndex(p.phase)].short)}</span>
+          </div>`).join('') || `<div class="empty"><b>Nobody yet</b>The day has not started.</div>`}
+      </div>`,
+
+    Clinical: () => `
+      <h1 class="head">Clinical</h1><p class="head-q">Consent, radiographs and treatment records.</p>
+      <div class="card">
+        ${GATES.TREATMENT.map(g => `
+          <div class="item" data-tone="${S.facts[g.key] ? 'good' : 'warn'}">
+            <span class="item-b">
+              <span class="item-t">${esc(g.need)}</span>
+              <span class="item-n">${S.facts[g.key] ? 'Held' : 'Not held — this blocks treatment'}</span>
+            </span>
+            <span class="pill" data-tone="${S.facts[g.key] ? 'good' : 'warn'}">${S.facts[g.key] ? 'Met' : 'Open'}</span>
+          </div>`).join('')}
+      </div>
+      <p class="tiny" style="margin:12px 2px">
+        These are checked automatically when treatment is started. They are here to be
+        looked at, never to be worked through.
+      </p>`,
+
+    Operations: () => `
+      <h1 class="head">Operations</h1><p class="head-q">Sterilisation, stock and equipment.</p>
+      <div class="card">
+        ${GATES.OPEN_READY.concat(GATES.CLOSE_LOCK).map(g => `
+          <div class="item" data-tone="${S.facts[g.key] ? 'good' : 'warn'}">
+            <span class="item-b">
+              <span class="item-t">${esc(g.need)}</span>
+              <span class="item-n">${S.facts[g.key] ? 'Done' : 'Outstanding'}</span>
+            </span>
+            <span class="pill" data-tone="${S.facts[g.key] ? 'good' : 'warn'}">${S.facts[g.key] ? 'Done' : 'Open'}</span>
+          </div>`).join('')}
+      </div>`,
+
+    Reports: () => `
+      <h1 class="head">Reports</h1><p class="head-q">What today amounted to.</p>
+      <div class="card"><div class="hz">
+        <div><div class="v">${S.done.length}</div><div class="k">Patients seen</div></div>
+        <div><div class="v">${h.revenue ? '₹' + h.revenue.toLocaleString('en-IN') : '—'}</div><div class="k">Collected</div></div>
+        <div><div class="v">${h.wait === null ? '—' : h.wait + 'm'}</div><div class="k">Average wait</div></div>
+        <div><div class="v">${h.compliance}%</div><div class="k">Compliance</div></div>
+      </div></div>
+      <h2 class="grp-h" style="margin-top:22px">What happened, in order</h2>
+      <div class="card" style="padding:6px 16px 10px">
+        <div class="log">
+          ${S.log.length ? S.log.map(l => `<div><time>${esc(l.at)}</time><span>${esc(l.text)}</span></div>`).join('')
+                         : '<div style="border:0;color:var(--ink-faint)">Nothing has happened yet today.</div>'}
+        </div>
+      </div>`,
+
+    Settings: () => `
+      <h1 class="head">Settings</h1><p class="head-q">How this clinic is configured.</p>
+      <div class="card">
+        <div class="item"><span class="item-b"><span class="item-t">Opens</span><span class="item-n">09:00, Monday to Saturday</span></span></div>
+        <div class="item"><span class="item-b"><span class="item-t">A patient counts as dormant after</span><span class="item-n">30 days</span></span></div>
+        <div class="item"><span class="item-b"><span class="item-t">Air conditioning</span><span class="item-n">24°C in occupied rooms</span></span></div>
+        <div class="item"><span class="item-b"><span class="item-t">Missed rounds escalate to</span><span class="item-n">Clinic Manager, then Clinic Head</span></span></div>
+      </div>
+      <p class="tiny" style="margin:14px 2px">All data here is synthetic.</p>`,
+  }[S.where];
+
+  return (body ? body() : '') + `
+    <div style="margin-top:26px">
+      <button class="rowbtn" data-jump="TODAY">← Back to Today</button>
+    </div>`;
+}
+
+draw();
+</script>
+
+</body>
+</html>
