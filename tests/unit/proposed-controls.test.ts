@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import {
-  PROPOSED_CONTROLS, proposalById, readyToAccept,
+  PROPOSED_CONTROLS, proposalById, readyToAccept, liveProposals, withdrawn,
   DAILY_STANDARD, ACTIVITY_LIBRARY, ladderFor, proposedLadderFor, provenanceOf, runDay,
 } from '@kubi/contracts';
 
@@ -51,11 +51,51 @@ describe('the generated file and the register the owner edits', () => {
   });
 
   it('counts what is settled and what is not', () => {
-    // 28 proposals; 14 could be accepted the day the matrix unfreezes, 14 are
-    // waiting on a frequency, a due rule, a sub-process or a KPI.
-    expect(PROPOSED_CONTROLS).toHaveLength(28);
-    expect(readyToAccept()).toHaveLength(14);
-    expect(PROPOSED_CONTROLS.filter((p) => p.openDecisions.length > 0)).toHaveLength(14);
+    // 38 rows: 32 live proposals and 6 withdrawn. Of the live ones, 12 could be
+    // accepted the day the matrix unfreezes; 20 are waiting on a frequency, a
+    // due rule, a sub-process or a KPI.
+    expect(PROPOSED_CONTROLS).toHaveLength(38);
+    expect(liveProposals()).toHaveLength(32);
+    expect(withdrawn()).toHaveLength(6);
+    expect(readyToAccept()).toHaveLength(12);
+  });
+});
+
+describe('the check that has to happen before anything is proposed', () => {
+  it('records, on every row, what it was compared against in the frozen matrix', () => {
+    // The column exists because it was skipped once. Six proposals reached the
+    // owner's register duplicating controls the clinic already runs — a staff
+    // arrival time, a crown-delivery scheduling gate, a same-day sterilisation
+    // deadline — because the frozen matrix was never read alongside them.
+    // An empty cell here means that comparison was not made.
+    for (const p of PROPOSED_CONTROLS) {
+      expect(p.frozenCheck, `${p.id} has no frozen-matrix check`).toBeTruthy();
+    }
+  });
+
+  it('names real frozen activities, or says NONE_FOUND', () => {
+    const frozen = new Set(ACTIVITY_LIBRARY.map((a) => a.id));
+    for (const p of PROPOSED_CONTROLS) {
+      const named = p.frozenCheck.match(/\b[A-Z]{3,4}-\d{3}\b/g) ?? [];
+      if (named.length === 0) {
+        expect(p.frozenCheck, `${p.id} names nothing and does not say NONE_FOUND`)
+          .toContain('NONE_FOUND');
+        continue;
+      }
+      for (const id of named) {
+        expect(frozen.has(id), `${p.id} cites ${id}, which is not in the frozen matrix`).toBe(true);
+      }
+    }
+  });
+
+  it('gives a withdrawn row a frozen control to point at', () => {
+    // A withdrawal must name what supersedes it. "Withdrawn" with no successor
+    // is how work quietly disappears.
+    for (const p of withdrawn()) {
+      expect(p.frozenCheck, `${p.id} was withdrawn without naming what replaces it`)
+        .toMatch(/[A-Z]{3,4}-\d{3}/);
+      expect(p.frozenCheck).not.toContain('NONE_FOUND');
+    }
   });
 });
 
@@ -111,6 +151,10 @@ describe('a proposal is not a control, however it is displayed', () => {
   });
 
   it('keeps every proposed id out of the frozen matrix', () => {
+    // This test is what caught the duplication. Five ids collided outright —
+    // ATT-001, ATT-002, LAB-001, INV-001, TRN-001 — and the collision was the
+    // symptom: the frozen matrix already ran attendance, lab cases, consumable
+    // checks and competency, and the proposals had been written without it.
     // The freeze, restated where it would be broken. If one of these ever
     // appears in ACTIVITY_LIBRARY it has been accepted, and this file — not
     // the screen — is where that has to be noticed.

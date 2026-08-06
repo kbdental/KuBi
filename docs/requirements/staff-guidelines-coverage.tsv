@@ -1,0 +1,72 @@
+SG ID	Verdict	Where it already lives	Note
+SG-1.1	ALREADY_RUNS	ATT-001 Report for duty	"All scheduled staff checked in by 09:45" — the owner's own time, already frozen. I recorded this as new because I searched the daily standard and the journey libraries and not the 101-activity matrix.
+SG-1.2	ALREADY_RUNS	OPN-001 Open clinic/floors	"Required clinic areas opened before first patient." Floors are in the frozen matrix; I said KuBi had no concept of them.
+SG-1.3	NOT_A_CONTROL	—	A value, not a measurable event. Kept in the guidelines; deliberately not made into a task nobody can pass or fail.
+SG-1.4	ALREADY_RUNS	ATT-003 Submit planned leave	"Planned leave submitted in advance per policy."
+SG-1.5	ALREADY_RUNS	ATT-003, ATT-004 Approve/reject leave	"Every submitted leave has disposition and coverage check." The one-week notice is a policy parameter of ATT-003, not a missing control.
+SG-1.6	NEEDS_NEW_CONCEPT	—	Still true: a leave-accounting rule for payroll. ATT-003 and ATT-004 record the application and its approval, not how days are counted.
+SG-2.1	ALREADY_PROPOSED	HK-001, HK-002, HK-003, HK-004, HK-005, HK-013	Treatment rooms, chair surfaces, slabs, mirrors, floors, reception.
+SG-2.2	ALREADY_PROPOSED	HK-012	Staff dining area cleaning. The only staff-area cleanliness row in any register.
+SG-2.3	ALREADY_PROPOSED	HK-006, HK-007, HK-008, MNT-001, MNT-002, MNT-003	Handles and switches are cleaned by the HK rows and checked for damage by the MNT rows. Two different jobs on the same object, deliberately separate.
+SG-2.4	ALREADY_RUNS	EQP-005 Breakdown reporting	"Failure creates breakdown ticket and asset restriction." MNT-004 has been withdrawn as a duplicate of this.
+SG-2.5	ALREADY_RUNS	OPN-004 Environment readiness	"AC 24C where applicable, diffuser/lights as schedule." The setpoint the owner wrote is already frozen.
+SG-2.6	ALREADY_RUNS	CLS-004 Utilities shutdown, OPN-004	"Unused AC/lights/fans/equipment switched off safely." UTL-002 has been withdrawn as a duplicate of this.
+SG-2.7	ALREADY_PROPOSED	HK-014	Plants watered to schedule. Schedule itself still DECISION_REQUIRED.
+SG-2.8	ALREADY_RUNS	CLS-005 Water pump/tank check	"Pump safely switched off when tank full/at closing." UTL-001 has been withdrawn as a duplicate.
+SG-2.9	ALREADY_RUNS	OPN-004 Environment readiness	"diffuser/lights as schedule". I called this a gap twice — once for missing it, once for finding it. It was frozen all along.
+SG-3.1	ALREADY_RUNS	STER-001 to STER-005, DOS-38, CND-050, CND-051	Collect, ultrasonic, inspect and pack, autoclave with recorded parameters, release only verified batches.
+SG-3.2	PARTIAL	STER-001 to STER-007	The frozen chain runs collect, ultrasonic, pack, autoclave, release, closing check and waste. No step is a UV chamber. STR-001 proposes it.
+SG-3.3	ALREADY_RUNS	DOS-46, EXC-038	BMW disposal and segregation.
+SG-3.4	ALREADY_RUNS	STER-007 Biomedical waste disposal; IC-003 proposed for general waste	Biomedical waste is frozen; the general-waste round is proposed.
+SG-3.5	ALREADY_RUNS	INV-001 Daily critical consumable check	"Critical room consumables available." The owner's longer list — toilet paper, glasses, RVG sleeves — is the configuration of which items are critical.
+SG-3.6	PARTIAL	CLN-005 Chairside setup, EXC-062 PPE violation	The exception punishes a PPE breach; no frozen control states who must wear what. STR-003 proposes it for the treating doctor, which is the part the owner emphasised.
+SG-3.7	ALREADY_RUNS	STER-003 Inspect/dry/pack	"Instruments inspected and properly sealed/packed" — this line exactly.
+SG-3.8	ALREADY_RUNS	STER-002 Ultrasonic cleaning, STER-006 Closing pending instrument check	"Required instruments ultrasonically cleaned same day" and "No used instruments remain unprocessed at closing" — exactly this line, word for word in effect.
+SG-4.1	ALREADY_RUNS	DOS-12, DOS-13	Review the day's appointments, then confirm the remainder.
+SG-4.2	NOT_A_CONTROL	The whole patient journey	A statement of intent covering 96 tasks. "And call too" is covered by SG-4.1 and SG-4.6.
+SG-4.3	PARTIAL	CLN-003 Pre-treatment scan/photo, CLN-009 Post-treatment scan/photo	Both frozen, both conditional — "required baseline", "required post-treatment record". This line makes them unconditional. PAT-001 proposes that amendment.
+SG-4.4	ALREADY_RUNS	PJ-BOOKED-6, PJ-AFTER_PROCEDURE-4	Pre- and post-operative instructions.
+SG-4.5	ALREADY_RUNS	CLN-002 Verify procedure consent	"Valid procedure-specific consent signed" covers any procedure. Facial aesthetics needs to exist as a procedure with a consent requirement — configuration, not a new control.
+SG-4.6	ALREADY_RUNS	PJ-FOLLOW_UP-2, CND-071	24-hour post-surgical follow-up.
+SG-4.7	ALREADY_RUNS	CLN-006 Pre-op medication reminder, CLN-007 Pre-op meal/instruction reminder	Two frozen controls, one for the medicine and one for the meal.
+SG-4.8	ALREADY_RUNS	PJ-COMPLETION-2, CND-080	Satisfaction feedback and its escalation.
+SG-4.9	ALREADY_RUNS	PJ-COMPLETION-3	Google review request.
+SG-4.10	ALREADY_RUNS	LAB-006 Schedule after readiness	"Patient delivery appointment only after configured lab readiness." I called this the most valuable line in the document and said KuBi had no scheduling gates. It is frozen, and it is a scheduling gate.
+SG-4.11	NEEDS_NEW_CONCEPT	—	Requires a notion of an eligible patient and a charitable service. Neither exists.
+SG-4.12	ALREADY_RUNS	DOS-09, PJ-BEFORE_PROCEDURE-9, CND-096 to CND-100, EXC-010	Emergency kit, oxygen, and the emergency protocol chain.
+SG-4.13	ALREADY_RUNS	LAB-004 Receive and cross-check case, LAB-006	Receipt is matched to case, patient and specification; the appointment follows readiness.
+SG-5.1	ALREADY_RUNS	DOS-12, DOS-33	Morning and afternoon appointment review.
+SG-5.2	ALREADY_RUNS	DOS-27, DOS-39, EXC-054	Clinical notes and software entry.
+SG-5.3	ALREADY_RUNS	DOS-16, CND-025 to CND-030	Consent verification before the procedure.
+SG-5.4	ALREADY_RUNS	CND-039, EXC-057	Lab prescriptions and records.
+SG-6.1	ALREADY_RUNS	LAB-003 Monitor expected return, LAB-005 Doctor QC	Cases tracked against due date, QC before patient-ready.
+SG-6.2	ALREADY_RUNS	LAB-003, LAB-004, LAB-007 Manage remake/correction	Tracking, cross-check on receipt, and the remake workflow.
+SG-6.3	NEW	—	Physical organisation of cases and materials in the lab area. No library covers where a case is kept, only where it is in its lifecycle.
+SG-7.1	ALREADY_RUNS	INV-001, INV-004 Low-stock reorder, INV-005 Expiry monitoring	Threshold reorder and FEFO expiry handling.
+SG-7.2	ALREADY_RUNS	IMP-001 Maintain implant SKU master, IMP-003 Implant stock readiness	"Manufacturer/system/platform/dimensions/components current" — the catalogue currency this line asks for.
+SG-7.3	ALREADY_RUNS	INV-001, INV-003 Record stock issue, INV-004 Low-stock reorder	Room consumables checked daily, issues recorded through a controlled transaction, reorder generated at the threshold.
+SG-7.4	ALREADY_RUNS	INV-008 Wastage/adjustment control	"All wastage/adjustments have reason and authorization." I called this unmeasurable; the matrix measures it.
+SG-8.1	NEW	—	A flexible-assignment rule. KuBi models functional assignment as an authority axis but has no way to say "help elsewhere when free".
+SG-8.2	NEW	—	Same as SG-8.1, applied to reception work.
+SG-8.3	ALREADY_RUNS	OPN-003 Reception readiness	"Phones, appointment list, payment/reception systems ready."
+SG-8.4	NEW	—	Asset control: clinic property leaving without authorisation. Nothing in KuBi tracks assets.
+SG-9.1	NOT_A_CONTROL	—	A value. Deliberately not a task.
+SG-9.2	NOT_A_CONTROL	DOS-14 morning huddle	The huddle is the only communication event KuBi has. "Mandatory effective communication" is not measurable.
+SG-9.3	ALREADY_RUNS	CON-002 Patient-facing conflict prevention	"No staff arguments/unprofessional conduct in patient areas." CON-001 records the incident and CON-003 follows it up.
+SG-9.4	NOT_A_CONTROL	The whole system	This is what KuBi is for.
+SG-9.5	NOT_A_CONTROL	—	Observation only. A rule worth stating to staff; nothing an app can see.
+SG-10.1	NEEDS_NEW_CONCEPT	OPN-001 opens "clinic/floors"	Floors exist in the frozen matrix as areas to open. Moving a patient between them is still not modelled.
+SG-10.2	NEW	DOS has a LUNCH rhythm	The rhythm exists; a break roster does not. Nothing records who is on lunch, so "uninterrupted care" cannot be checked.
+SG-10.3	NEW	—	Needs the actual schedule. DECISION_REQUIRED until the owner states the times and who is in each sitting.
+SG-10.4	PARTIAL	DOS-14 and OPN-006 morning huddle	One coordination point at the start of the day, none through it.
+SG-11.1	ALREADY_RUNS	DOS-05, DOS-10, CND-054 to CND-059	Equipment checks and the maintenance triggers.
+SG-11.2	PARTIAL	MNT-003 clinic furniture check	Furniture is covered. File boxes, cabinets and storage systems are named here for the first time.
+SG-11.3	ALREADY_RUNS	TRN-001 Role competency assignment, TRN-004 Restricted work gate	The machinery is frozen: each role has a competency profile and independent work requires a minimum competency. OPG is a configuration of it, not a missing control.
+SG-12.1	NOT_A_CONTROL	—	Shoes on chairs. Observation only: a person can see it and no system can. Worth stating to staff, not worth pretending KuBi will catch.
+SG-12.2	ALREADY_RUNS	EQP-001 Daily functional check, EQP-005 Breakdown reporting	Damage becomes a breakdown ticket with an asset restriction.
+SG-12.3	ALREADY_PROPOSED	HK-001, HK-002, HK-003, HK-004, HK-005, HK-012, HK-013	Restates section 2. The same housekeeping rounds, written once more as a general standard.
+SG-12.4	NOT_A_CONTROL	—	Supporting a colleague. A value, and one the task list quietly serves: work that is visible to everybody is easier to help with than work that is not.
+SG-T.1	ALREADY_RUNS	ATT-001 Report for duty	The check-in exists as a control. What is missing is the biometric device feeding it — an integration, not a control.
+SG-T.2	NOT_A_CONTROL	—	Mobile phones during clinic hours. Observation only; no system can see it. A rule for the noticeboard, not for KuBi.
+SG-T.3	ALREADY_RUNS	DOS-17, PJ-BEFORE_SEATING-1 to PJ-BEFORE_SEATING-8	"Without saying" is the point of the whole system: the room preparation tasks appear before the patient is seated, so nobody has to be told.
+SG-T.4	PARTIAL	FUP-004 Treatment progress follow-up, APT-006 No-show handling	Follow-up during treatment and no-show handling are frozen. A patient who attended, never started, and stopped coming is neither. PAT-006 proposes it.

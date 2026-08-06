@@ -54,6 +54,8 @@ const COL = {
   l2: at('Escalation L2'),
   l3: at('Escalation L3'),
   kpi: at('KPI'),
+  status: at('Status'),
+  frozenCheck: at('Frozen Matrix Check'),
 };
 
 const rows = lines.slice(1).filter((l) => l.trim() !== '').map((line) => {
@@ -72,6 +74,8 @@ const rows = lines.slice(1).filter((l) => l.trim() !== '').map((line) => {
     owner: cell(COL.owner),
     escalation: [cell(COL.l1), cell(COL.l2), cell(COL.l3)].filter((s) => s !== ''),
     kpi: cell(COL.kpi),
+    status: cell(COL.status),
+    frozenCheck: cell(COL.frozenCheck),
     openDecisions,
   };
 });
@@ -86,6 +90,8 @@ const body = rows.map((r) => `  {
     dueRule: ${r.dueRule === 'DECISION_REQUIRED' ? 'null' : q(r.dueRule)},
     owner: ${q(r.owner)},
     escalation: [${r.escalation.map(q).join(', ')}],
+    status: ${q(r.status)},
+    frozenCheck: ${q(r.frozenCheck)},
     openDecisions: [${r.openDecisions.map(q).join(', ')}],
   },`).join('\n');
 
@@ -132,6 +138,20 @@ export interface ProposedControl {
   /** L1 → L2 → L3, as job titles. Decided, even where the schedule is not. */
   escalation: string[];
   /**
+   * PROPOSED, or WITHDRAWN_DUPLICATE where a frozen v2.0 control already does
+   * this. Withdrawn rows are kept rather than deleted: the owner has read them,
+   * and a proposal that quietly vanishes is indistinguishable from one that was
+   * never considered.
+   */
+  status: string;
+  /**
+   * The frozen activities this was compared against before being proposed, or
+   * NONE_FOUND. Required on every row. Six proposals were withdrawn the day
+   * this column was added, because nobody had made that comparison and the
+   * frozen matrix already ran them.
+   */
+  frozenCheck: string;
+  /**
    * Register columns still marked DECISION_REQUIRED. Non-empty means this
    * proposal cannot be accepted into a v3.0 matrix yet, whatever else is
    * settled about it.
@@ -148,9 +168,19 @@ export function proposalById(id: string): ProposedControl | null {
   return PROPOSED_CONTROLS.find((p) => p.id === id) ?? null;
 }
 
-/** Proposals that could be accepted today — nothing left to decide. */
+/** Live proposals. Excludes anything withdrawn as a duplicate of a frozen control. */
+export function liveProposals(): ProposedControl[] {
+  return PROPOSED_CONTROLS.filter((p) => p.status === 'PROPOSED');
+}
+
+/** Live proposals that could be accepted today — nothing left to decide. */
 export function readyToAccept(): ProposedControl[] {
-  return PROPOSED_CONTROLS.filter((p) => p.openDecisions.length === 0);
+  return liveProposals().filter((p) => p.openDecisions.length === 0);
+}
+
+/** Withdrawn because the frozen matrix already does this. */
+export function withdrawn(): ProposedControl[] {
+  return PROPOSED_CONTROLS.filter((p) => p.status === 'WITHDRAWN_DUPLICATE');
 }
 `;
 
@@ -168,6 +198,9 @@ if (checkOnly) {
 }
 
 writeFileSync(OUT, file);
-const open = rows.filter((r) => r.openDecisions.length > 0);
-console.log(`Wrote ${OUT}: ${rows.length} proposals, `
-  + `${rows.length - open.length} ready to accept, ${open.length} still waiting on a decision.`);
+const live = rows.filter((r) => r.status === 'PROPOSED');
+const open = live.filter((r) => r.openDecisions.length > 0);
+console.log(`Wrote ${OUT}: ${rows.length} rows — ${live.length} proposed, `
+  + `${rows.length - live.length} withdrawn as duplicates of frozen controls. `
+  + `Of the live ones, ${live.length - open.length} ready to accept and `
+  + `${open.length} still waiting on a decision.`);

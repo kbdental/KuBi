@@ -41,6 +41,20 @@ export interface ProposedControl {
   /** L1 → L2 → L3, as job titles. Decided, even where the schedule is not. */
   escalation: string[];
   /**
+   * PROPOSED, or WITHDRAWN_DUPLICATE where a frozen v2.0 control already does
+   * this. Withdrawn rows are kept rather than deleted: the owner has read them,
+   * and a proposal that quietly vanishes is indistinguishable from one that was
+   * never considered.
+   */
+  status: string;
+  /**
+   * The frozen activities this was compared against before being proposed, or
+   * NONE_FOUND. Required on every row. Six proposals were withdrawn the day
+   * this column was added, because nobody had made that comparison and the
+   * frozen matrix already ran them.
+   */
+  frozenCheck: string;
+  /**
    * Register columns still marked DECISION_REQUIRED. Non-empty means this
    * proposal cannot be accepted into a v3.0 matrix yet, whatever else is
    * settled about it.
@@ -58,6 +72,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "Opening, between patients, and closing",
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "OPN-002 — readiness is the state at opening; this is the round that produces it",
     openDecisions: [],
   },
   {
@@ -69,6 +85,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "Opening, between patients, and closing",
     owner: "Clinic Manager",
     escalation: ["Assistant", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "OPN-002",
     openDecisions: [],
   },
   {
@@ -80,6 +98,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "Opening, between patients, and closing",
     owner: "Clinic Manager",
     escalation: ["Assistant", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "OPN-002",
     openDecisions: [],
   },
   {
@@ -91,6 +111,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "Opening, between patients, and closing",
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND",
     openDecisions: [],
   },
   {
@@ -102,6 +124,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "Opening, between patients, and closing",
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "OPN-002",
     openDecisions: [],
   },
   {
@@ -113,6 +137,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: null,
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND",
     openDecisions: ["Frequency", "Due Rule"],
   },
   {
@@ -124,6 +150,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: null,
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND",
     openDecisions: ["Frequency", "Due Rule"],
   },
   {
@@ -135,6 +163,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: null,
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND",
     openDecisions: ["Frequency", "Due Rule"],
   },
   {
@@ -146,6 +176,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: null,
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND",
     openDecisions: ["Frequency", "Due Rule"],
   },
   {
@@ -157,6 +189,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: null,
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "INV-001 — covers clinical consumables, not washroom supplies",
     openDecisions: ["Frequency", "Due Rule"],
   },
   {
@@ -168,6 +202,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: null,
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "INV-001 — covers clinical consumables, not washroom supplies",
     openDecisions: ["Frequency", "Due Rule"],
   },
   {
@@ -179,6 +215,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "Closing",
     owner: "Clinic Manager",
     escalation: ["Staff/HK", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND",
     openDecisions: [],
   },
   {
@@ -190,6 +228,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "Opening",
     owner: "Clinic Manager",
     escalation: ["HK/Reception", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "OPN-003 — reception systems readiness, not reception cleanliness",
     openDecisions: ["Sub-Process", "KPI"],
   },
   {
@@ -201,6 +241,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: null,
     owner: "Clinic Manager",
     escalation: ["HK", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND",
     openDecisions: ["Sub-Process", "Frequency", "Due Rule", "KPI"],
   },
   {
@@ -212,6 +254,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "Opening",
     owner: "Clinic Manager",
     escalation: ["Assistant", "Clinic Manager", "Clinic Head"],
+    status: "WITHDRAWN_DUPLICATE",
+    frozenCheck: "INV-001 Daily critical consumable check — same control",
     openDecisions: [],
   },
   {
@@ -223,6 +267,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "Before procedure",
     owner: "Clinic Manager",
     escalation: ["Assistant", "Clinic Manager", "Clinic Head"],
+    status: "WITHDRAWN_DUPLICATE",
+    frozenCheck: "CLN-005 Chairside setup — same control",
     openDecisions: [],
   },
   {
@@ -234,6 +280,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "Opening",
     owner: "Clinic Manager",
     escalation: ["Assistant", "Clinic Manager", "Clinic Head"],
+    status: "WITHDRAWN_DUPLICATE",
+    frozenCheck: "EQP-001 Daily functional check — same control",
     openDecisions: [],
   },
   {
@@ -245,6 +293,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "At patient checkout",
     owner: "Clinic Manager",
     escalation: ["Assistant", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND — the frozen matrix has opening readiness, not a between-patient reset",
     openDecisions: [],
   },
   {
@@ -256,6 +306,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: null,
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "EQP-001 — covers critical assets, not building fabric",
     openDecisions: ["Due Rule"],
   },
   {
@@ -267,6 +319,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: null,
     owner: "Clinic Head",
     escalation: ["Clinic Manager", "Clinic Head", "Owner"],
+    status: "PROPOSED",
+    frozenCheck: "EQP-001 — covers critical assets, not electrical fittings and wiring",
     openDecisions: ["Due Rule"],
   },
   {
@@ -278,6 +332,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: null,
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND",
     openDecisions: ["Due Rule"],
   },
   {
@@ -289,6 +345,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "Immediately on discovery",
     owner: "Clinic Manager",
     escalation: ["Clinic Manager", "Clinic Head", "Owner"],
+    status: "WITHDRAWN_DUPLICATE",
+    frozenCheck: "EQP-005 Breakdown reporting — same control",
     openDecisions: [],
   },
   {
@@ -300,6 +358,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: null,
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "WITHDRAWN_DUPLICATE",
+    frozenCheck: "CLS-005 Water pump/tank check — same control",
     openDecisions: ["Due Rule"],
   },
   {
@@ -311,6 +371,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: null,
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "WITHDRAWN_DUPLICATE",
+    frozenCheck: "CLS-004 Utilities shutdown and OPN-004 Environment readiness — same control",
     openDecisions: ["Due Rule"],
   },
   {
@@ -322,6 +384,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "Opening and closing",
     owner: "Clinic Head",
     escalation: ["Senior Assistant", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND",
     openDecisions: [],
   },
   {
@@ -333,6 +397,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "After the last patient",
     owner: "Clinic Head",
     escalation: ["Senior Assistant", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND",
     openDecisions: [],
   },
   {
@@ -344,6 +410,8 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: "Opening and closing",
     owner: "Clinic Manager",
     escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "STER-007 — biomedical waste only; general waste is not covered",
     openDecisions: [],
   },
   {
@@ -355,7 +423,139 @@ export const PROPOSED_CONTROLS: readonly ProposedControl[] = [
     dueRule: null,
     owner: "Clinic Head",
     escalation: ["Clinic Manager", "Clinic Head", "Owner"],
+    status: "PROPOSED",
+    frozenCheck: "OPN-001, OPN-002, OPN-003, OPN-004, OPN-005 — no huddle among them",
     openDecisions: ["Due Rule"],
+  },
+  {
+    id: "STR-001",
+    parameter: "Infection Control",
+    activity: "UV chamber holding",
+    standard: "Released instruments held in the UV chamber per protocol before storage",
+    frequency: "PER_EVENT",
+    dueRule: "After autoclave release, before storage",
+    owner: "Clinic Head",
+    escalation: ["Sterilization Technician", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "STER-001 to STER-007 — the chain has no UV step",
+    openDecisions: ["KPI"],
+  },
+  {
+    id: "STR-003",
+    parameter: "Infection Control",
+    activity: "Glove use by the treating doctor",
+    standard: "The treating doctor wears gloves for every examination and treatment",
+    frequency: "PER_PATIENT",
+    dueRule: "Before the patient is touched",
+    owner: "Clinic Head",
+    escalation: ["Treating Doctor", "Clinic Head", "Owner"],
+    status: "PROPOSED",
+    frozenCheck: "CLN-005, STER-001 to STER-007 — no PPE control by role",
+    openDecisions: [],
+  },
+  {
+    id: "PAT-001",
+    parameter: "Clinical Documentation",
+    activity: "Pre- and post-treatment scan",
+    standard: "A pre-treatment and a post-treatment scan recorded for every patient",
+    frequency: "PER_PATIENT",
+    dueRule: "Before treatment starts and before the patient leaves",
+    owner: "Clinic Head",
+    escalation: ["Dental Assistant", "Treating Doctor", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "CLN-003 and CLN-009 — both exist and both say \"required\"; this removes the condition",
+    openDecisions: [],
+  },
+  {
+    id: "PAT-006",
+    parameter: "Patient Retention",
+    activity: "Dormant patient follow-up",
+    standard: "Patients who attended but did not start treatment, or stopped attending, are followed up by a doctor",
+    frequency: null,
+    dueRule: null,
+    owner: "Clinic Head",
+    escalation: ["Treating Doctor", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "FUP-004 follows treatment in progress; APT-006 handles no-shows; neither finds a patient who attended and never started",
+    openDecisions: ["Frequency", "Due Rule", "Failure Definition"],
+  },
+  {
+    id: "LABS-001",
+    parameter: "Laboratory & Prosthetics",
+    activity: "Lab case storage and organisation",
+    standard: "Every lab case and material is in its labelled place and can be found",
+    frequency: null,
+    dueRule: null,
+    owner: "Clinic Manager",
+    escalation: ["Lab Coordinator", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "LAB-001 to LAB-007 — lifecycle only, never physical location",
+    openDecisions: ["Frequency", "Due Rule", "KPI"],
+  },
+  {
+    id: "REC-001",
+    parameter: "Workflow & Coordination",
+    activity: "Reception support when free",
+    standard: "Clinical staff with no patient assist reception with appointments, calls and coordination",
+    frequency: "PER_EVENT",
+    dueRule: null,
+    owner: "Clinic Manager",
+    escalation: ["Dental Assistant", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND",
+    openDecisions: ["Due Rule", "Failure Definition", "KPI"],
+  },
+  {
+    id: "REC-002",
+    parameter: "Asset Control",
+    activity: "Clinic property removal authorisation",
+    standard: "No clinic property or material leaves the premises without recorded authorisation",
+    frequency: "PER_EVENT",
+    dueRule: "Before it leaves",
+    owner: "Clinic Manager",
+    escalation: ["Clinic Manager", "Clinic Head", "Owner"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND",
+    openDecisions: ["KPI"],
+  },
+  {
+    id: "COORD-001",
+    parameter: "Workflow & Coordination",
+    activity: "Lunch roster",
+    standard: "Lunch taken to a fixed schedule with patient cover maintained throughout",
+    frequency: "DAILY",
+    dueRule: null,
+    owner: "Clinic Manager",
+    escalation: ["Clinic Manager", "Clinic Head", "Owner"],
+    status: "PROPOSED",
+    frozenCheck: "NONE_FOUND",
+    openDecisions: ["Due Rule", "KPI"],
+  },
+  {
+    id: "COORD-002",
+    parameter: "Workflow & Coordination",
+    activity: "Coordination check through the day",
+    standard: "DECISION_REQUIRED",
+    frequency: null,
+    dueRule: null,
+    owner: "Clinic Manager",
+    escalation: ["Clinic Manager", "Clinic Head", "Owner"],
+    status: "PROPOSED",
+    frozenCheck: "AUD-001 and AUD-002 — periodic reviews, not through-the-day coordination",
+    openDecisions: ["Standard / Expected Result", "Frequency", "Due Rule", "Failure Definition", "KPI"],
+  },
+  {
+    id: "MNT-005",
+    parameter: "Maintenance",
+    activity: "Storage and filing systems check",
+    standard: "File boxes, cabinets and storage systems intact, closing and properly maintained",
+    frequency: null,
+    dueRule: null,
+    owner: "Clinic Manager",
+    escalation: ["Housekeeping", "Clinic Manager", "Clinic Head"],
+    status: "PROPOSED",
+    frozenCheck: "EQP-001 — assets, not filing and storage furniture",
+    openDecisions: ["Frequency", "Due Rule", "KPI"],
   },
 ];
 
@@ -364,7 +564,17 @@ export function proposalById(id: string): ProposedControl | null {
   return PROPOSED_CONTROLS.find((p) => p.id === id) ?? null;
 }
 
-/** Proposals that could be accepted today — nothing left to decide. */
+/** Live proposals. Excludes anything withdrawn as a duplicate of a frozen control. */
+export function liveProposals(): ProposedControl[] {
+  return PROPOSED_CONTROLS.filter((p) => p.status === 'PROPOSED');
+}
+
+/** Live proposals that could be accepted today — nothing left to decide. */
 export function readyToAccept(): ProposedControl[] {
-  return PROPOSED_CONTROLS.filter((p) => p.openDecisions.length === 0);
+  return liveProposals().filter((p) => p.openDecisions.length === 0);
+}
+
+/** Withdrawn because the frozen matrix already does this. */
+export function withdrawn(): ProposedControl[] {
+  return PROPOSED_CONTROLS.filter((p) => p.status === 'WITHDRAWN_DUPLICATE');
 }
