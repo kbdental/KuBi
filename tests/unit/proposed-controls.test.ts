@@ -51,13 +51,17 @@ describe('the generated file and the register the owner edits', () => {
   });
 
   it('counts what is settled and what is not', () => {
-    // 38 rows: 32 live proposals and 6 withdrawn. Of the live ones, 12 could be
-    // accepted the day the matrix unfreezes; 20 are waiting on a frequency, a
-    // due rule, a sub-process or a KPI.
+    // 38 rows: 32 live proposals and 6 withdrawn. Of the live ones, 13 could
+    // be accepted the day the matrix unfreezes; 19 are waiting on a frequency,
+    // a due rule, a sub-process or a KPI.
+    //
+    // 13 rather than 12 since 2026-08-06: the owner answered PAT-006, the
+    // dormant-patient control, with "30 days". One answer, one fewer blocked
+    // proposal — which is the shape of every remaining decision on this list.
     expect(PROPOSED_CONTROLS).toHaveLength(38);
     expect(liveProposals()).toHaveLength(32);
     expect(withdrawn()).toHaveLength(6);
-    expect(readyToAccept()).toHaveLength(12);
+    expect(readyToAccept()).toHaveLength(13);
   });
 });
 

@@ -103,12 +103,14 @@ describe('the registry as a record of what is missing', () => {
 
   it('builds exactly the clinical workflow in phase 1, and nothing else', () => {
     // Doctor, assistant, lab, reception, sterilisation — the five the owner
-    // scoped — plus the owner's and manager's, which were already live.
+    // scoped — plus the owner's and manager's, which were already live, plus
+    // RETENTION, the first dashboard built from the staff guidelines rather
+    // than from the original scope.
     const built = allDashboards()
       .filter((d) => d.status === DashboardStatus.LIVE).map((d) => d.id).sort();
     expect(built).toEqual([
       'ASSISTANT', 'COMMAND', 'DESK', 'DOCTOR', 'HOUSEKEEPING', 'LAB', 'OWNER',
-      'STERILIZATION',
+      'RETENTION', 'STERILIZATION',
     ]);
   });
 

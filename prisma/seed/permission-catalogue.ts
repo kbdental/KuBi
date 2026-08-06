@@ -139,6 +139,7 @@ export const PERMISSION_CATALOGUE: readonly PermissionSeed[] = [
   p('patient', 'view', S, 'Phase 0.5 D1 clinical.patient — clinic-scoped read only; no clinical fields exist yet'),
   p('patient', 'view_all_clinics', A, 'ADR-002/D-02 — the org-wide visibility permission that OD-05 governs'),
   p('patient', 'emergency_access', B, 'NEW — break-glass only'),
+  p('patient', 'retention_followup', C, 'NEW — SG-T.4. Ringing a patient about unfinished treatment is a clinical conversation: the caller has to be able to answer "is it urgent that I come in". CLINICAL rather than STANDARD for that reason, which keeps it off reception by default.'),
 ] as const;
 
 /** Fast lookup by `resource:action` code. */

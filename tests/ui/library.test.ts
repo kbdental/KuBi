@@ -80,6 +80,9 @@ const CONVERTED = [
   'gate.tsx',
   'notifications.tsx',
   'patient-360.tsx',
+  // Built on the vocabulary from the first line rather than converted onto it
+  // afterwards, which is the point of having one.
+  'retention.tsx',
   'rules.tsx',
   'today.tsx',
 ];

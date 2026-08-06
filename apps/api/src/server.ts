@@ -12,7 +12,7 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import { z } from 'zod';
-import { prisma, withTenantContext } from './platform/tenancy/rls-context.js';
+import { prisma, withTenantContext, type TenantPrisma } from './platform/tenancy/rls-context.js';
 import { systemClock } from './shared/clock.js';
 import { logger } from './shared/logging/logger.js';
 import { verifyPassword } from './platform/auth/password.service.js';
@@ -37,7 +37,12 @@ import {
   raiseIncident, containIncident, investigateIncident, addAction,
   implementAction, checkEffectiveness, closeIncident, listIncidents, CapaRuleError,
 } from './platform/quality/capa.service.js';
-import { ActivityStatus, ExceptionStatus, DAILY_STANDARD } from '@kubi/contracts';
+import { RetentionService, RetentionError } from './domains/clinical/retention.service.js';
+import {
+  ActivityStatus, ExceptionStatus, DAILY_STANDARD,
+  DORMANT_AFTER_DAYS, type OutreachOutcome,
+} from '@kubi/contracts';
+
 
 /**
  * What each role's briefing is called, and the one question it answers.
@@ -68,6 +73,12 @@ const ROLE_QUESTION: Record<string, string> = {
 };
 
 const clock = systemClock;
+
+/**
+ * The retention loop. Stateless apart from the clock, so one instance is
+ * enough; the tenant transaction is passed in on every call.
+ */
+const retention = new RetentionService(clock);
 
 /** Buckets for TODAY. Plain words, ordered by urgency. */
 type Bucket = 'OVERDUE' | 'NOW' | 'NEXT' | 'LATER';
@@ -192,6 +203,36 @@ async function clinicContext(
   return { ...base, phase, opening, closing, readyBy, closingAt };
 }
 
+/**
+ * Refuse, audibly, unless this person holds the permission.
+ *
+ * The denial is written to the audit log before the 403 is thrown, because a
+ * refused clinical action is exactly the thing somebody will later ask about.
+ * Extracted here after the third copy of this block; the two older routes keep
+ * their inline versions until they are next touched, since rewriting working
+ * authorisation code to save six lines is not a trade worth making.
+ */
+async function requireClinical(
+  tx: TenantPrisma, s: ResolvedSession, clinicId: string,
+  code: string, entityType: string, entityId: string,
+): Promise<void> {
+  const decision = await checkPermission(tx, clock, {
+    employeeId: s.employeeId!, organizationId: s.organizationId, clinicId, code,
+  });
+  if (decision.allowed) return;
+
+  await writeAudit(tx, {
+    organizationId: s.organizationId, clinicId,
+    actorEmployeeId: s.employeeId, action: AuditAction.UNAUTHORIZED_ATTEMPT,
+    entityType, entityId,
+  });
+  throw Object.assign(
+    new Error('Following a patient up about unfinished treatment is a clinical call, '
+      + 'and your role does not hold that permission.'),
+    { statusCode: 403 },
+  );
+}
+
 async function requireSession(req: FastifyRequest): Promise<ResolvedSession> {
   const token = (req.cookies as Record<string, string | undefined>)['kubi_at']
     ?? req.headers.authorization?.replace(/^Bearer /, '');
@@ -242,6 +283,14 @@ export async function buildServer(): Promise<FastifyInstance> {
     }
     if (err instanceof AppointmentTransitionError) {
       reply.status(409).send({ error: err.message });
+      return;
+    }
+    // "Somebody is already following this patient up" and "they have booked
+    // since you opened this list" are both states of the clinic, not faults in
+    // the request. 409 so the screen can say so and reload, rather than
+    // reporting a server error for a race the user handled correctly.
+    if (err instanceof RetentionError) {
+      reply.status(409).send({ error: err.message, code: err.code });
       return;
     }
     if (status >= 500) logger.error({ errorName: err.name }, 'request failed');
@@ -824,6 +873,69 @@ export async function buildServer(): Promise<FastifyInstance> {
     await withTenantContext(prisma, s.tenancy, (tx) =>
       authoriseGate(tx, clock, { instanceId: id, employeeId: s.employeeId!, reason: body.reason }));
     await track(s, 'authorise_gate', { instanceId: id });
+    return { ok: true };
+  });
+
+  // ---- RETENTION: the patients who stopped coming (SG-T.4, 30 days) ----
+  //
+  // Read is open to anyone who can see the schedule; acting on it is not.
+  // Ringing a patient about unfinished treatment is a clinical conversation,
+  // so opening and recording require 'patient:followup', the same permission
+  // the post-surgical follow-up uses.
+
+  app.get('/api/v1/retention', async (req) => {
+    const s = await requireSession(req);
+    const result = await withTenantContext(prisma, s.tenancy, async (tx) => {
+      const clinicId = s.tenancy.clinicIds[0];
+      if (s.tenancy.clinicIds.length !== 1 || !clinicId) {
+        return { items: [], summary: null, dormantAfterDays: DORMANT_AFTER_DAYS };
+      }
+      const [items, summary] = await Promise.all([
+        retention.list(tx, clinicId),
+        retention.summary(tx, clinicId),
+      ]);
+      return { items, summary, dormantAfterDays: DORMANT_AFTER_DAYS };
+    });
+
+    await track(s, 'view_retention');
+    return result;
+  });
+
+  app.post('/api/v1/retention/:patientId/open', async (req) => {
+    const s = await requireSession(req);
+    const { patientId } = z.object({ patientId: z.string().uuid() }).parse(req.params);
+
+    const result = await withTenantContext(prisma, s.tenancy, async (tx) => {
+      const clinicId = s.tenancy.clinicIds[0];
+      if (!clinicId) throw Object.assign(new Error('No clinic in context.'), { statusCode: 400 });
+      await requireClinical(tx, s, clinicId, 'patient:followup', 'patient', patientId);
+      return retention.open(tx, clinicId, s.organizationId, patientId);
+    });
+
+    await track(s, 'retention_open', { metadata: { patientId } });
+    return result;
+  });
+
+  app.post('/api/v1/retention/:id/record', async (req) => {
+    const s = await requireSession(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const body = z.object({
+      outcome: z.enum([
+        'RETURNING', 'DECLINED', 'WILL_DECIDE', 'NO_ANSWER', 'UNREACHABLE', 'NOT_APPLICABLE',
+      ]),
+      note: z.string().max(1000).optional(),
+    }).parse(req.body);
+
+    await withTenantContext(prisma, s.tenancy, async (tx) => {
+      const clinicId = s.tenancy.clinicIds[0];
+      if (!clinicId) throw Object.assign(new Error('No clinic in context.'), { statusCode: 400 });
+      await requireClinical(tx, s, clinicId, 'patient:followup', 'retention_outreach', id);
+      await retention.record(
+        tx, clinicId, id, body.outcome as OutreachOutcome, s.employeeId!, body.note,
+      );
+    });
+
+    await track(s, 'retention_record', { metadata: { outcome: body.outcome } });
     return { ok: true };
   });
 

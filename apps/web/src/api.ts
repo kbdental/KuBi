@@ -727,6 +727,38 @@ export interface ReceptionBoard {
   paymentsAvailable: boolean;
 }
 
+/** One patient on the retention list. See packages/contracts/src/retention.ts. */
+export interface RetentionItem {
+  patientId: string;
+  patientLabel: string;
+  uhid: string;
+  reason: 'NEVER_STARTED' | 'STOPPED_MID_TREATMENT';
+  daysSinceLastVisit: number;
+  /** The clinical stake, in one clause. */
+  stake: string;
+  outreach: {
+    id: string;
+    raisedAt: string;
+    contactedAt: string | null;
+    outcome: string | null;
+    note: string | null;
+  } | null;
+}
+
+export interface Retention {
+  items: RetentionItem[];
+  summary: {
+    dormant: number;
+    midTreatment: number;
+    contactedThisMonth: number;
+    returningThisMonth: number;
+  } | null;
+  dormantAfterDays: number;
+}
+
+export type OutreachOutcome =
+  'RETURNING' | 'DECLINED' | 'WILL_DECIDE' | 'NO_ANSWER' | 'UNREACHABLE' | 'NOT_APPLICABLE';
+
 export const api = {
   login: (email: string, password: string) =>
     post<{ displayLabel: string; roleCodes: string[] }>('/api/v1/auth/login', { email, password }),
@@ -785,6 +817,13 @@ export const api = {
     post<PatientProcedure>(`/api/v1/patient-procedures/${id}/start`, {}),
   overridePatientProcedure: (id: string, reason: string) =>
     post<PatientProcedure>(`/api/v1/patient-procedures/${id}/override`, { reason }),
+
+  retention: () => call<Retention>('/api/v1/retention'),
+  openRetention: (patientId: string) =>
+    post<{ id: string }>(`/api/v1/retention/${patientId}/open`, {}),
+  recordRetention: (id: string, outcome: OutreachOutcome, note?: string) =>
+    post<{ ok: boolean }>(`/api/v1/retention/${id}/record`,
+      { outcome, ...(note ? { note } : {}) }),
 
   followups: () => call<Followup[]>('/api/v1/followups'),
   respondToFollowup: (

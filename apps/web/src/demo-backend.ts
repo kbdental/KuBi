@@ -32,6 +32,7 @@ import {
   type Responsibility, type EscalationRung,
   DAILY_STANDARD, provenanceOf, minutesFromOpening, standardById,
   type WorkProvenance,
+  retentionOrder, DORMANT_AFTER_DAYS, CLOSING_OUTCOMES,
 } from '@kubi/contracts';
 
 type Role =
@@ -234,6 +235,23 @@ function workSpecFor(t: Task): {
     escalation: ladder(responsibility, minutes),
     kpi: KPI[t.parameter] ?? null,
   };
+}
+
+/** One row of the retention list, shaped exactly as the real API returns it. */
+interface DemoRetention {
+  patientId: string;
+  patientLabel: string;
+  uhid: string;
+  reason: 'NEVER_STARTED' | 'STOPPED_MID_TREATMENT';
+  daysSinceLastVisit: number;
+  stake: string;
+  outreach: {
+    id: string;
+    raisedAt: string;
+    contactedAt: string | null;
+    outcome: string | null;
+    note: string | null;
+  } | null;
 }
 
 interface Attention {
@@ -946,9 +964,49 @@ function freshState() {
     { id: 'b4', batchRef: 'STER-0911', stage: 'QUARANTINED', packCount: 6, operator: 'Priya', cycleResult: 'INCONCLUSIVE' },
   ];
 
+  /**
+   * Patients who have gone quiet, as the retention rule would find them.
+   *
+   * Synthetic, and named as such. Four rows, chosen so the screen shows every
+   * state it has to handle rather than four of the same: two mid-treatment
+   * (one already picked up by a colleague), one who never started, and — not
+   * in this list at all — the patient who booked last week, whose absence is
+   * the point. See packages/contracts/src/retention.ts.
+   */
+  const retention: DemoRetention[] = [
+    {
+      patientId: 'rp-1', patientLabel: 'SYNTHETIC Meera R.', uhid: 'SYN-1041',
+      reason: 'STOPPED_MID_TREATMENT', daysSinceLastVisit: 63,
+      stake: '1 treatment left unfinished', outreach: null,
+    },
+    {
+      patientId: 'rp-2', patientLabel: 'SYNTHETIC Kabir S.', uhid: 'SYN-1077',
+      reason: 'STOPPED_MID_TREATMENT', daysSinceLastVisit: 41,
+      stake: '2 treatments left unfinished',
+      // Already claimed and rung once, with no answer. On screen this is the
+      // difference between "nobody has called" and "somebody tried".
+      outreach: {
+        id: 'ro-2', raisedAt: new Date(Date.now() - 2 * 864e5).toISOString(),
+        contactedAt: new Date(Date.now() - 864e5).toISOString(),
+        outcome: 'NO_ANSWER', note: null,
+      },
+    },
+    {
+      patientId: 'rp-3', patientLabel: 'SYNTHETIC Devika N.', uhid: 'SYN-1108',
+      reason: 'NEVER_STARTED', daysSinceLastVisit: 118,
+      stake: '3 planned treatments never begun', outreach: null,
+    },
+    {
+      patientId: 'rp-4', patientLabel: 'SYNTHETIC Rohan T.', uhid: 'SYN-1132',
+      reason: 'NEVER_STARTED', daysSinceLastVisit: 34,
+      stake: '1 planned treatment never begun', outreach: null,
+    },
+  ];
+
   return {
     tasks, visits, attention, incidents, patientProcedures, followups,
-    assets, stock, implants, batches, labCases,
+    assets, stock, implants, batches, labCases, retention,
+    retentionContacted: 0, retentionReturning: 0,
     nextIncidentNumber: 8,
     /**
      * The audit trail. Append-only by construction — nothing in this file
@@ -2649,6 +2707,73 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     // time buries the thing that has been failing longest.
     rows.sort((x, y) => (y.level ?? 0) - (x.level ?? 0) || y.minutesLate - x.minutesLate);
     return json(rows);
+  }
+
+  // ---- RETENTION: the patients who stopped coming (SG-T.4, 30 days) ----
+  //
+  // The owner asked how long counts as "not coming back" and said thirty days.
+  // Here the list is a fixed set of synthetic patients rather than arithmetic
+  // over a year of appointments, because this file has no year of appointments
+  // — but the shape, the ordering and every state the screen must handle are
+  // the real ones, and the sort is the real function from contracts.
+
+  if (path === '/api/v1/retention' && method === 'GET') {
+    // Reception is deliberately refused. The permission is CLINICAL, granted
+    // to the treating doctor, because the first sentence of this call can turn
+    // clinical. A demo that let everyone in would misrepresent the product.
+    // Only the doctor here: this file has no Clinical Director persona, and
+    // adding one to widen a check would be inventing a person to pass a test.
+    if (!me.roles.includes('TREATING_DOCTOR')) {
+      return json({ error: 'Following a patient up about unfinished treatment is a clinical '
+        + 'call, and your role does not hold that permission.' }, 403);
+    }
+
+    const items = [...db.retention].sort(retentionOrder);
+    return json({
+      items,
+      summary: {
+        dormant: items.length,
+        midTreatment: items.filter((i) => i.reason === 'STOPPED_MID_TREATMENT').length,
+        contactedThisMonth: db.retentionContacted,
+        returningThisMonth: db.retentionReturning,
+      },
+      dormantAfterDays: DORMANT_AFTER_DAYS,
+    });
+  }
+
+  const claim = /^\/api\/v1\/retention\/([\w-]+)\/open$/.exec(path);
+  if (claim && method === 'POST') {
+    const row = db.retention.find((r) => r.patientId === claim[1]);
+    if (!row) return json({ error: 'No such patient' }, 404);
+    if (row.outreach) {
+      return json({ error: 'Somebody is already following this patient up' }, 409);
+    }
+    row.outreach = {
+      id: `ro-${row.patientId}`, raisedAt: new Date().toISOString(),
+      contactedAt: null, outcome: null, note: null,
+    };
+    return json({ id: row.outreach.id });
+  }
+
+  const record = /^\/api\/v1\/retention\/([\w-]+)\/record$/.exec(path);
+  if (record && method === 'POST') {
+    const row = db.retention.find((r) => r.outreach?.id === record[1]);
+    if (!row || !row.outreach) return json({ error: 'No such follow-up' }, 404);
+
+    const outcome = String(body.outcome);
+    db.retentionContacted += 1;
+    if (outcome === 'RETURNING') db.retentionReturning += 1;
+
+    // The same rule as the server: a real answer takes them off the list; an
+    // unanswered phone does not, because nobody has spoken to them.
+    if (CLOSING_OUTCOMES.includes(outcome as never) || outcome === 'WILL_DECIDE') {
+      db.retention = db.retention.filter((r) => r !== row);
+    } else {
+      row.outreach.contactedAt = new Date().toISOString();
+      row.outreach.outcome = outcome;
+      row.outreach.note = body.note ? String(body.note) : null;
+    }
+    return json({ ok: true });
   }
 
   // ---- SCOREBOARD: sixteen parameters into eight management scores ----

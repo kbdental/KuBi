@@ -14,6 +14,7 @@ import { CommandCentre } from '../screens/command-centre.js';
 import { OwnerBusiness } from '../screens/owner-business.js';
 import { ReceptionBoard } from '../screens/reception-board.js';
 import { BriefingScreen } from '../screens/briefing.js';
+import { Retention as RetentionScreen } from '../screens/retention.js';
 import { registerDashboard, DashboardStatus } from './registry.js';
 
 export function registerAllDashboards(): void {
@@ -74,6 +75,20 @@ export function registerAllDashboards(): void {
     status: DashboardStatus.LIVE,
     home: true,
     render: (ctx) => <BriefingScreen onOpenTask={ctx.openTask} onRefresh={ctx.reload} />,
+  });
+
+  registerDashboard({
+    id: 'RETENTION',
+    question: 'Who has stopped coming?',
+    label: 'Follow up',
+    // The owner named the doctor for this work, and the permission follows:
+    // patient:retention_followup is CLINICAL and is granted to the treating
+    // doctor alone. Reception can see nothing here, which is deliberate — the
+    // first sentence of the call can turn clinical.
+    roles: ['TREATING_DOCTOR', 'CLINICAL_DIRECTOR'],
+    phase: 1,
+    status: DashboardStatus.LIVE,
+    render: () => <RetentionScreen />,
   });
 
   registerDashboard({

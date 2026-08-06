@@ -151,6 +151,11 @@ export const CANONICAL_ROLES: readonly RoleSeed[] = [
       c('employee', 'view'),
       c('competency', 'view'),
       c('patient', 'view'),
+      // SG-T.4: "Dr's to do follow up with existing patient and patient that
+      // have come but not started treatment". The owner named the doctor, so
+      // the doctor holds it — and reception, who make most other calls, does
+      // not, because this one may turn clinical in the first sentence.
+      c('patient', 'retention_followup'),
     ],
   },
   {

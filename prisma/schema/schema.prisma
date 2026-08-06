@@ -51,21 +51,22 @@ model Organization {
   automationExecutions  AutomationExecution[]
   appointments          Appointment[]
 
-  incidents         Incident[]
-  capaActions       CapaAction[]
-  procedures        Procedure[]
-  patientProcedures PatientProcedure[]
-  consents          Consent[]
-  followups         Followup[]
-  assets            Asset[]
-  maintenancePlans  MaintenancePlan[]
-  assetChecks       AssetCheck[]
-  breakdowns        Breakdown[]
-  items             Item[]
-  stockBatches      StockBatch[]
-  implantSkus       ImplantSku[]
+  incidents            Incident[]
+  capaActions          CapaAction[]
+  procedures           Procedure[]
+  patientProcedures    PatientProcedure[]
+  consents             Consent[]
+  followups            Followup[]
+  assets               Asset[]
+  maintenancePlans     MaintenancePlan[]
+  assetChecks          AssetCheck[]
+  breakdowns           Breakdown[]
+  items                Item[]
+  stockBatches         StockBatch[]
+  implantSkus          ImplantSku[]
   sterilizationBatches SterilizationBatch[]
   labCases             LabCase[]
+  retentionOutreach    RetentionOutreach[]
 
   @@map("organizations")
 }
@@ -113,6 +114,7 @@ model Patient {
   followups         Followup[]
 
   labCases          LabCase[]
+  retentionOutreach RetentionOutreach[]
 
   @@unique([organizationId, uhid])
   @@index([organizationId, clinicId])
@@ -569,10 +571,9 @@ model ActivityInstance {
   evidence       Evidence[]
   verifications  Verification[]
   attentionItems AttentionItem[]
+  incidents      Incident[]
 
   @@unique([definitionId, scopeKey, periodKey])
-  incidents Incident[]
-
   @@index([organizationId, clinicId, status])
   @@index([assigneeEmployeeId, status])
   @@map("activity_instances")
@@ -891,8 +892,8 @@ model Procedure {
   id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String @map("organization_id") @db.Uuid
 
-  code String
-  name String
+  code     String
+  name     String
   /// OD-06 is OPEN: only SURGERY and IMPLANT_SURGERY are confirmed by the
   /// Build Pack. No protocol may be seeded against an unconfirmed category.
   category String
@@ -923,8 +924,8 @@ model ProcedureRequirement {
   procedureId String @map("procedure_id") @db.Uuid
 
   /// What is being required — CONSENT, MEDICAL_HISTORY, RADIOGRAPH, and so on.
-  kind  String
-  label String
+  kind        String
+  label       String
   /// ADVISORY | BLOCK_OVERRIDABLE | BLOCK_HARD. Drives the enforcement matrix.
   enforcement String
   /// Gate code, where this requirement corresponds to a registered gate.
@@ -953,7 +954,7 @@ model PatientProcedure {
   /// Last evaluated readiness. A cache of the evaluation, never the authority:
   /// the gate is recomputed server-side at the moment of starting, because a
   /// stored READY from an hour ago is not evidence that it is ready now.
-  readiness           String    @default("PENDING")
+  readiness            String    @default("PENDING")
   readinessEvaluatedAt DateTime? @map("readiness_evaluated_at") @db.Timestamptz(6)
 
   /// The implant components this specific case needs, as recorded when it was
@@ -995,16 +996,16 @@ model Consent {
   patientId          String  @map("patient_id") @db.Uuid
   patientProcedureId String? @map("patient_procedure_id") @db.Uuid
 
-  consentType String @map("consent_type")
+  consentType     String @map("consent_type")
   /// The template version signed. A consent is only evidence of what the
   /// patient actually saw, so the version is part of the record.
   templateCode    String @map("template_code")
   templateVersion Int    @map("template_version")
 
-  signedAt          DateTime @map("signed_at") @db.Timestamptz(6)
-  witnessEmployeeId String?  @map("witness_employee_id") @db.Uuid
+  signedAt          DateTime  @map("signed_at") @db.Timestamptz(6)
+  witnessEmployeeId String?   @map("witness_employee_id") @db.Uuid
   /// Consent can be withdrawn. A withdrawn consent stops satisfying its gate.
-  withdrawnAt DateTime? @map("withdrawn_at") @db.Timestamptz(6)
+  withdrawnAt       DateTime? @map("withdrawn_at") @db.Timestamptz(6)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -1036,13 +1037,13 @@ model Followup {
   outcome String @default("PENDING")
 
   /// NONE | MILD | MODERATE | SEVERE
-  pain String?
+  pain           String?
   /// EXPECTED | EXCESSIVE
-  swelling String?
+  swelling       String?
   /// NO | YES
-  bleeding String?
+  bleeding       String?
   /// TAKING | PROBLEM
-  medication String?
+  medication     String?
   otherComplaint Boolean? @map("other_complaint")
 
   /// Set by the engine, not by the caller. Whoever makes the call records
@@ -1116,11 +1117,11 @@ model MaintenancePlan {
   organizationId String @map("organization_id") @db.Uuid
   assetId        String @map("asset_id") @db.Uuid
 
-  kind          String
-  intervalDays  Int     @map("interval_days")
+  kind         String
+  intervalDays Int    @map("interval_days")
   /// How many days before the due date the task should appear. A service task
   /// created on the morning it is due is a service that happens tomorrow.
-  leadTimeDays  Int     @default(7) @map("lead_time_days")
+  leadTimeDays Int    @default(7) @map("lead_time_days")
 
   lastServicedAt DateTime? @map("last_serviced_at") @db.Timestamptz(6)
   nextDueAt      DateTime  @map("next_due_at") @db.Timestamptz(6)
@@ -1138,14 +1139,14 @@ model MaintenancePlan {
 /// A daily functional check on an asset (EQP-001). A FAIL is not a note — it
 /// changes the asset's status and raises a patient-safety exception.
 model AssetCheck {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  assetId        String   @map("asset_id") @db.Uuid
-  periodKey      String   @map("period_key")
-  result         String
-  note           String?
-  checkedByEmployeeId String? @map("checked_by_employee_id") @db.Uuid
-  checkedAt      DateTime @default(now()) @map("checked_at") @db.Timestamptz(6)
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  assetId             String   @map("asset_id") @db.Uuid
+  periodKey           String   @map("period_key")
+  result              String
+  note                String?
+  checkedByEmployeeId String?  @map("checked_by_employee_id") @db.Uuid
+  checkedAt           DateTime @default(now()) @map("checked_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id])
   asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
@@ -1155,17 +1156,17 @@ model AssetCheck {
 }
 
 model Breakdown {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
-  assetId        String    @map("asset_id") @db.Uuid
-  reportedAt     DateTime  @default(now()) @map("reported_at") @db.Timestamptz(6)
-  reportedByEmployeeId String? @map("reported_by_employee_id") @db.Uuid
-  description    String
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String    @map("organization_id") @db.Uuid
+  assetId              String    @map("asset_id") @db.Uuid
+  reportedAt           DateTime  @default(now()) @map("reported_at") @db.Timestamptz(6)
+  reportedByEmployeeId String?   @map("reported_by_employee_id") @db.Uuid
+  description          String
   /// Return to service is a decision somebody makes and signs, never a
   /// timestamp that arrives on its own (EQP-006).
-  repairedAt     DateTime? @map("repaired_at") @db.Timestamptz(6)
-  verifiedByEmployeeId String? @map("verified_by_employee_id") @db.Uuid
-  verifiedAt     DateTime? @map("verified_at") @db.Timestamptz(6)
+  repairedAt           DateTime? @map("repaired_at") @db.Timestamptz(6)
+  verifiedByEmployeeId String?   @map("verified_by_employee_id") @db.Uuid
+  verifiedAt           DateTime? @map("verified_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id])
   asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
@@ -1188,8 +1189,8 @@ model Item {
   category String
   unit     String
 
-  minimumQty  Int @map("minimum_qty")
-  reorderQty  Int @map("reorder_qty")
+  minimumQty   Int @map("minimum_qty")
+  reorderQty   Int @map("reorder_qty")
   /// Reorder level is the trigger; minimum is the floor. Below reorder raises
   /// a purchase requirement; below minimum is a shortage, which is worse.
   reorderLevel Int @map("reorder_level")
@@ -1239,9 +1240,9 @@ model ImplantSku {
   organizationId String @map("organization_id") @db.Uuid
   clinicId       String @map("clinic_id") @db.Uuid
 
-  brand    String
-  line     String
-  platform String
+  brand      String
+  line       String
+  platform   String
   /// Millimetres. Null on components that are not dimension-specific.
   diameterMm Float? @map("diameter_mm")
   lengthMm   Float? @map("length_mm")
@@ -1249,9 +1250,9 @@ model ImplantSku {
   /// IMPLANT | HEALING_ABUTMENT | IMPRESSION_COMPONENT | PROSTHETIC_COMPONENT
   componentType String @map("component_type")
 
-  quantity  Int       @default(0)
-  batchRef  String?   @map("batch_ref")
-  expiryAt  DateTime? @map("expiry_at") @db.Timestamptz(6)
+  quantity Int       @default(0)
+  batchRef String?   @map("batch_ref")
+  expiryAt DateTime? @map("expiry_at") @db.Timestamptz(6)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -1281,12 +1282,12 @@ model SterilizationBatch {
   operatorEmployeeId String? @map("operator_employee_id") @db.Uuid
   packCount          Int     @default(0) @map("pack_count")
 
-  cycleNumber   String?   @map("cycle_number")
-  cycleStartAt  DateTime? @map("cycle_start_at") @db.Timestamptz(6)
-  cycleEndAt    DateTime? @map("cycle_end_at") @db.Timestamptz(6)
+  cycleNumber  String?   @map("cycle_number")
+  cycleStartAt DateTime? @map("cycle_start_at") @db.Timestamptz(6)
+  cycleEndAt   DateTime? @map("cycle_end_at") @db.Timestamptz(6)
   /// PASS | FAIL | INCONCLUSIVE. Inconclusive holds the batch rather than
   /// forcing a two-valued answer — see the CycleResult enum.
-  cycleResult   String?   @map("cycle_result")
+  cycleResult  String?   @map("cycle_result")
 
   releasedByEmployeeId String?   @map("released_by_employee_id") @db.Uuid
   releasedAt           DateTime? @map("released_at") @db.Timestamptz(6)
@@ -1327,17 +1328,17 @@ model LabCase {
 
   status String @default("CREATED")
 
-  dispatchedAt   DateTime? @map("dispatched_at") @db.Timestamptz(6)
+  dispatchedAt     DateTime? @map("dispatched_at") @db.Timestamptz(6)
   /// Mandatory at dispatch (LAB-007). A case with no expected return cannot be
   /// late, which is the same as never being chased.
   expectedReturnAt DateTime? @map("expected_return_at") @db.Timestamptz(6)
-  receivedAt     DateTime? @map("received_at") @db.Timestamptz(6)
+  receivedAt       DateTime? @map("received_at") @db.Timestamptz(6)
 
   /// Doctor QC (LAB-005). PASS | FAIL, and null until somebody has looked.
-  qcResult             String?   @map("qc_result")
-  qcByEmployeeId       String?   @map("qc_by_employee_id") @db.Uuid
-  qcAt                 DateTime? @map("qc_at") @db.Timestamptz(6)
-  qcNote               String?   @map("qc_note")
+  qcResult       String?   @map("qc_result")
+  qcByEmployeeId String?   @map("qc_by_employee_id") @db.Uuid
+  qcAt           DateTime? @map("qc_at") @db.Timestamptz(6)
+  qcNote         String?   @map("qc_note")
 
   /// How many times this case has been remade. A second remake is a different
   /// conversation from a first, and only visible if the count survives.
@@ -1355,4 +1356,40 @@ model LabCase {
   @@index([organizationId, clinicId, status])
   @@index([expectedReturnAt])
   @@map("lab_cases")
+}
+
+/// An attempt to bring a dormant patient back, and what they said.
+///
+/// Detection is not stored — a patient is dormant or not according to
+/// `dormancyOf()` at the instant you ask, because a stored flag is wrong the
+/// moment somebody books. What is stored is the call: that it happened, who
+/// made it, and the answer. See packages/contracts/src/retention.ts.
+model RetentionOutreach {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  clinicId       String @map("clinic_id") @db.Uuid
+  patientId      String @map("patient_id") @db.Uuid
+
+  /// NEVER_STARTED | STOPPED_MID_TREATMENT, as at the moment it was raised.
+  reason      String
+  daysDormant Int      @map("days_dormant")
+  raisedAt    DateTime @default(now()) @map("raised_at") @db.Timestamptz(6)
+
+  contactedAt           DateTime? @map("contacted_at") @db.Timestamptz(6)
+  contactedByEmployeeId String?   @map("contacted_by_employee_id") @db.Uuid
+  /// RETURNING | DECLINED | WILL_DECIDE | NO_ANSWER | UNREACHABLE | NOT_APPLICABLE
+  outcome               String?
+  /// What the patient said. The reason the list is worth keeping.
+  note                  String?
+
+  closedAt DateTime? @map("closed_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  patient      Patient      @relation(fields: [patientId], references: [id])
+
+  @@index([organizationId, clinicId, closedAt])
+  @@map("retention_outreach")
 }
