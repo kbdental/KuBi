@@ -278,6 +278,39 @@ button.item:hover { background: var(--line-soft); }
   padding: 8px 13px; font-size: 14px; font-weight: 560; cursor: pointer; color: var(--ink-soft);
 }
 .rowbtn:hover { border-color: var(--ink-faint); color: var(--ink); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Two kinds of right-hand thing, and they must never be confusable.
+
+   A .pill is a STATUS. It is never inside anything pressable and it never
+   uses a verb — the owner pressed a pill that said "Open", meaning
+   outstanding, and nothing happened. That word is gone.
+
+   A .doit is an ACTION. It only appears on a row that is a <button>, and it
+   says what will happen when you press it.
+   ═══════════════════════════════════════════════════════════════════════ */
+.doit {
+  display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
+  font-size: 13.5px; font-weight: 640; color: var(--accent);
+  border: 1px solid var(--accent-line); background: var(--accent-soft);
+  padding: 6px 12px; border-radius: 999px; white-space: nowrap;
+}
+button.item:hover .doit { background: var(--accent); color: #fff; border-color: var(--accent); }
+.doit[data-tone="stop"] { color: var(--stop); border-color: var(--stop-line); background: var(--stop-soft); }
+button.item:hover .doit[data-tone="stop"] { background: var(--stop); color: #fff; border-color: var(--stop); }
+
+.sub { margin: 26px 0 10px; }
+.sub h2 {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 0 0 9px; padding: 0 2px;
+}
+.stage { display: flex; gap: 4px; margin-top: 8px; }
+.stage i { height: 3px; width: 26px; border-radius: 2px; background: var(--line); }
+.stage i[data-on="1"] { background: var(--accent); }
+.stage i[data-warn="1"] { background: var(--warn); }
+.bar { height: 6px; border-radius: 4px; background: var(--line-soft); overflow: hidden; margin-top: 7px; max-width: 220px; }
+.bar span { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.bar[data-low="1"] span { background: var(--warn); }
 </style>
 
 <div id="root"></div>
@@ -304,6 +337,22 @@ const CLINIC = [
     act:'Lock up',                next:'CLOSED',  gate:'CLOSE_LOCK' },
 ];
 const clinicAt = id => CLINIC.find(s => s.id === id);
+
+/** The instrument loop, in order. Quarantine is not on it — it is a way off it. */
+const STAGES = ['DIRTY', 'ULTRASONIC', 'PACKED', 'AUTOCLAVED', 'RELEASED'];
+const STAGE_WORD = {
+  DIRTY:'Collected', ULTRASONIC:'In the ultrasonic', PACKED:'Packed and sealed',
+  AUTOCLAVED:'Out of the autoclave', RELEASED:'Released for use',
+  QUARANTINED:'Quarantined',
+};
+const NEXT_STAGE = {
+  QUARANTINED:'DIRTY', DIRTY:'ULTRASONIC', ULTRASONIC:'PACKED',
+  PACKED:'AUTOCLAVED', AUTOCLAVED:'RELEASED',
+};
+const STAGE_VERB = {
+  QUARANTINED:'Send back through', DIRTY:'Into the ultrasonic', ULTRASONIC:'Pack and seal',
+  PACKED:'Run the autoclave', AUTOCLAVED:'Release the batch',
+};
 
 /* ═══ THE PATIENT, AS A JOURNEY ═════════════════════════════════════════ */
 
@@ -389,6 +438,29 @@ const startState = () => ({
     { id:'p4', name:'SYNTHETIC Devika N.',uhid:'SYN-1108', at:'11:30', visit:'Implant review',           phase:'APPOINTMENT' },
   ],
   done: [],
+
+  /**
+   * The instrument loop. Five stages, and quarantine off to one side — a
+   * batch whose indicator came back inconclusive has not failed and has not
+   * passed, and it may not be released either way.
+   */
+  batches: [
+    { id:'b1', ref:'STER-0911', stage:'QUARANTINED', packs:6, why:'Biological indicator inconclusive' },
+    { id:'b2', ref:'STER-0912', stage:'AUTOCLAVED', packs:12 },
+    { id:'b3', ref:'STER-0913', stage:'ULTRASONIC', packs:7 },
+  ],
+  stock: [
+    { id:'s1', name:'Gauze', have:4,  min:12, unit:'packs' },
+    { id:'s2', name:'Gloves, medium', have:22, min:10, unit:'boxes' },
+    { id:'s3', name:'RVG sleeves', have:9,  min:15, unit:'packs' },
+    { id:'s4', name:'Cotton rolls', have:31, min:10, unit:'packs' },
+  ],
+  equipment: [
+    { id:'q1', name:'Autoclave 1',      state:'Working', due:'Calibration due in 4 days' },
+    { id:'q2', name:'Chair 2 suction',  state:'Working', due:'Serviced 12 days ago' },
+    { id:'q3', name:'OPG X-ray',        state:'Working', due:'AMC expires in 21 days' },
+    { id:'q4', name:'Compressor',       state:'Working', due:'Checked this morning' },
+  ],
 
   raised: [
     { id:'a1', tone:'stop', t:'Autoclave batch STER-0911 quarantined',
@@ -588,8 +660,76 @@ function draw() {
   const rs = root.querySelector('[data-restart]');
   if (rs) rs.onclick = () => { S = startState(); blocked = null; draw(); };
 
+  // Every button on a secondary screen, wired. There is no such thing here as
+  // a row that looks pressable and is not — an unhandled data-do would be
+  // exactly the bug this replaced, so an unknown one throws rather than
+  // silently doing nothing.
+  root.querySelectorAll('[data-do]').forEach(b => {
+    b.onclick = () => { doThing(b.dataset.do); draw(); };
+  });
+
   root.querySelectorAll('[data-jump]').forEach(b =>
     b.onclick = () => { S.where = b.dataset.jump; blocked = null; draw(); });
+}
+
+/**
+ * What a button on a secondary screen does.
+ *
+ * One place, so that adding a button and forgetting to make it work is not
+ * possible without this throwing.
+ */
+function doThing(what) {
+  const [kind, id] = what.split(':');
+
+  if (kind === 'restart') { S = startState(); blocked = null; return; }
+
+  if (kind === 'fact') {
+    S.facts[id] = true;
+    const g = Object.values(GATES).flat().find(x => x.key === id);
+    note(`Done — ${(g ? g.need : id).toLowerCase()}`);
+    tick(3);
+    // Clearing the last blocked requirement clears whatever raised it.
+    if (id === 'sterile') S.raised = S.raised.filter(a => a.id !== 'a1');
+    return;
+  }
+
+  if (kind === 'batch') {
+    const b = S.batches.find(x => x.id === id);
+    if (!b) return;
+    const was = b.stage;
+    b.stage = NEXT_STAGE[b.stage];
+    if (was === 'QUARANTINED') { b.why = null; S.raised = S.raised.filter(a => a.id !== 'a1'); }
+    note(`${b.ref} — ${STAGE_WORD[b.stage].toLowerCase()}`);
+    tick(8);
+    // A released batch is what "a sterile pack released for today" means. The
+    // opening requirement is satisfied by the work, not by ticking a box about
+    // the work.
+    if (S.batches.some(x => x.stage === 'RELEASED')) S.facts.sterile = true;
+    if (S.batches.every(x => x.stage === 'RELEASED')) S.facts.sterClosed = true;
+    return;
+  }
+
+  if (kind === 'stock') {
+    const x = S.stock.find(y => y.id === id);
+    if (!x) return;
+    x.have = x.min * 2;
+    note(`${x.name} reordered — ${x.have} ${x.unit} on the shelf`);
+    S.raised = S.raised.filter(a => a.id !== 'a3');
+    return;
+  }
+
+  if (kind === 'bring') {
+    const i = S.queue.findIndex(p => p.id === id);
+    if (i < 0 || S.chair) return;
+    S.chair = S.queue.splice(i, 1)[0];
+    S.facts.chairFree = false;
+    S.facts.consent = false;
+    note(`${S.chair.name} brought through`);
+    S.where = 'TODAY';           // the chair is where the clinic is
+    return;
+  }
+
+  throw new Error(`Nothing is wired to "${what}" — a button that does nothing is the bug this exists to prevent`);
 }
 
 /* ─── TODAY: five sections, nothing else ────────────────────────────── */
@@ -722,79 +862,202 @@ function patient(p) {
     </div>`;
 }
 
-/* ─── Everything else. Secondary by design, and small on purpose. ────── */
+/* ═══════════════════════════════════════════════════════════════════════
+   THE OTHER FIVE PLACES
+
+   Secondary, and still real. Every row here is one of exactly two things:
+
+     a fact      — a <div>, with a status pill, and nothing to press
+     an action   — a <button>, with a verb, that changes the clinic
+
+   Never a third thing that looks like the second and behaves like the first.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/** A fact. Not pressable, and does not pretend to be. */
+function fact(title, note, status, tone = '') {
+  return `<div class="item"${tone ? ` data-tone="${tone}"` : ''}>
+    <span class="item-b"><span class="item-t">${esc(title)}</span>
+    ${note ? `<span class="item-n">${esc(note)}</span>` : ''}</span>
+    ${status ? `<span class="pill"${tone ? ` data-tone="${tone}"` : ''}>${esc(status)}</span>` : ''}
+  </div>`;
+}
+
+/** An action. A button, saying what pressing it will do. */
+function action(doAttr, title, note, verb, tone = '') {
+  return `<button class="item" data-do="${doAttr}"${tone ? ` data-tone="${tone}"` : ''}>
+    <span class="item-b"><span class="item-t">${esc(title)}</span>
+    ${note ? `<span class="item-n">${esc(note)}</span>` : ''}</span>
+    <span class="doit"${tone ? ` data-tone="${tone}"` : ''}>${esc(verb)} <span aria-hidden="true">›</span></span>
+  </button>`;
+}
+
+const nameOf = p => p.name.replace('SYNTHETIC ', '');
 
 function secondary() {
   const h = health();
-  const body = {
-    Patients: () => `
-      <h1 class="head">Patients</h1><p class="head-q">Who is in the building, and who has been seen.</p>
-      <div class="card">
-        ${[...(S.chair ? [S.chair] : []), ...S.queue, ...S.done].map(p => `
-          <div class="item" data-tone="${p.phase === 'CLOSED' ? '' : 'good'}">
-            <span class="item-b">
-              <span class="item-t">${esc(p.name.replace('SYNTHETIC ',''))}</span>
-              <span class="item-n">${esc(p.visit)}</span>
-            </span>
-            <span class="pill" data-tone="${p.phase === 'CLOSED' ? 'good' : ''}">${esc(JOURNEY[stepIndex(p.phase)].short)}</span>
-          </div>`).join('') || `<div class="empty"><b>Nobody yet</b>The day has not started.</div>`}
-      </div>`,
 
+  const body = {
+
+    /* ── PATIENTS ─────────────────────────────────────────────────────── */
+    Patients: () => {
+      const all = [...(S.chair ? [S.chair] : []), ...S.queue, ...S.done];
+      return `
+      <h1 class="head">Patients</h1>
+      <p class="head-q">Who is in the building, and how far each visit has got.</p>
+      ${all.length === 0 ? `<div class="card"><div class="empty"><b>Nobody yet</b>The day has not started.</div></div>` : ''}
+      ${S.chair ? `
+        <div class="sub"><h2>In the chair</h2></div>
+        <div class="card">${patient(S.chair)}</div>` : ''}
+      ${S.queue.length ? `
+        <div class="sub"><h2>Waiting · ${S.queue.length}</h2></div>
+        <div class="card">
+          ${S.queue.map((p, i) => (i === 0 && !S.chair && S.clinic === 'RUNNING'
+            ? action(`bring:${p.id}`, nameOf(p), `${p.visit} · due ${p.at}`, 'Bring through')
+            : fact(nameOf(p), `${p.visit} · due ${p.at}`, 'Waiting'))).join('')}
+        </div>` : ''}
+      ${S.done.length ? `
+        <div class="sub"><h2>Seen today · ${S.done.length}</h2></div>
+        <div class="card">
+          ${S.done.map(p => fact(nameOf(p), `${p.visit} · ${p.uhid}`, 'Case closed', 'good')).join('')}
+        </div>` : ''}`;
+    },
+
+    /* ── CLINICAL ─────────────────────────────────────────────────────── */
     Clinical: () => `
-      <h1 class="head">Clinical</h1><p class="head-q">Consent, radiographs and treatment records.</p>
+      <h1 class="head">Clinical</h1>
+      <p class="head-q">${S.chair
+        ? `What ${esc(nameOf(S.chair))} needs before treatment can start.`
+        : 'What every patient needs before treatment can start.'}</p>
       <div class="card">
-        ${GATES.TREATMENT.map(g => `
-          <div class="item" data-tone="${S.facts[g.key] ? 'good' : 'warn'}">
-            <span class="item-b">
-              <span class="item-t">${esc(g.need)}</span>
-              <span class="item-n">${S.facts[g.key] ? 'Held' : 'Not held — this blocks treatment'}</span>
-            </span>
-            <span class="pill" data-tone="${S.facts[g.key] ? 'good' : 'warn'}">${S.facts[g.key] ? 'Met' : 'Open'}</span>
-          </div>`).join('')}
+        ${GATES.TREATMENT.map(g => (S.facts[g.key]
+          ? fact(g.need, 'Held on file', 'Held', 'good')
+          : action(`fact:${g.key}`, g.need, 'Not held — treatment cannot start without it', g.fix, 'stop')
+        )).join('')}
       </div>
       <p class="tiny" style="margin:12px 2px">
-        These are checked automatically when treatment is started. They are here to be
-        looked at, never to be worked through.
-      </p>`,
+        KuBi checks these itself the moment somebody presses Start treatment. They
+        are listed here so they can be dealt with early — never so that anybody
+        has to work down the list.
+      </p>
 
-    Operations: () => `
-      <h1 class="head">Operations</h1><p class="head-q">Sterilisation, stock and equipment.</p>
+      <div class="sub"><h2>Today’s visits</h2></div>
       <div class="card">
-        ${GATES.OPEN_READY.concat(GATES.CLOSE_LOCK).map(g => `
-          <div class="item" data-tone="${S.facts[g.key] ? 'good' : 'warn'}">
-            <span class="item-b">
-              <span class="item-t">${esc(g.need)}</span>
-              <span class="item-n">${S.facts[g.key] ? 'Done' : 'Outstanding'}</span>
-            </span>
-            <span class="pill" data-tone="${S.facts[g.key] ? 'good' : 'warn'}">${S.facts[g.key] ? 'Done' : 'Open'}</span>
-          </div>`).join('')}
+        ${[...(S.chair ? [S.chair] : []), ...S.done].length === 0
+          ? `<div class="empty"><b>No visit has started</b>Nothing has been recorded yet today.</div>`
+          : [...(S.chair ? [S.chair] : []), ...S.done].map(p =>
+              fact(nameOf(p), `${p.visit} · ${p.uhid}`,
+                   JOURNEY[stepIndex(p.phase)].short,
+                   p.phase === 'CLOSED' ? 'good' : '')).join('')}
       </div>`,
 
+    /* ── OPERATIONS ───────────────────────────────────────────────────── */
+    Operations: () => {
+      const low = S.stock.filter(x => x.have < x.min);
+      return `
+      <h1 class="head">Operations</h1>
+      <p class="head-q">The instrument loop, what is on the shelf, and what might fail.</p>
+
+      <div class="sub"><h2>Sterilisation · ${S.batches.length} batches</h2></div>
+      <div class="card">
+        ${S.batches.map(b => {
+          const at = STAGES.indexOf(b.stage);
+          const q = b.stage === 'QUARANTINED';
+          const rail = `<span class="stage" aria-hidden="true">${STAGES.map((_, i) =>
+            `<i data-${q ? 'warn' : 'on'}="${q ? 1 : (i <= at ? 1 : 0)}"></i>`).join('')}</span>`;
+          const note = `${b.packs} packs · ${STAGE_WORD[b.stage]}${b.why ? ` · ${b.why}` : ''}`;
+          return b.stage === 'RELEASED'
+            ? fact(b.ref, note, 'Released', 'good')
+            : `<button class="item" data-do="batch:${b.id}" data-tone="${q ? 'stop' : 'warn'}">
+                 <span class="item-b"><span class="item-t">${esc(b.ref)}</span>
+                 <span class="item-n">${esc(note)}</span>${rail}</span>
+                 <span class="doit" data-tone="${q ? 'stop' : ''}">${esc(STAGE_VERB[b.stage])} <span aria-hidden="true">›</span></span>
+               </button>`;
+        }).join('')}
+      </div>
+
+      <div class="sub"><h2>Stock${low.length ? ` · ${low.length} below minimum` : ''}</h2></div>
+      <div class="card">
+        ${S.stock.map(x => {
+          const pct = Math.min(100, Math.round((x.have / (x.min * 2)) * 100));
+          const bar = `<span class="bar"${x.have < x.min ? ' data-low="1"' : ''}><span style="width:${pct}%"></span></span>`;
+          const note = `${x.have} ${x.unit} · minimum ${x.min}`;
+          return x.have < x.min
+            ? `<button class="item" data-do="stock:${x.id}" data-tone="warn">
+                 <span class="item-b"><span class="item-t">${esc(x.name)}</span>
+                 <span class="item-n">${esc(note)}</span>${bar}</span>
+                 <span class="doit">Reorder <span aria-hidden="true">›</span></span>
+               </button>`
+            : `<div class="item"><span class="item-b"><span class="item-t">${esc(x.name)}</span>
+                 <span class="item-n">${esc(note)}</span>${bar}</span>
+                 <span class="pill" data-tone="good">In stock</span></div>`;
+        }).join('')}
+      </div>
+
+      <div class="sub"><h2>Equipment</h2></div>
+      <div class="card">
+        ${S.equipment.map(e => fact(e.name, e.due, e.state, 'good')).join('')}
+      </div>
+
+      <div class="sub"><h2>Opening and closing</h2></div>
+      <div class="card">
+        ${GATES.OPEN_READY.concat(GATES.CLOSE_LOCK).map(g => (S.facts[g.key]
+          ? fact(g.need, null, 'Done', 'good')
+          : action(`fact:${g.key}`, g.need, 'Not done', 'Mark done', 'warn')
+        )).join('')}
+      </div>`;
+    },
+
+    /* ── REPORTS ──────────────────────────────────────────────────────── */
     Reports: () => `
-      <h1 class="head">Reports</h1><p class="head-q">What today amounted to.</p>
+      <h1 class="head">Reports</h1>
+      <p class="head-q">What today has amounted to so far.</p>
       <div class="card"><div class="hz">
         <div><div class="v">${S.done.length}</div><div class="k">Patients seen</div></div>
         <div><div class="v">${h.revenue ? '₹' + h.revenue.toLocaleString('en-IN') : '—'}</div><div class="k">Collected</div></div>
         <div><div class="v">${h.wait === null ? '—' : h.wait + 'm'}</div><div class="k">Average wait</div></div>
-        <div><div class="v">${h.compliance}%</div><div class="k">Compliance</div></div>
+        <div><div class="v" data-tone="${h.compliance >= 90 ? 'good' : h.compliance >= 70 ? 'warn' : 'stop'}">${h.compliance}%</div><div class="k">Compliance</div></div>
       </div></div>
-      <h2 class="grp-h" style="margin-top:22px">What happened, in order</h2>
-      <div class="card" style="padding:6px 16px 10px">
+
+      <div class="sub"><h2>Where the day stands</h2></div>
+      <div class="card">
+        ${fact('Clinic state', clinicAt(S.clinic).why, clinicAt(S.clinic).label)}
+        ${fact('Time', 'Clinic clock', hhmm(S.clock))}
+        ${fact('Still to be seen', S.queue.length ? `${nameOf(S.queue[0])} is next` : 'Nobody is waiting', String(S.queue.length))}
+        ${fact('Needing attention', 'Capped at five on Today', String(S.raised.length), S.raised.length ? 'warn' : 'good')}
+      </div>
+
+      <div class="sub"><h2>What happened, in order</h2></div>
+      <div class="card" style="padding:6px 16px 12px">
         <div class="log">
-          ${S.log.length ? S.log.map(l => `<div><time>${esc(l.at)}</time><span>${esc(l.text)}</span></div>`).join('')
-                         : '<div style="border:0;color:var(--ink-faint)">Nothing has happened yet today.</div>'}
+          ${S.log.length
+            ? S.log.map(l => `<div><time>${esc(l.at)}</time><span>${esc(l.text)}</span></div>`).join('')
+            : '<div style="border:0;color:var(--ink-faint)">Nothing has happened yet today.</div>'}
         </div>
       </div>`,
 
+    /* ── SETTINGS ─────────────────────────────────────────────────────── */
     Settings: () => `
-      <h1 class="head">Settings</h1><p class="head-q">How this clinic is configured.</p>
+      <h1 class="head">Settings</h1>
+      <p class="head-q">How this clinic is configured. Every number here is a decision somebody made.</p>
       <div class="card">
-        <div class="item"><span class="item-b"><span class="item-t">Opens</span><span class="item-n">09:00, Monday to Saturday</span></span></div>
-        <div class="item"><span class="item-b"><span class="item-t">A patient counts as dormant after</span><span class="item-n">30 days</span></span></div>
-        <div class="item"><span class="item-b"><span class="item-t">Air conditioning</span><span class="item-n">24°C in occupied rooms</span></span></div>
-        <div class="item"><span class="item-b"><span class="item-t">Missed rounds escalate to</span><span class="item-n">Clinic Manager, then Clinic Head</span></span></div>
+        ${fact('Clinic opens', 'Monday to Saturday', '09:00')}
+        ${fact('Staff report by', 'Checked against the biometric', '09:45')}
+        ${fact('Air conditioning', 'In occupied rooms', '24°C')}
+        ${fact('A patient counts as dormant after', 'Then a doctor follows them up', '30 days')}
       </div>
-      <p class="tiny" style="margin:14px 2px">All data here is synthetic.</p>`,
+
+      <div class="sub"><h2>Who hears when something is missed</h2></div>
+      <div class="card">
+        ${fact('First', 'The person whose work it is', 'after 15 min')}
+        ${fact('Then', 'Clinic Manager', 'after 30 min')}
+        ${fact('Then', 'Clinic Head', 'after 60 min')}
+      </div>
+
+      <div class="sub"><h2>This demonstration</h2></div>
+      <div class="card">
+        ${action('restart', 'Start the day again', 'Back to 08:40, clinic closed', 'Restart')}
+      </div>
+      <p class="tiny" style="margin:14px 2px">Every patient, batch and number here is synthetic.</p>`,
   }[S.where];
 
   return (body ? body() : '') + `
