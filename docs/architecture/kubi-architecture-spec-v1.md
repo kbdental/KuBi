@@ -594,7 +594,7 @@ owner, clock and escalation.
 
 The centre. Everything above is input to this.
 
-### 16.1 A decision
+### 12.1 A decision
 
 | Field | Meaning |
 |---|---|
@@ -609,7 +609,7 @@ The centre. Everything above is input to this.
 | `fix` | One action. Only when not `PROCEED`. |
 | `dueAt`, `lateBy` | §8 |
 
-### 16.2 The four questions, answered every minute
+### 12.2 The four questions, answered every minute
 
 > *What decision must be made? Who should make it? Is enough information
 > available? If yes, execute. If no, wait. If overdue, escalate.*
@@ -627,7 +627,7 @@ decisions(world, now):
   order by: objective rank (§2.1), then lateBy, then dueAt
 ```
 
-### 16.3 Verdicts
+### 12.3 Verdicts
 
 - **PROCEED** — the person can act now. One action, named.
 - **WAIT** — nothing is wrong; a resource is busy. Says what and for how long.
@@ -636,7 +636,7 @@ decisions(world, now):
 - **BLOCKED** — would be unsafe or non-compliant. One reason, one fix. The
   words *gate, requirement, compliance, validation, rule* never appear.
 
-### 16.4 Why every screen becomes trivial
+### 12.4 Why every screen becomes trivial
 
 | Screen | Is |
 |---|---|
@@ -738,7 +738,7 @@ Each event declares the documents it **requires** and the documents it
 | `PAYMENT_RECEIVED` | Invoice | Receipt |
 | `LAB_DISPATCHED` | Prescription | Lab slip |
 
-A required document that is absent is a **governance refusal** (§12.3
+A required document that is absent is a **governance refusal** (§14.3
 `BLOCKED`), in one sentence, with the one button that produces it. A produced
 document is attached to the event and is thereafter found by following the
 event — never by searching a folder.
@@ -753,7 +753,7 @@ a design preference, and it needs the owner and probably their advisor.
 > why? what evidence? what protocol? what happens if ignored?"*
 
 This is the difference between a system that instructs and a system that can be
-argued with. Every `Decision` (§12.1) therefore carries four more fields:
+argued with. Every `Decision` (§14.1) therefore carries four more fields:
 
 | Field | Answers | Source |
 |---|---|---|
@@ -773,7 +773,7 @@ no explanation at all.
 
 ## 14. Prediction and the Command Centre
 
-### 12.1 The honest constraint, first
+### 14.1 The honest constraint, first
 
 Prediction runs on history. **KuBi has no history yet.** So:
 
@@ -787,7 +787,7 @@ because it will be believed.
 **DECISION_REQUIRED (D-10):** the minimum sample before a prediction is shown.
 Suggestion: 20 completed instances of the same node.
 
-### 12.2 What is predicted
+### 14.2 What is predicted
 
 | Prediction | From |
 |---|---|
@@ -799,7 +799,7 @@ Suggestion: 20 completed instances of the same node.
 | Lab delay risk | Vendor's historical return vs promised date |
 | Revenue completion | Settled vs treated, today |
 
-### 12.3 The Command Centre
+### 14.3 The Command Centre
 
 The owner's screen. Not reports — the next failure:
 
@@ -811,10 +811,10 @@ Next failure       Sterilisation delayed in ~18 min
 Suggested action   Move assistant 2 to the sterile bay
 ```
 
-Every line above is a function of `decisions()` and §14.2. None of it is
+Every line above is a function of `decisions()` and §16.2. None of it is
 stored, and none of it is a report of the past.
 
-### 12.4 The pattern layer
+### 14.4 The pattern layer
 
 The owner's examples — *"every Tuesday the doctor runs late"*, *"sterilisation
 takes 17 minutes longer after lunch"*, *"patients cancel mostly after the
@@ -880,14 +880,14 @@ The impure edges, injected:
 
 ## 16. Event log and schema
 
-### 14.1 The principle
+### 16.1 The principle
 
 > **The event log is the only truth. Everything else is a projection.**
 
 The owner: *"Everything should come from Event Log. Nothing should be stored
 twice."*
 
-### 14.2 The one writable table
+### 16.2 The one writable table
 
 ```sql
 CREATE TABLE clinic_events (
@@ -917,7 +917,7 @@ REVOKE UPDATE, DELETE, TRUNCATE ON clinic_events FROM kubi_app;
 **Append-only by database grant, not by good manners.** This is the difference
 the Sheets analysis established and it is not negotiable.
 
-### 14.3 Projections
+### 16.3 Projections
 
 `flows`, `resource_claims`, `open_decisions` are all rebuildable from the log
 by replay. They exist for query speed and may be dropped and rebuilt at any
@@ -926,7 +926,7 @@ time.
 > **Invariant S-1.** Deleting every projection and replaying the log produces
 > an identical world. Tested by replay, not asserted.
 
-### 14.4 What this replaces
+### 16.4 What this replaces
 
 The existing tables (`patient_procedures`, `lab_cases`, `sterilization_batches`)
 become projections. They keep their shape; they stop being written directly.
@@ -946,18 +946,18 @@ Nothing below has been guessed. Each blocks the section it belongs to.
 | D-01 | §2.1 | May patient safety ever be traded against waiting time? |
 | D-02 | §2.2 | Does an unpaid bill block closing the day, or escalate? |
 | D-03 | §6.3 | What happens when a patient leaves mid-treatment? |
-| D-04 | §6 | Does ownership resolve to a person when one employee holds the role? |
+| D-04 | §7 | Does ownership resolve to a person when one employee holds the role? |
 | D-05 | §8.3 | Expected time for all 27 nodes |
 | D-06 | §8.4 | The patient-safety escalation ladder |
-| D-07 | §8 | The clinic's real resource inventory |
-| D-08 | §8 | May one doctor hold two chairs? |
-| D-09 | §12 | The overload threshold |
+| D-07 | §9 | The clinic's real resource inventory |
+| D-08 | §9 | May one doctor hold two chairs? |
+| D-09 | §10 | The overload threshold |
 | D-10 | §14.1 | Minimum history before a prediction is shown |
 | D-11 | §16.4 | Backfill existing rows, or start the log empty? |
 | D-12 | §13.1 | Which SOPs exist in writing today, and where do they live? |
 | D-13 | §13.2 | Which communication channels, and who owns contact consent? |
 | D-14 | §13.3 | Which documents are legally required per procedure here? |
-| D-15 | §9 | Does a decision wait for *every* resource, or proceed on the critical few? |
+| D-15 | §9.1 | Does a decision wait for *every* resource, or proceed on the critical few? |
 
 ---
 

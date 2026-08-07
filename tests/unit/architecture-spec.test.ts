@@ -142,18 +142,60 @@ describe('every BUILT claim points at something that exists', () => {
 });
 
 describe('the document points at itself correctly', () => {
+  /** Every heading, in order, as { level, number, line }. */
+  const headings = text.split('\n').flatMap((line) => {
+    const top = /^## (\d+)\./.exec(line);
+    if (top) return [{ top: top[1]!, sub: null as string | null, line }];
+    const sub = /^### (\d+)\.(\d+)/.exec(line);
+    if (sub) return [{ top: sub[1]!, sub: `${sub[1]}.${sub[2]}`, line }];
+    return [];
+  });
+  const numbers = new Set(headings.map((h) => h.sub ?? h.top));
+
+  it('numbers every subsection under the parent it actually sits in', () => {
+    // The check that was missing. The first version of this test asserted only
+    // that a reference resolved to SOME heading, and passed while §12's
+    // subsections were numbered 16.x, §14's were 12.x and §16's were 14.x — a
+    // three-way rotation left by a renumbering script. Existence is not
+    // correctness.
+    let parent: string | null = null;
+    for (const line of text.split('\n')) {
+      const top = /^## (\d+)\./.exec(line);
+      if (top) { parent = top[1]!; continue; }
+      const sub = /^### (\d+)\.\d+/.exec(line);
+      if (sub) {
+        expect(sub[1], `"${line.trim()}" sits under §${parent}`).toBe(parent);
+      }
+    }
+  });
+
   it('resolves every section reference to a heading that exists', () => {
-    // Two references broke silently when the domains section was inserted and
-    // everything below it shifted by two. A long specification with dead
-    // cross-references is one nobody trusts, and this is cheaper than care.
-    const headings = new Set([
-      ...[...text.matchAll(/^## (\d+)\./gm)].map((m) => m[1]!),
-      ...[...text.matchAll(/^### (\d+\.\d+)/gm)].map((m) => m[1]!),
-    ]);
     const refs = [...new Set([...text.matchAll(/§(\d+(?:\.\d+)?)/g)].map((m) => m[1]!))];
     expect(refs.length).toBeGreaterThan(15);
     for (const r of refs) {
-      expect(headings.has(r), `§${r} is referenced but no such section exists`).toBe(true);
+      expect(numbers.has(r), `§${r} is referenced but no such section exists`).toBe(true);
+    }
+  });
+
+  it('points each register row at the section where that decision is raised', () => {
+    // Seven of the fifteen pointed somewhere plausible and wrong. A decision
+    // whose register entry sends you to the wrong section is a decision that
+    // gets answered against the wrong context.
+    const raisedIn = new Map<string, string>();
+    let section: string | null = null;
+    for (const line of text.split('\n')) {
+      const h = /^### (\d+\.\d+)/.exec(line) ?? /^## (\d+)\./.exec(line);
+      if (h) section = h[1]!;
+      for (const m of line.matchAll(/DECISION_REQUIRED \((D-\d\d)\)/g)) {
+        raisedIn.set(m[1]!, section!);
+      }
+    }
+    expect(raisedIn.size).toBeGreaterThanOrEqual(15);
+
+    for (const m of text.matchAll(/^\| (D-\d\d) \| §([\d.]+) \|/gm)) {
+      const [, id, cited] = m;
+      expect(cited, `${id} is raised in §${raisedIn.get(id!)} but the register cites §${cited}`)
+        .toBe(raisedIn.get(id!));
     }
   });
 });
