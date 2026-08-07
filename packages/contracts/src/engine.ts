@@ -166,6 +166,37 @@ const RULES: Partial<Record<ClinicEvent, readonly Requirement[]>> = {
       'This case has not passed the doctor’s check', 'Open the case', 'Operations'),
   ],
   [ClinicEvent.CLINIC_LOCKED]: [
+    /**
+     * The clinical record, and the correction that put it here.
+     *
+     * The owner: *"A bill being financially important does not mean a clinical
+     * note can safely be left incomplete… verify that objective ranking is not
+     * accidentally being used to override mandatory clinical closure
+     * dependencies."*
+     *
+     * It was. The clinic could lock up at 19:30 with a treatment recorded and
+     * no note written, because RECORDS_COMPLETE ranks seventh and nothing
+     * turned that ranking into a requirement. Two different things had been
+     * conflated:
+     *
+     *   **operational priority** — what a person should do first. Objective
+     *     rank, and only that. It orders a list.
+     *   **closure dependency** — what must exist before the day may end.
+     *     Governance, and only that. It refuses.
+     *
+     * A low rank must never imply "optional". The note is the last thing
+     * anybody should be interrupted for and the day still cannot end without
+     * it, and those two statements are not in tension — they are made by
+     * different mechanisms, which is the point.
+     *
+     * Deliberately keyed on the note itself rather than on the CLINICAL flow
+     * being finished: that flow's second node is tomorrow's follow-up call,
+     * and refusing to close today until tomorrow's call has happened would be
+     * absurd.
+     */
+    req((w) => !w.flows.some((f) => f.kind === FlowKind.CLINICAL && !f.done
+      && !f.history.some((h) => h.node === 'NOTES')),
+      'A clinical note has not been completed', 'Open the clinical record', 'Clinical'),
     req((w) => !w.flows.some((f) => f.kind === FlowKind.STERILIZATION && !f.done),
       'Instruments are still in the loop', 'Open sterilisation', 'Operations'),
     req((w) => !w.flows.some((f) => f.kind === FlowKind.PATIENT && !f.done),

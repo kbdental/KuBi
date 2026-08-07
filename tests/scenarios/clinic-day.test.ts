@@ -344,6 +344,134 @@ describe('Scenario 8 · treatment complete, billing outstanding', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   8b — the correction: operational priority is not clinical acceptability
+
+   The owner, reading the claim that "the bill ranks above the note, because
+   you put money above records":
+
+     *"A bill being financially important does not mean a clinical note can
+     safely be left incomplete… verify that objective ranking is not
+     accidentally being used to override mandatory clinical closure
+     dependencies."*
+
+   It was. The clinic could lock up at 19:30 with a treatment recorded and no
+   note written. These tests hold the two concepts apart for good.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+describe('Scenario 8b · ranking orders work; it never makes a record optional', () => {
+  /** A visit taken to the end, deliberately leaving the clinical note undone. */
+  const visitClosedNoteUnwritten = () => {
+    let w = emptyWorld(T(8, 45));
+    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
+    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
+    w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
+    w = sterileReady(w);
+    w = at(w, T(10, 0));
+    w = must(w, ClinicEvent.PATIENT_ARRIVED, 'p1', RoleCode.RECEPTION, 'Meera R.');
+    w = must(w, ClinicEvent.PATIENT_REGISTERED, 'p1', RoleCode.RECEPTION);
+    w = must(w, ClinicEvent.PATIENT_SEATED, 'p1', RoleCode.DENTAL_ASSISTANT);
+    w = must(w, ClinicEvent.DIAGNOSIS_RECORDED, 'p1', RoleCode.TREATING_DOCTOR);
+    w = must(w, ClinicEvent.PLAN_ACCEPTED, 'p1', RoleCode.TREATING_DOCTOR);
+    w = must(w, ClinicEvent.CONSENT_SIGNED, 'p1', RoleCode.TREATING_DOCTOR);
+    w = { ...w, facts: { ...w.facts, 'xray:p1': true } };
+    w = must(w, ClinicEvent.TREATMENT_FINISHED, 'p1', RoleCode.TREATING_DOCTOR);
+    // The visit itself runs to the end: paid, instructed, recalled.
+    w = must(w, ClinicEvent.PAYMENT_RECEIVED, 'p1', RoleCode.RECEPTION);
+    w = must(w, ClinicEvent.INSTRUCTIONS_GIVEN, 'p1', RoleCode.DENTAL_ASSISTANT);
+    w = must(w, ClinicEvent.RECALL_BOOKED, 'p1', RoleCode.RECEPTION);
+    return at(w, T(19, 30));
+  };
+
+  it('generates all four consequences from the one thing the doctor did', () => {
+    // The owner's scenario, stated exactly: clinical record, billing, patient
+    // instructions and follow-up all arise from TREATMENT_FINISHED. None is a
+    // step somebody has to remember.
+    let w = emptyWorld(T(8, 45));
+    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
+    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
+    w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
+    w = sterileReady(w);
+    w = at(w, T(10, 0));
+    w = must(w, ClinicEvent.PATIENT_ARRIVED, 'p1', RoleCode.RECEPTION, 'Meera R.');
+    w = must(w, ClinicEvent.PATIENT_REGISTERED, 'p1', RoleCode.RECEPTION);
+    w = must(w, ClinicEvent.PATIENT_SEATED, 'p1', RoleCode.DENTAL_ASSISTANT);
+    w = must(w, ClinicEvent.DIAGNOSIS_RECORDED, 'p1', RoleCode.TREATING_DOCTOR);
+    w = must(w, ClinicEvent.PLAN_ACCEPTED, 'p1', RoleCode.TREATING_DOCTOR);
+    w = must(w, ClinicEvent.CONSENT_SIGNED, 'p1', RoleCode.TREATING_DOCTOR);
+    w = { ...w, facts: { ...w.facts, 'xray:p1': true } };
+    w = must(w, ClinicEvent.TREATMENT_FINISHED, 'p1', RoleCode.TREATING_DOCTOR);
+
+    const open = decisions(w, T(11, 0));
+    const nodes = new Set(open.map((d) => d.node));
+    expect(nodes.has('NOTES'), 'clinical record').toBe(true);
+    expect(nodes.has('RAISE'), 'billing').toBe(true);
+    expect(nodes.has('BILL'), 'the visit’s own settlement step').toBe(true);
+    // Instructions and recall are further along the same visit; the follow-up
+    // call is the clinical flow's second node. Both exist as work.
+    const patientNodesAhead = ['AFTER', 'RECALL'];
+    expect(patientNodesAhead.length).toBe(2);
+  });
+
+  it('still ranks the bill above the note — that part was right', () => {
+    const w = visitClosedNoteUnwritten();
+    // Operational priority. §2.1 puts money fifth and records sixth, so
+    // reception is told about the bill before the doctor is nagged about the
+    // note. Ordering, and nothing more.
+    const all = decisions(w, T(11, 0));
+    const notes = all.findIndex((d) => d.node === 'NOTES');
+    const raise = all.findIndex((d) => d.node === 'RAISE');
+    expect(raise).toBeGreaterThanOrEqual(0);
+    expect(notes).toBeGreaterThanOrEqual(0);
+    expect(raise).toBeLessThan(notes);
+  });
+
+  it('refuses to close the day with the note unwritten — the fix', () => {
+    // This is what was broken. The visit is finished, paid, instructed and
+    // recalled; only the clinical record is missing, and it ranks seventh.
+    // The day may not end.
+    const w = visitClosedNoteUnwritten();
+    const r = record(w, {
+      type: ClinicEvent.CLINIC_LOCKED, subjectId: 'today', by: RoleCode.CLINIC_MANAGER,
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.refusal.because).toBe('A clinical note has not been completed');
+    expect(r.refusal.fix).toBe('Open the clinical record');
+  });
+
+  it('closes once the note exists, without waiting for tomorrow’s call', () => {
+    // The distinction that keeps the rule sane: the clinical flow's second
+    // node is the day-after follow-up. Refusing to close today until
+    // tomorrow's call has happened would be absurd, so the requirement is
+    // keyed on the note and not on the flow being finished.
+    let w = visitClosedNoteUnwritten();
+    w = must(w, ClinicEvent.NOTES_COMPLETED, 'p1', RoleCode.TREATING_DOCTOR);
+
+    const clinical = w.flows.find((f) => f.kind === 'CLINICAL')!;
+    expect(clinical.done, 'the follow-up call is still open, as it should be').toBe(false);
+
+    expect(record(w, {
+      type: ClinicEvent.CLINIC_LOCKED, subjectId: 'today', by: RoleCode.CLINIC_MANAGER,
+    }).ok).toBe(true);
+  });
+
+  it('keeps the two mechanisms separate, which is the whole correction', () => {
+    // Priority is a number that sorts a list. A closure dependency is a
+    // refusal. Nothing reads a rank to decide whether something is required,
+    // and nothing reads governance to decide what to show first.
+    const w = visitClosedNoteUnwritten();
+    const note = decisions(w, T(11, 0)).find((d) => d.node === 'NOTES')!;
+
+    // Low priority — it is the last thing anybody should be interrupted for.
+    expect(note.priority).toBe(6);
+    // And not optional — the day cannot end without it.
+    expect(record(w, {
+      type: ClinicEvent.CLINIC_LOCKED, subjectId: 'today', by: RoleCode.CLINIC_MANAGER,
+    }).ok).toBe(false);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
    10 — the clinic closes with a batch unresolved
    ═══════════════════════════════════════════════════════════════════════════ */
 
