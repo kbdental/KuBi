@@ -1,0 +1,220 @@
+/**
+ * The decision engine. Specification §12.
+ *
+ * *"KuBi should never be built around Flows. It should be built around
+ * Decisions."*
+ *
+ * This is that sentence as a function. Everything else in the model — events,
+ * flows, ownership, time, governance, objectives — exists to produce, evaluate
+ * or order the list this returns. Every screen will render a slice of it and
+ * compute nothing.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * The four questions, every minute
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ *   What decision must be made?     every open node, and every open exception
+ *   Who should make it?             the node's owner role
+ *   Is enough information there?    governance, and what it is missing
+ *   Then: proceed · wait · escalate
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * What this deliberately does not do
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * It does not reorder itself to be encouraging. When the most serious thing a
+ * person owns is blocked, the blocked thing is still first — the alternative
+ * is a list that puts a tickable item above an unsafe one because the tickable
+ * one feels like progress.
+ *
+ * Pure: `(world, now) => Decision[]`. No clock, no database, no I/O.
+ */
+import type { RoleCode } from './enums.js';
+import { rank, OBJECTIVE_WORD, type Objective } from './objectives.js';
+import { FLOWS, type FlowKind, type ClinicEvent } from './operating-model.js';
+import { admit, lateness, type World, type Flow } from './engine.js';
+
+/* -------------------------------------------------------------------------
+ * A decision
+ * ---------------------------------------------------------------------- */
+
+export const Verdict = {
+  /** The person can act now. */
+  PROCEED: 'PROCEED',
+  /** Nothing is wrong; something they do not control is not ready yet. */
+  WAIT: 'WAIT',
+  /** Overdue. Still theirs (§7 rule 4); somebody else has now been told. */
+  ESCALATE: 'ESCALATE',
+  /** Would be unsafe or non-compliant. One reason, one fix. */
+  BLOCKED: 'BLOCKED',
+} as const;
+export type Verdict = (typeof Verdict)[keyof typeof Verdict];
+
+export interface Decision {
+  /** Stable while the decision stays open, so a screen can keep its place. */
+  id: string;
+  /** The question, in the words the owner would use. */
+  question: string;
+  owner: RoleCode;
+  objective: Objective;
+  /** Its rank (§2.1). 1 is most important. */
+  priority: number;
+
+  verdict: Verdict;
+  /** Only when not PROCEED. One sentence, no jargon. */
+  because: string | null;
+  /** Only when not PROCEED. One action. */
+  fix: string | null;
+  /** Where that action goes. */
+  goes: string | null;
+
+  /** Minutes since this landed on them, and minutes past when it should be done. */
+  heldFor: number;
+  lateBy: number;
+
+  /* ---- decision quality, §13.4 ---------------------------------------- */
+  /** Why this, now. */
+  why: string;
+  /** What the system is going by: the events that produced it. */
+  evidence: readonly number[];
+  /** What says so. */
+  protocol: string;
+  /** What happens if nobody acts. */
+  ifIgnored: string;
+
+  /* ---- provenance, for the UI to trace back ---------------------------- */
+  flowId: string;
+  flowKind: FlowKind;
+  subjectId: string;
+  subjectLabel: string;
+  node: string;
+  /** The event that would close it. The screen shows this as one plain action. */
+  completedBy: ClinicEvent;
+}
+
+/* -------------------------------------------------------------------------
+ * Building one
+ * ---------------------------------------------------------------------- */
+
+/** The question a person would actually ask about this piece of work. */
+function questionFor(label: string, subject: string): string {
+  return `${label} — ${subject}`;
+}
+
+function decisionFor(w: World, f: Flow, now: number): Decision | null {
+  const def = FLOWS[f.kind];
+  const nd = def.nodes[f.at];
+  if (!nd || f.done) return null;
+
+  const heldFor = Math.max(0, now - f.heldSince);
+  const lateBy = lateness(f, now);
+
+  // Governance first. A blocked decision is blocked however late it is —
+  // lateness never argues a safety requirement away.
+  const refusal = admit(w, nd.completedBy, f.subjectId);
+
+  const verdict: Verdict = refusal
+    ? Verdict.BLOCKED
+    : lateBy > 0
+      ? Verdict.ESCALATE
+      : Verdict.PROCEED;
+
+  // The evidence: the events that brought this flow to where it is. Sequence
+  // numbers rather than prose, so a person can be shown the actual record
+  // rather than a summary somebody wrote.
+  const evidence = w.events
+    .filter((e) => e.subjectId === f.subjectId)
+    .map((e) => e.seq);
+
+  return {
+    id: `${f.id}#${nd.id}`,
+    question: questionFor(nd.label, f.subjectLabel),
+    owner: nd.owner,
+    objective: nd.objective,
+    priority: rank(nd.objective),
+
+    verdict,
+    because: refusal ? refusal.because : null,
+    fix: refusal ? refusal.fix : null,
+    goes: refusal ? refusal.goes : null,
+
+    heldFor,
+    lateBy,
+
+    why: `This is about ${OBJECTIVE_WORD[nd.objective]}.`,
+    evidence,
+    protocol: `${def.label} · ${nd.id}`,
+    ifIgnored: lateBy > 0
+      ? `${lateBy} min over. The ${role(nd.escalateTo)} has been told.`
+      : `Due in ${Math.max(0, nd.expectMinutes - heldFor)} min, then the ${role(nd.escalateTo)} is told.`,
+
+    flowId: f.id,
+    flowKind: f.kind,
+    subjectId: f.subjectId,
+    subjectLabel: f.subjectLabel,
+    node: nd.id,
+    completedBy: nd.completedBy,
+  };
+}
+
+const role = (r: RoleCode) => String(r).replace(/_/g, ' ').toLowerCase();
+
+/* -------------------------------------------------------------------------
+ * The list
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Ordered by: what it is for, then how late it is, then how long it has been
+ * held.
+ *
+ * The objective comes first and nothing outranks it. A safety decision sits
+ * above a billing decision that has been waiting four hours, because that is
+ * what §2.1 says the clinic believes — and if it is ever wrong, it is wrong in
+ * one line rather than scattered through a scheduler.
+ */
+export function decisions(w: World, now: number): Decision[] {
+  const out: Decision[] = [];
+  for (const f of w.flows) {
+    const d = decisionFor(w, f, now);
+    if (d) out.push(d);
+  }
+  return out.sort(
+    (a, b) => a.priority - b.priority || b.lateBy - a.lateBy || b.heldFor - a.heldFor,
+  );
+}
+
+/**
+ * What one role sees — the whole of their clinic, and none of anybody else's.
+ *
+ * *"Same database. Different operating systems."* Reception is not shown a
+ * filtered version of the doctor's queue; they own none of it, so none of it
+ * is here.
+ */
+export function decisionsFor(w: World, who: RoleCode, now: number): Decision[] {
+  return decisions(w, now).filter((d) => d.owner === who);
+}
+
+/**
+ * Late work whose escalation role is this person — visible to them, and still
+ * owned by somebody else.
+ *
+ * Escalation never reassigns (§7 rule 4). Moving the work would let the holder
+ * off, and the manager's screen would slowly become everybody's to-do list.
+ */
+export function escalatedTo(w: World, who: RoleCode, now: number): Decision[] {
+  return decisions(w, now).filter((d) => {
+    const nd = FLOWS[d.flowKind].nodes.find((n) => n.id === d.node);
+    return d.lateBy > 0 && nd?.escalateTo === who && d.owner !== who;
+  });
+}
+
+/**
+ * The single most important thing in the clinic right now, or null.
+ *
+ * The command centre's top line, and the answer to *"what does the clinic need
+ * to do RIGHT NOW?"*. Null when there is genuinely nothing open, which is a
+ * real state and must not be dressed up as an achievement.
+ */
+export function mostImportant(w: World, now: number): Decision | null {
+  return decisions(w, now)[0] ?? null;
+}

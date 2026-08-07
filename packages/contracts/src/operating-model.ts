@@ -39,6 +39,7 @@
  *    by hand.
  */
 import { RoleCode } from './enums.js';
+import { Objective } from './objectives.js';
 
 /* -------------------------------------------------------------------------
  * Events — what happened, never what to do
@@ -143,6 +144,12 @@ export interface FlowNode {
   expectMinutes: number;
   /** Who hears when it has taken longer than that. */
   escalateTo: RoleCode;
+  /**
+   * What this step is for (§2.1). Its rank is what orders a person's day when
+   * two pieces of work want them at once, so it is not decoration — assigning
+   * the wrong one here changes which patient gets seen first.
+   */
+  objective: Objective;
 }
 
 export interface FlowDefinition {
@@ -156,8 +163,9 @@ export interface FlowDefinition {
 const node = (
   id: string, label: string, owner: RoleCode,
   completedBy: ClinicEvent, expectMinutes: number,
+  objective: Objective,
   escalateTo: RoleCode = RoleCode.CLINIC_MANAGER,
-): FlowNode => ({ id, label, owner, completedBy, expectMinutes, escalateTo });
+): FlowNode => ({ id, label, owner, completedBy, expectMinutes, escalateTo, objective });
 
 export const FLOWS: Record<FlowKind, FlowDefinition> = {
   [FlowKind.CLINIC]: {
@@ -165,10 +173,10 @@ export const FLOWS: Record<FlowKind, FlowDefinition> = {
     label: 'The premises',
     subjectNoun: 'the clinic',
     nodes: [
-      node('UNLOCK', 'Unlock and open up', RoleCode.RECEPTION, ClinicEvent.CLINIC_UNLOCKED, 10),
-      node('ROOMS', 'Make the rooms ready', RoleCode.DENTAL_ASSISTANT, ClinicEvent.ROOMS_READY, 25),
-      node('HUDDLE', 'Hold the morning huddle', RoleCode.CLINIC_MANAGER, ClinicEvent.HUDDLE_HELD, 15, RoleCode.CLINIC_HEAD),
-      node('RUN', 'Run the day', RoleCode.CLINIC_MANAGER, ClinicEvent.CLINIC_LOCKED, 480, RoleCode.CLINIC_HEAD),
+      node('UNLOCK', 'Unlock and open up', RoleCode.RECEPTION, ClinicEvent.CLINIC_UNLOCKED, 10, Objective.CLINIC_EFFICIENT),
+      node('ROOMS', 'Make the rooms ready', RoleCode.DENTAL_ASSISTANT, ClinicEvent.ROOMS_READY, 25, Objective.PATIENT_SAFE),
+      node('HUDDLE', 'Hold the morning huddle', RoleCode.CLINIC_MANAGER, ClinicEvent.HUDDLE_HELD, 15, Objective.CLINIC_EFFICIENT, RoleCode.CLINIC_HEAD),
+      node('RUN', 'Run the day', RoleCode.CLINIC_MANAGER, ClinicEvent.CLINIC_LOCKED, 480, Objective.CLINIC_EFFICIENT, RoleCode.CLINIC_HEAD),
     ],
   },
 
@@ -177,17 +185,17 @@ export const FLOWS: Record<FlowKind, FlowDefinition> = {
     label: 'Patient visit',
     subjectNoun: 'patient',
     nodes: [
-      node('ARRIVE', 'Waiting to arrive', RoleCode.RECEPTION, ClinicEvent.PATIENT_ARRIVED, 15),
-      node('REGISTER', 'Register and check alerts', RoleCode.RECEPTION, ClinicEvent.PATIENT_REGISTERED, 5),
+      node('ARRIVE', 'Waiting to arrive', RoleCode.RECEPTION, ClinicEvent.PATIENT_ARRIVED, 15, Objective.PATIENT_HAPPY),
+      node('REGISTER', 'Register and check alerts', RoleCode.RECEPTION, ClinicEvent.PATIENT_REGISTERED, 5, Objective.PATIENT_SAFE),
       // The waiting-room clock. Fifteen minutes is the owner's own threshold:
       // "Patient waiting 14 minutes → notify Reception."
-      node('SEAT', 'Waiting for a chair', RoleCode.DENTAL_ASSISTANT, ClinicEvent.PATIENT_SEATED, 15),
-      node('ASSESS', 'Examine and diagnose', RoleCode.TREATING_DOCTOR, ClinicEvent.DIAGNOSIS_RECORDED, 20, RoleCode.CLINIC_HEAD),
-      node('PLAN', 'Agree the treatment plan', RoleCode.TREATING_DOCTOR, ClinicEvent.PLAN_ACCEPTED, 15, RoleCode.CLINIC_HEAD),
-      node('TREAT', 'Carry out the treatment', RoleCode.TREATING_DOCTOR, ClinicEvent.TREATMENT_FINISHED, 50, RoleCode.CLINIC_HEAD),
-      node('BILL', 'Settle the bill', RoleCode.RECEPTION, ClinicEvent.PAYMENT_RECEIVED, 15),
-      node('AFTER', 'Give post-operative instructions', RoleCode.DENTAL_ASSISTANT, ClinicEvent.INSTRUCTIONS_GIVEN, 10),
-      node('RECALL', 'Book the recall', RoleCode.RECEPTION, ClinicEvent.RECALL_BOOKED, 10),
+      node('SEAT', 'Waiting for a chair', RoleCode.DENTAL_ASSISTANT, ClinicEvent.PATIENT_SEATED, 15, Objective.PATIENT_HAPPY),
+      node('ASSESS', 'Examine and diagnose', RoleCode.TREATING_DOCTOR, ClinicEvent.DIAGNOSIS_RECORDED, 20, Objective.TREATMENT_SUCCESSFUL, RoleCode.CLINIC_HEAD),
+      node('PLAN', 'Agree the treatment plan', RoleCode.TREATING_DOCTOR, ClinicEvent.PLAN_ACCEPTED, 15, Objective.TREATMENT_SUCCESSFUL, RoleCode.CLINIC_HEAD),
+      node('TREAT', 'Carry out the treatment', RoleCode.TREATING_DOCTOR, ClinicEvent.TREATMENT_FINISHED, 50, Objective.TREATMENT_SUCCESSFUL, RoleCode.CLINIC_HEAD),
+      node('BILL', 'Settle the bill', RoleCode.RECEPTION, ClinicEvent.PAYMENT_RECEIVED, 15, Objective.MONEY_COLLECTED),
+      node('AFTER', 'Give post-operative instructions', RoleCode.DENTAL_ASSISTANT, ClinicEvent.INSTRUCTIONS_GIVEN, 10, Objective.TREATMENT_SUCCESSFUL),
+      node('RECALL', 'Book the recall', RoleCode.RECEPTION, ClinicEvent.RECALL_BOOKED, 10, Objective.PATIENT_RECALLED),
     ],
   },
 
@@ -196,8 +204,8 @@ export const FLOWS: Record<FlowKind, FlowDefinition> = {
     label: 'Clinical record',
     subjectNoun: 'treatment',
     nodes: [
-      node('NOTES', 'Complete the clinical note', RoleCode.TREATING_DOCTOR, ClinicEvent.NOTES_COMPLETED, 30, RoleCode.CLINIC_HEAD),
-      node('CALL', 'Day-after follow-up call', RoleCode.TREATING_DOCTOR, ClinicEvent.FOLLOWUP_CALLED, 1440, RoleCode.CLINIC_HEAD),
+      node('NOTES', 'Complete the clinical note', RoleCode.TREATING_DOCTOR, ClinicEvent.NOTES_COMPLETED, 30, Objective.RECORDS_COMPLETE, RoleCode.CLINIC_HEAD),
+      node('CALL', 'Day-after follow-up call', RoleCode.TREATING_DOCTOR, ClinicEvent.FOLLOWUP_CALLED, 1440, Objective.TREATMENT_SUCCESSFUL, RoleCode.CLINIC_HEAD),
     ],
   },
 
@@ -206,10 +214,10 @@ export const FLOWS: Record<FlowKind, FlowDefinition> = {
     label: 'Sterilisation',
     subjectNoun: 'batch',
     nodes: [
-      node('COLLECT', 'Collect used instruments', RoleCode.STERILIZATION_TECHNICIAN, ClinicEvent.BATCH_COLLECTED, 10),
-      node('ULTRA', 'Run the ultrasonic', RoleCode.STERILIZATION_TECHNICIAN, ClinicEvent.BATCH_ULTRASONIC_DONE, 20),
-      node('PACK', 'Inspect, dry and pack', RoleCode.STERILIZATION_TECHNICIAN, ClinicEvent.BATCH_PACKED, 15),
-      node('AUTO', 'Run the autoclave', RoleCode.STERILIZATION_TECHNICIAN, ClinicEvent.BATCH_AUTOCLAVED, 45),
+      node('COLLECT', 'Collect used instruments', RoleCode.STERILIZATION_TECHNICIAN, ClinicEvent.BATCH_COLLECTED, 10, Objective.PATIENT_SAFE),
+      node('ULTRA', 'Run the ultrasonic', RoleCode.STERILIZATION_TECHNICIAN, ClinicEvent.BATCH_ULTRASONIC_DONE, 20, Objective.PATIENT_SAFE),
+      node('PACK', 'Inspect, dry and pack', RoleCode.STERILIZATION_TECHNICIAN, ClinicEvent.BATCH_PACKED, 15, Objective.PATIENT_SAFE),
+      node('AUTO', 'Run the autoclave', RoleCode.STERILIZATION_TECHNICIAN, ClinicEvent.BATCH_AUTOCLAVED, 45, Objective.PATIENT_SAFE),
       /**
        * The clearest case of ownership moving on its own, and the reason the
        * engine has to do it rather than a person: an operator may not release
@@ -217,7 +225,7 @@ export const FLOWS: Record<FlowKind, FlowDefinition> = {
        * senior assistant's screen. Nobody hands it over, so nobody can decide
        * not to.
        */
-      node('RELEASE', 'Check and release the batch', RoleCode.SENIOR_ASSISTANT, ClinicEvent.BATCH_RELEASED, 15, RoleCode.CLINIC_HEAD),
+      node('RELEASE', 'Check and release the batch', RoleCode.SENIOR_ASSISTANT, ClinicEvent.BATCH_RELEASED, 15, Objective.PATIENT_SAFE, RoleCode.CLINIC_HEAD),
     ],
   },
 
@@ -226,10 +234,10 @@ export const FLOWS: Record<FlowKind, FlowDefinition> = {
     label: 'Laboratory case',
     subjectNoun: 'case',
     nodes: [
-      node('SEND', 'Send the case out', RoleCode.LAB_COORDINATOR, ClinicEvent.LAB_DISPATCHED, 30),
-      node('AWAIT', 'Chase the case back', RoleCode.LAB_COORDINATOR, ClinicEvent.LAB_ARRIVED, 4320),
-      node('QC', 'Check the work before the patient sees it', RoleCode.TREATING_DOCTOR, ClinicEvent.LAB_QC_PASSED, 60, RoleCode.CLINIC_HEAD),
-      node('BOOK', 'Give the patient a date', RoleCode.RECEPTION, ClinicEvent.LAB_APPOINTMENT_GIVEN, 60),
+      node('SEND', 'Send the case out', RoleCode.LAB_COORDINATOR, ClinicEvent.LAB_DISPATCHED, 30, Objective.TREATMENT_SUCCESSFUL),
+      node('AWAIT', 'Chase the case back', RoleCode.LAB_COORDINATOR, ClinicEvent.LAB_ARRIVED, 4320, Objective.TREATMENT_SUCCESSFUL),
+      node('QC', 'Check the work before the patient sees it', RoleCode.TREATING_DOCTOR, ClinicEvent.LAB_QC_PASSED, 60, Objective.PATIENT_SAFE, RoleCode.CLINIC_HEAD),
+      node('BOOK', 'Give the patient a date', RoleCode.RECEPTION, ClinicEvent.LAB_APPOINTMENT_GIVEN, 60, Objective.PATIENT_HAPPY),
     ],
   },
 
@@ -238,8 +246,8 @@ export const FLOWS: Record<FlowKind, FlowDefinition> = {
     label: 'Replenishment',
     subjectNoun: 'item',
     nodes: [
-      node('ORDER', 'Raise the order', RoleCode.INVENTORY_COORDINATOR, ClinicEvent.STOCK_ORDERED, 120),
-      node('RECEIVE', 'Book the stock in', RoleCode.INVENTORY_COORDINATOR, ClinicEvent.STOCK_RECEIVED, 2880),
+      node('ORDER', 'Raise the order', RoleCode.INVENTORY_COORDINATOR, ClinicEvent.STOCK_ORDERED, 120, Objective.CLINIC_EFFICIENT),
+      node('RECEIVE', 'Book the stock in', RoleCode.INVENTORY_COORDINATOR, ClinicEvent.STOCK_RECEIVED, 2880, Objective.CLINIC_EFFICIENT),
     ],
   },
 
@@ -248,8 +256,8 @@ export const FLOWS: Record<FlowKind, FlowDefinition> = {
     label: 'Billing',
     subjectNoun: 'invoice',
     nodes: [
-      node('RAISE', 'Raise the invoice', RoleCode.RECEPTION, ClinicEvent.INVOICE_RAISED, 20),
-      node('SETTLE', 'Collect what is owed', RoleCode.RECEPTION, ClinicEvent.INVOICE_SETTLED, 2880),
+      node('RAISE', 'Raise the invoice', RoleCode.RECEPTION, ClinicEvent.INVOICE_RAISED, 20, Objective.MONEY_COLLECTED),
+      node('SETTLE', 'Collect what is owed', RoleCode.RECEPTION, ClinicEvent.INVOICE_SETTLED, 2880, Objective.MONEY_COLLECTED),
     ],
   },
 };

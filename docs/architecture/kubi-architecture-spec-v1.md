@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status** | **COMPLETE — awaiting owner acceptance.** No further sections will be added; see §18. |
+| **Status** | **FROZEN — KuBi V1.0.** Frozen by the owner, 2026-08-06. No engine, domain, workflow, principle, feature or abstraction may be added. Corrections queue for v1.1. |
 | **Date** | 2026-08-06 |
 | **Supersedes** | The event/workflow model in `packages/contracts/src/engine.ts` |
 | **Authority** | The owner's brief of 2026-08-06 and the analysis that followed it |
@@ -210,7 +210,37 @@ that belongs to none does not belong in KuBi.
 | B-6 | **Quality** | Audit · NABH · incidents · CAPA · feedback · complaints · training | Continuous |
 | B-7 | **Learning** | Training · competency · skill matrix · credentialing · assessment · re-certification | Careers |
 
-### 3.2 The finding this produces
+### 3.2 What V1 does and does not attempt
+
+The owner's correction, on being shown the domain coverage below:
+
+> *"Do not respond by expanding the architecture to fully build those domains
+> now. That's a scope trap… Growth, advanced business intelligence and learning
+> can exist as domain boundaries/interfaces, but they don't need fully
+> developed engines before the first usable version. Otherwise we are going to
+> spend another month designing the operating system instead of actually using
+> it."*
+
+**Adopted, and binding.** For V1 the promise is one sentence:
+
+> **Run the clinic correctly, continuously, and visibly.**
+
+| Domain | V1 |
+|---|---|
+| B-1 Patient relationship | The visit and the recall. Lead, enquiry, membership and referral are a **boundary only**. |
+| B-2 Clinical care | The chair-side chain and its records. |
+| B-3 Practice operations | Fully. |
+| B-4 Business | Billing to settlement. Case acceptance and receivables ageing are a **boundary only**. |
+| B-5 Growth | **Boundary only.** No engine. |
+| B-6 Quality | Exceptions and CAPA, connected to events at last. |
+| B-7 Learning | **Boundary only.** No engine. |
+
+A *boundary only* domain has a name, an interface and no implementation, and
+the specification says so rather than half-building it. Coverage below is the
+measurement that produced this scope, kept because it is the honest picture —
+not because those gaps are V1 work.
+
+### 3.3 The finding this produces
 
 Mapping the seven flows of §5 onto the seven domains is uncomfortable, and the
 discomfort is the point:
@@ -230,7 +260,7 @@ discomfort is the point:
 > owner keeps saying KuBi feels like software rather than like running a clinic:
 > the clinic's day is well covered and the clinic's *business* is not.
 
-### 3.3 Financial intelligence, which is B-4 and not billing
+### 3.4 Financial intelligence, which is B-4 and not billing
 
 The owner's example is the whole distinction:
 
@@ -253,7 +283,7 @@ This makes `case acceptance` and `treatment conversion` first-class, not
 report columns. Both are open until the domain model of Phase 2 defines a
 treatment plan properly.
 
-### 3.4 The rule the domains impose
+### 3.5 The rule the domains impose
 
 1. **Every flow declares its domain.** A flow belonging to none is rejected at
    startup.
@@ -265,7 +295,7 @@ treatment plan properly.
    to two — a recall is relationship *and* clinical — it belongs to the one
    whose objective it serves, by §2.1 order.
 
-### 3.5 What is deliberately NOT here
+### 3.6 What is deliberately NOT here
 
 The **Dental Practice Domain Model** — the full entity language of patients,
 appointments, clinical records, treatment plans, procedures, lab cases,

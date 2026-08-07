@@ -291,12 +291,23 @@ describe('the things it deliberately does not do', () => {
     expect(text).toContain('Append-only by database grant, not by good manners');
   });
 
+  it('records the V1 scope narrowing rather than treating gaps as V1 work', () => {
+    // The owner's correction: naming Growth, Business and Learning as absent
+    // was a measurement, not a plan. Building them now is the scope trap.
+    expect(text).toContain('Run the clinic correctly, continuously, and visibly');
+    expect(text).toContain('boundary only');
+  });
+
   it('closes itself to further expansion, at the owner’s instruction', () => {
     // "I would not let Claude continue expanding this architecture
     // indefinitely." A specification that keeps growing is one nothing is ever
     // built from, so this is a rule in the document and a test here.
     expect(text).toContain('This specification stops expanding here');
-    expect(text).toContain('COMPLETE — awaiting owner acceptance');
+    // Frozen by the owner on 2026-08-06. The status line is load-bearing: it
+    // is what a future contributor reads before deciding whether adding "just
+    // one more engine" is allowed. It is not.
+    expect(text).toContain('FROZEN — KuBi V1.0');
+    expect(text).toContain('No engine, domain, workflow, principle, feature or abstraction may be added');
   });
 
   it('adopts the owner’s four phases, with the UI last', () => {
