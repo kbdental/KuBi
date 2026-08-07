@@ -15,6 +15,7 @@ import { OwnerBusiness } from '../screens/owner-business.js';
 import { ReceptionBoard } from '../screens/reception-board.js';
 import { BriefingScreen } from '../screens/briefing.js';
 import { Retention as RetentionScreen } from '../screens/retention.js';
+import { Now as NowScreen } from '../screens/now.js';
 import { registerDashboard, DashboardStatus } from './registry.js';
 
 export function registerAllDashboards(): void {
@@ -75,6 +76,29 @@ export function registerAllDashboards(): void {
     status: DashboardStatus.LIVE,
     home: true,
     render: (ctx) => <BriefingScreen onOpenTask={ctx.openTask} onRefresh={ctx.reload} />,
+  });
+
+  /**
+   * The clinic, for everybody.
+   *
+   * One entry rather than eight, because the screen is the same code for
+   * every role — the engine returns a different world to each of them. That
+   * is §12.4: "same database, different operating systems", and it is why
+   * there is no reception dashboard, doctor dashboard and so on to keep in
+   * step with one another.
+   */
+  registerDashboard({
+    id: 'CLINIC_NOW',
+    question: 'What does the clinic need from me now?',
+    label: 'Now',
+    roles: [
+      'RECEPTION', 'TREATING_DOCTOR', 'CLINICAL_DIRECTOR', 'DENTAL_ASSISTANT',
+      'SENIOR_ASSISTANT', 'STERILIZATION_TECHNICIAN', 'LAB_COORDINATOR',
+      'INVENTORY_COORDINATOR', 'CLINIC_MANAGER', 'CLINIC_HEAD', 'OWNER_DIRECTOR',
+    ],
+    phase: 1,
+    status: DashboardStatus.LIVE,
+    render: () => <NowScreen />,
   });
 
   registerDashboard({

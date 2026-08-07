@@ -67,6 +67,7 @@ model Organization {
   sterilizationBatches SterilizationBatch[]
   labCases             LabCase[]
   retentionOutreach    RetentionOutreach[]
+  clinicEvents         ClinicEventRow[]
 
   @@map("organizations")
 }
@@ -1392,4 +1393,39 @@ model RetentionOutreach {
 
   @@index([organizationId, clinicId, closedAt])
   @@map("retention_outreach")
+}
+
+/// The event log. Specification §16 — the only writable table in the model.
+///
+/// Flows, ownership, timers and governance state are all replayed from this
+/// and none of them has a column anywhere. Append-only by database grant: the
+/// application role holds SELECT and INSERT and nothing else.
+model ClinicEventRow {
+  seq            BigInt @id @default(autoincrement())
+  organizationId String @map("organization_id") @db.Uuid
+  clinicId       String @map("clinic_id") @db.Uuid
+
+  type         String
+  subjectId    String  @map("subject_id")
+  subjectLabel String? @map("subject_label")
+
+  occurredAt     DateTime @map("occurred_at") @db.Timestamptz(6)
+  recordedAt     DateTime @default(now()) @map("recorded_at") @db.Timestamptz(6)
+  /// Clinic-local minutes since midnight, as the engine reasons in.
+  occurredMinute Int      @map("occurred_minute")
+
+  byEmployeeId String? @map("by_employee_id") @db.Uuid
+  byRole       String  @map("by_role")
+
+  payload Json @default("{}")
+
+  /// The caller's own id. A retried request inserts nothing the second time.
+  idempotencyKey String @map("idempotency_key")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, clinicId, seq])
+  @@index([organizationId, subjectId])
+  @@map("clinic_events")
 }

@@ -38,9 +38,13 @@ import {
   implementAction, checkEffectiveness, closeIncident, listIncidents, CapaRuleError,
 } from './platform/quality/capa.service.js';
 import { RetentionService, RetentionError } from './domains/clinical/retention.service.js';
+import { EventStore, EventStoreError } from './platform/events/event-store.js';
 import {
   ActivityStatus, ExceptionStatus, DAILY_STANDARD,
   DORMANT_AFTER_DAYS, type OutreachOutcome, headlineFor,
+  ClinicEvent, FLOWS,
+  decisions, decisionsFor, escalatedTo, mostImportant, sweep, board,
+  type RoleCode as Role,
 } from '@kubi/contracts';
 
 
@@ -79,6 +83,15 @@ const clock = systemClock;
  * enough; the tenant transaction is passed in on every call.
  */
 const retention = new RetentionService(clock);
+
+/**
+ * The event log and the engine on top of it.
+ *
+ * Every route below is one of exactly two things: it reads decisions(), or it
+ * records an event. There is no third kind, and no route computes what should
+ * happen next — that is the engine's job and the whole point of §12.
+ */
+const events = new EventStore(clock);
 
 /** Buckets for TODAY. Plain words, ordered by urgency. */
 type Bucket = 'OVERDUE' | 'NOW' | 'NEXT' | 'LATER';
@@ -289,6 +302,10 @@ export async function buildServer(): Promise<FastifyInstance> {
     // since you opened this list" are both states of the clinic, not faults in
     // the request. 409 so the screen can say so and reload, rather than
     // reporting a server error for a race the user handled correctly.
+    if (err instanceof EventStoreError) {
+      reply.status(400).send({ error: err.message, code: err.code });
+      return;
+    }
     if (err instanceof RetentionError) {
       reply.status(409).send({ error: err.message, code: err.code });
       return;
@@ -867,6 +884,113 @@ export async function buildServer(): Promise<FastifyInstance> {
       authoriseGate(tx, clock, { instanceId: id, employeeId: s.employeeId!, reason: body.reason }));
     await track(s, 'authorise_gate', { instanceId: id });
     return { ok: true };
+  });
+
+  /* ═══════════════════════════════════════════════════════════════════
+     THE ENGINE
+
+     Three routes. A screen reads the first two and posts to the third, and
+     computes nothing of its own — principle P-1 and the reason the UI can
+     stay thin enough to be trusted.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /** What this person must decide now, and what has escalated to them. */
+  app.get('/api/v1/now', async (req) => {
+    const s = await requireSession(req);
+    const result = await withTenantContext(prisma, s.tenancy, async (tx) => {
+      const clinicId = s.tenancy.clinicIds[0];
+      if (!clinicId) return null;
+      const now = events.minuteNow();
+      const world = await events.replay(tx, clinicId, now);
+      const role = (s.roleCodes[0] ?? 'RECEPTION') as Role;
+      return {
+        now,
+        role,
+        mine: decisionsFor(world, role, now),
+        escalated: escalatedTo(world, role, now),
+      };
+    });
+    await track(s, 'view_now');
+    if (!result) throw Object.assign(new Error('No clinic in context.'), { statusCode: 400 });
+    return result;
+  });
+
+  /**
+   * The whole clinic: every open decision, the live board, and what is late.
+   *
+   * One route rather than seven, because the owner asked for one clinic and
+   * not seven software modules. A screen slices this; it does not query per
+   * flow.
+   */
+  app.get('/api/v1/clinic', async (req) => {
+    const s = await requireSession(req);
+    const result = await withTenantContext(prisma, s.tenancy, async (tx) => {
+      const clinicId = s.tenancy.clinicIds[0];
+      if (!clinicId) return null;
+      const now = events.minuteNow();
+      const world = await events.replay(tx, clinicId, now);
+      const all = decisions(world, now);
+      return {
+        now,
+        first: mostImportant(world, now),
+        decisions: all,
+        board: board(world, now),
+        late: sweep(world, now).alerts,
+        flows: world.flows.filter((f) => !f.done).map((f) => ({
+          id: f.id, kind: f.kind, subjectLabel: f.subjectLabel,
+          node: FLOWS[f.kind].nodes[f.at]?.id ?? null,
+        })),
+        eventCount: world.events.length,
+      };
+    });
+    await track(s, 'view_clinic');
+    if (!result) throw Object.assign(new Error('No clinic in context.'), { statusCode: 400 });
+    return result;
+  });
+
+  /**
+   * Record something that happened.
+   *
+   * The only write path in the application. The body names an event and a
+   * subject; it cannot name a workflow position, a phase or an assignee,
+   * because none of those is a thing a person does.
+   */
+  app.post('/api/v1/events', async (req) => {
+    const s = await requireSession(req);
+    const body = z.object({
+      type: z.enum(Object.values(ClinicEvent) as [string, ...string[]]),
+      subjectId: z.string().min(1).max(120),
+      subjectLabel: z.string().max(200).optional(),
+      idempotencyKey: z.string().min(8).max(120),
+    }).parse(req.body);
+
+    const out = await withTenantContext(prisma, s.tenancy, async (tx) => {
+      const clinicId = s.tenancy.clinicIds[0];
+      if (!clinicId) throw Object.assign(new Error('No clinic in context.'), { statusCode: 400 });
+      const now = events.minuteNow();
+      return events.append(tx, {
+        organizationId: s.organizationId,
+        clinicId,
+        type: body.type as ClinicEvent,
+        subjectId: body.subjectId,
+        ...(body.subjectLabel ? { subjectLabel: body.subjectLabel } : {}),
+        byRole: (s.roleCodes[0] ?? 'RECEPTION') as Role,
+        ...(s.employeeId ? { byEmployeeId: s.employeeId } : {}),
+        idempotencyKey: body.idempotencyKey,
+      }, now);
+    });
+
+    // A refusal is a state of the clinic, not a failure of the request. The
+    // screen shows one sentence and one button; 409 is how it knows to.
+    if (!out.outcome.ok) {
+      return { ok: false, refusal: out.outcome.refusal };
+    }
+    await track(s, 'record_event', { metadata: { type: body.type } });
+    return {
+      ok: true,
+      duplicate: out.duplicate,
+      consequences: out.outcome.consequences,
+    };
   });
 
   // ---- RETENTION: the patients who stopped coming (SG-T.4, 30 days) ----

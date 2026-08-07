@@ -65,12 +65,28 @@ describe('routing by role', () => {
     expect(homeFor(['RECEPTION'])?.id).toBe('DESK');
   });
 
-  it('returns null rather than guessing for a role with no live dashboard', () => {
-    // A role with no dashboard must land on its own task list, never on
-    // somebody else's screen. Housekeeping used to be the example here and now
-    // has one of its own — INVENTORY_COORDINATOR is the current case.
-    expect(homeFor(['INVENTORY_COORDINATOR'])).toBeNull();
+  it('returns null rather than guessing when there is no role at all', () => {
+    // The claim this test protects has always been "never show somebody
+    // another role's screen". What has changed is that there is no longer a
+    // role without a home: CLINIC_NOW is registered for all eleven, because
+    // the engine returns a different world to each of them rather than there
+    // being a different screen per role (§12.4).
+    //
+    // So the example that used to sit here — INVENTORY_COORDINATOR — is now
+    // covered, and the assertion below is the part that still bites: no role,
+    // no guess.
     expect(homeFor([])).toBeNull();
+    expect(homeFor(['NOT_A_REAL_ROLE'])).toBeNull();
+  });
+
+  it('leaves no role without a home', () => {
+    const roles = ['RECEPTION', 'TREATING_DOCTOR', 'CLINICAL_DIRECTOR',
+      'DENTAL_ASSISTANT', 'SENIOR_ASSISTANT', 'STERILIZATION_TECHNICIAN',
+      'LAB_COORDINATOR', 'INVENTORY_COORDINATOR', 'CLINIC_MANAGER',
+      'CLINIC_HEAD', 'OWNER_DIRECTOR'];
+    for (const r of roles) {
+      expect(homeFor([r]), `${r} has nowhere to land`).not.toBeNull();
+    }
   });
 
   it('never routes anyone to an unbuilt dashboard', () => {
@@ -106,11 +122,18 @@ describe('the registry as a record of what is missing', () => {
     // scoped — plus the owner's and manager's, which were already live, plus
     // RETENTION, the first dashboard built from the staff guidelines rather
     // than from the original scope.
+    //
+    // CLINIC_NOW is the tenth and is a different kind of entry from the other
+    // nine: one registration serving all eleven roles, because the screen is
+    // the same code for everybody and the engine hands each of them a
+    // different world. The owner's instruction was explicit — *"Do not create
+    // a separate screen for every flow. The user should experience one
+    // clinic, not seven software modules."*
     const built = allDashboards()
       .filter((d) => d.status === DashboardStatus.LIVE).map((d) => d.id).sort();
     expect(built).toEqual([
-      'ASSISTANT', 'COMMAND', 'DESK', 'DOCTOR', 'HOUSEKEEPING', 'LAB', 'OWNER',
-      'RETENTION', 'STERILIZATION',
+      'ASSISTANT', 'CLINIC_NOW', 'COMMAND', 'DESK', 'DOCTOR', 'HOUSEKEEPING',
+      'LAB', 'OWNER', 'RETENTION', 'STERILIZATION',
     ]);
   });
 

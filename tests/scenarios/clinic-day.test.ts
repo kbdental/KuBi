@@ -506,15 +506,168 @@ describe('Scenario 10 · closing with sterilisation unresolved', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   The three that cannot pass yet, and exactly why
-
-   Kept as failing-by-declaration rather than deleted or skipped. Each names
-   the engine it waits on, and each will be turned into a real scenario the
-   day that engine lands. A suite that reached green by removing these would
-   be lying about what KuBi can do.
+   9 — an emergency arrives while the clinic is full
    ═══════════════════════════════════════════════════════════════════════════ */
 
-describe('Not yet — the scenarios blocked on engines that do not exist', () => {
+describe('Scenario 9 · emergency arrives while the clinic is full', () => {
+  /** Two chairs' worth of work in flight, and a third patient waiting. */
+  const busyClinic = () => {
+    let w = emptyWorld(T(8, 45));
+    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
+    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
+    w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
+    w = sterileReady(w);
+    w = at(w, T(10, 0));
+
+    // A — in the chair, mid-assessment.
+    w = must(w, ClinicEvent.PATIENT_ARRIVED, 'pA', RoleCode.RECEPTION, 'Arjun P.');
+    w = must(w, ClinicEvent.PATIENT_REGISTERED, 'pA', RoleCode.RECEPTION);
+    w = must(w, ClinicEvent.PATIENT_SEATED, 'pA', RoleCode.DENTAL_ASSISTANT);
+    // B — registered, waiting for a chair.
+    w = must(w, ClinicEvent.PATIENT_ARRIVED, 'pB', RoleCode.RECEPTION, 'Meera R.');
+    w = must(w, ClinicEvent.PATIENT_REGISTERED, 'pB', RoleCode.RECEPTION);
+    // C — just walked in.
+    w = must(w, ClinicEvent.PATIENT_ARRIVED, 'pC', RoleCode.RECEPTION, 'Kabir S.');
+    return w;
+  };
+
+  it('starts an emergency from the event, with no triage button anywhere', () => {
+    let w = busyClinic();
+    const before = w.flows.filter((f) => !f.done).length;
+
+    w = must(w, ClinicEvent.EMERGENCY_PATIENT_ARRIVED, 'e1',
+      RoleCode.RECEPTION, 'Walk-in, facial swelling');
+
+    expect(w.flows.filter((f) => !f.done).length).toBe(before + 1);
+    const emergency = w.flows.find((f) => f.kind === 'EMERGENCY')!;
+    expect(emergency.subjectLabel).toBe('Walk-in, facial swelling');
+  });
+
+  it('puts it on the doctor and tells them, without anybody routing it', () => {
+    const w = busyClinic();
+    const r = record(w, {
+      type: ClinicEvent.EMERGENCY_PATIENT_ARRIVED, subjectId: 'e1',
+      subjectLabel: 'Walk-in, facial swelling', by: RoleCode.RECEPTION,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+
+    // §11: first owner is the doctor. Reception recorded it; the engine routed it.
+    const started = r.consequences.find((c) => c.kind === 'FLOW_STARTED');
+    expect(started).toMatchObject({ owner: RoleCode.TREATING_DOCTOR });
+    expect(r.consequences.some(
+      (c) => c.kind === 'NOTIFY' && c.role === RoleCode.TREATING_DOCTOR,
+    )).toBe(true);
+  });
+
+  it('ranks the emergency first among everything the doctor holds', () => {
+    let w = busyClinic();
+    w = must(w, ClinicEvent.EMERGENCY_PATIENT_ARRIVED, 'e1',
+      RoleCode.RECEPTION, 'Walk-in, facial swelling');
+
+    const mine = decisionsFor(w, RoleCode.TREATING_DOCTOR, T(10, 5));
+    expect(mine.length).toBeGreaterThan(1);
+    expect(mine[0]!.flowKind).toBe('EMERGENCY');
+    expect(mine[0]!.objective).toBe(Objective.PATIENT_SAFE);
+    expect(mine[0]!.priority).toBe(1);
+  });
+
+  it('cancels nothing — §11 rule 1, both run', () => {
+    let w = busyClinic();
+    const openBefore = w.flows.filter((f) => !f.done).map((f) => f.id).sort();
+    w = must(w, ClinicEvent.EMERGENCY_PATIENT_ARRIVED, 'e1',
+      RoleCode.RECEPTION, 'Walk-in, facial swelling');
+    const openAfter = w.flows.filter((f) => !f.done).map((f) => f.id).sort();
+
+    // Every flow that was running is still running, still owned by the same
+    // person, and none of them was quietly closed to make room.
+    for (const id of openBefore) expect(openAfter).toContain(id);
+    expect(decisionsFor(w, RoleCode.RECEPTION, T(10, 5)).length).toBeGreaterThan(0);
+  });
+
+  it('preserves every safety rule while the emergency is running', () => {
+    let w = busyClinic();
+    w = must(w, ClinicEvent.EMERGENCY_PATIENT_ARRIVED, 'e1',
+      RoleCode.RECEPTION, 'Walk-in, facial swelling');
+
+    // An emergency does not become a reason to skip consent on somebody else.
+    const r = record(w, {
+      type: ClinicEvent.TREATMENT_FINISHED, subjectId: 'pA', by: RoleCode.TREATING_DOCTOR,
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it('hands triage to documentation, and records it because EMR-003 says so', () => {
+    let w = busyClinic();
+    w = must(w, ClinicEvent.EMERGENCY_PATIENT_ARRIVED, 'e1',
+      RoleCode.RECEPTION, 'Walk-in, facial swelling');
+    w = must(w, ClinicEvent.EMERGENCY_TRIAGED, 'e1', RoleCode.TREATING_DOCTOR);
+
+    const doc = decisionsFor(w, RoleCode.TREATING_DOCTOR, T(10, 20))
+      .find((d) => d.node === 'DOCUMENT');
+    expect(doc).toBeDefined();
+    // The record is a frozen-matrix control, not a nicety: EMR-003, "every
+    // medical emergency creates incident record".
+    expect(doc!.objective).toBe(Objective.RECORDS_COMPLETE);
+  });
+
+  it('escalates an untriaged emergency to the clinic head, on the clock alone', () => {
+    let w = busyClinic();
+    w = must(w, ClinicEvent.EMERGENCY_PATIENT_ARRIVED, 'e1',
+      RoleCode.RECEPTION, 'Walk-in, facial swelling');
+
+    expect(sweep(w, T(10, 4)).alerts.some((a) => a.node === 'TRIAGE')).toBe(false);
+    const late = sweep(w, T(10, 10)).alerts.find((a) => a.node === 'TRIAGE');
+    expect(late).toBeDefined();
+    expect(late!.escalatedTo).toBe(RoleCode.CLINIC_HEAD);
+  });
+});
+
+describe('Scenario 9 · where the frozen specification stops, reported not guessed', () => {
+  it('cannot re-sequence the queue — that needs resources (D-07, D-08)', () => {
+    // §11 says the emergency "pre-empts the queue". Pre-empting means taking
+    // a chair from somebody, and nothing in the model knows a chair exists.
+    // The emergency is raised, owned, ranked and escalated; who loses their
+    // slot is not computable until the resource inventory arrives.
+    const w = must(emptyWorld(T(10, 0)),
+      ClinicEvent.EMERGENCY_PATIENT_ARRIVED, 'e1', RoleCode.RECEPTION, 'Walk-in');
+    expect(decisions(w, T(10, 0)).some((d) => d.verdict === Verdict.WAIT)).toBe(false);
+  });
+
+  it('does not outrank a LATE patient-safety item, which §11 rule 2 assumes it would', () => {
+    // Reported rather than fixed. §11 rule 2 says MEDICAL_EMERGENCY "outranks
+    // every decision in the system, by §2.1". §2.1 orders by objective and
+    // then by lateness — so a sterilisation release forty minutes overdue,
+    // also rank 1, sorts above a fresh emergency.
+    //
+    // Making the emergency win would need a rule §2.1 does not contain, and
+    // inventing one is exactly what was ruled out. Raised as a v1.1
+    // correction; the specification is frozen and this is a gap in it.
+    let w = emptyWorld(T(9, 0));
+    w = must(w, ClinicEvent.BATCH_COLLECTED, 'b1', RoleCode.STERILIZATION_TECHNICIAN, 'STER-1');
+    w = must(w, ClinicEvent.BATCH_ULTRASONIC_DONE, 'b1', RoleCode.STERILIZATION_TECHNICIAN);
+    w = must(w, ClinicEvent.BATCH_PACKED, 'b1', RoleCode.STERILIZATION_TECHNICIAN);
+    w = must(w, ClinicEvent.BATCH_AUTOCLAVED, 'b1', RoleCode.STERILIZATION_TECHNICIAN);
+    w = at(w, T(10, 0));
+    w = must(w, ClinicEvent.EMERGENCY_PATIENT_ARRIVED, 'e1', RoleCode.RECEPTION, 'Walk-in');
+
+    const all = decisions(w, T(10, 1));
+    expect(all[0]!.objective).toBe(Objective.PATIENT_SAFE);
+    // Both are rank 1; the overdue release sorts first because it is late.
+    expect(all[0]!.flowKind).toBe('STERILIZATION');
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   The one that cannot pass yet, and exactly why
+
+   Kept as blocked-by-declaration rather than deleted or skipped. It names the
+   engine it waits on, and becomes a real scenario the day that engine lands.
+   A suite that reached green by removing it would be lying about what KuBi
+   can do.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+describe('Not yet — the scenario blocked on an engine that does not exist', () => {
   it('Scenario 5 · chair frees while three wait — BLOCKED on the resource engine (§9, D-07)', () => {
     // Needs: chairs as resources, claims, and automatic reassignment when one
     // frees. Nothing in the model today knows a chair exists, so the engine
@@ -523,20 +676,5 @@ describe('Not yet — the scenarios blocked on engines that do not exist', () =>
     expect(decisions(w, T(10, 0)).some((d) => d.verdict === Verdict.WAIT)).toBe(false);
     // Blocked on D-07 (the clinic's real resource inventory) and D-08
     // (may one doctor hold two chairs).
-  });
-
-  it('Scenario 9 · emergency during a full schedule — BLOCKED on the exception engine (§11)', () => {
-    // Needs: MEDICAL_EMERGENCY as an event that opens its own flow and
-    // pre-empts everything by objective rank. The event does not exist yet,
-    // and inventing one to make this pass would be exactly the synthetic
-    // demonstration the owner asked us to stop building.
-    expect(Object.values(ClinicEvent).some((e) => String(e).includes('EMERGENCY'))).toBe(false);
-  });
-
-  it('nothing survives a restart yet — BLOCKED on PostgreSQL persistence (§16, D-11)', () => {
-    // The world is in memory. The event log table is specified and not built,
-    // so today's clinic is forgotten when the process stops.
-    const w = emptyWorld(T(9, 0));
-    expect(w.events).toHaveLength(0);
   });
 });

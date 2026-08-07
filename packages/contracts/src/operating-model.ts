@@ -88,6 +88,15 @@ export const ClinicEvent = {
   // Money
   INVOICE_RAISED: 'INVOICE_RAISED',
   INVOICE_SETTLED: 'INVOICE_SETTLED',
+
+  /* ── Exceptions (§11) ────────────────────────────────────────────────
+   * Thirteen are specified. Two are implemented, because §11 gives every
+   * exception an owner and none of them a node sequence — see EMERGENCY
+   * below for why these two could be derived rather than invented.
+   * ------------------------------------------------------------------ */
+  EMERGENCY_PATIENT_ARRIVED: 'EMERGENCY_PATIENT_ARRIVED',
+  EMERGENCY_TRIAGED: 'EMERGENCY_TRIAGED',
+  EMERGENCY_DOCUMENTED: 'EMERGENCY_DOCUMENTED',
 } as const;
 export type ClinicEvent = (typeof ClinicEvent)[keyof typeof ClinicEvent];
 
@@ -122,6 +131,11 @@ export const FlowKind = {
   INVENTORY: 'INVENTORY',
   /** One per invoice. */
   BILLING: 'BILLING',
+  /**
+   * One per emergency. §11's own design — an exception opens its own flow
+   * with its own owner and clock — and not an eighth routine workflow.
+   */
+  EMERGENCY: 'EMERGENCY',
 } as const;
 export type FlowKind = (typeof FlowKind)[keyof typeof FlowKind];
 
@@ -251,6 +265,37 @@ export const FLOWS: Record<FlowKind, FlowDefinition> = {
     ],
   },
 
+  /**
+   * The emergency, and the only exception flow that could be built without
+   * inventing anything.
+   *
+   * §11 gives thirteen exceptions an owner apiece and no node sequences. For
+   * this one the sequence is derivable rather than guessable:
+   *
+   *   TRIAGE    — §11 puts the emergency with the doctor and says it pre-empts
+   *               the queue. Deciding what the patient needs is that step.
+   *   DOCUMENT  — frozen matrix EMR-003, "Every medical emergency creates
+   *               incident record". Not a preference; a control that already
+   *               exists in the frozen matrix.
+   *
+   * The other twelve are left unbuilt on purpose. Writing a "continuity flow"
+   * or a "recovery flow" from the two words §11 gives them would be inventing
+   * clinical process, which is exactly what the owner asked not to happen.
+   */
+  [FlowKind.EMERGENCY]: {
+    kind: FlowKind.EMERGENCY,
+    label: 'Emergency',
+    subjectNoun: 'emergency',
+    nodes: [
+      node('TRIAGE', 'Assess the emergency and decide what is needed',
+        RoleCode.TREATING_DOCTOR, ClinicEvent.EMERGENCY_TRIAGED, 5,
+        Objective.PATIENT_SAFE, RoleCode.CLINIC_HEAD),
+      node('DOCUMENT', 'Record the emergency',
+        RoleCode.TREATING_DOCTOR, ClinicEvent.EMERGENCY_DOCUMENTED, 60,
+        Objective.RECORDS_COMPLETE, RoleCode.CLINIC_HEAD),
+    ],
+  },
+
   [FlowKind.BILLING]: {
     kind: FlowKind.BILLING,
     label: 'Billing',
@@ -283,6 +328,9 @@ export const STARTS: ReadonlyMap<ClinicEvent, FlowKind> = new Map([
   [ClinicEvent.LAB_DISPATCHED, FlowKind.LAB],
   [ClinicEvent.STOCK_ORDERED, FlowKind.INVENTORY],
   [ClinicEvent.INVOICE_RAISED, FlowKind.BILLING],
+  // An emergency walking in starts an emergency, exactly as a patient walking
+  // in starts a visit. No triage button, no queue-override switch.
+  [ClinicEvent.EMERGENCY_PATIENT_ARRIVED, FlowKind.EMERGENCY],
 ]);
 
 /**

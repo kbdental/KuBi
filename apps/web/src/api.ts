@@ -765,6 +765,63 @@ export interface Retention {
 export type OutreachOutcome =
   'RETURNING' | 'DECLINED' | 'WILL_DECIDE' | 'NO_ANSWER' | 'UNREACHABLE' | 'NOT_APPLICABLE';
 
+/* ── The engine, as the client sees it ─────────────────────────────────
+   These mirror packages/contracts/src/decisions.ts exactly. Nothing here
+   is computed on the client; every field arrives decided.
+   ------------------------------------------------------------------- */
+
+export interface EngineDecision {
+  id: string;
+  question: string;
+  owner: string;
+  objective: string;
+  priority: number;
+  verdict: 'PROCEED' | 'WAIT' | 'ESCALATE' | 'BLOCKED';
+  because: string | null;
+  fix: string | null;
+  goes: string | null;
+  heldFor: number;
+  lateBy: number;
+  why: string;
+  evidence: number[];
+  protocol: string;
+  ifIgnored: string;
+  flowId: string;
+  flowKind: string;
+  subjectId: string;
+  subjectLabel: string;
+  node: string;
+  /** The event this records. The button posts exactly this. */
+  completedBy: string;
+}
+
+export interface NowView {
+  now: number;
+  role: string;
+  mine: EngineDecision[];
+  escalated: Array<{
+    flowId: string; subjectLabel: string; node: string;
+    owner: string; escalatedTo: string; minutesLate: number; message: string;
+  }>;
+}
+
+export interface ClinicView {
+  now: number;
+  first: EngineDecision | null;
+  decisions: EngineDecision[];
+  board: Array<{
+    node: string; label: string; owner: string;
+    patients: Array<{ subjectLabel: string; minutesHeld: number; minutesLate: number }>;
+  }>;
+  late: Array<{ subjectLabel: string; node: string; minutesLate: number; escalatedTo: string }>;
+  flows: Array<{ id: string; kind: string; subjectLabel: string; node: string | null }>;
+  eventCount: number;
+}
+
+export type RecordResult =
+  | { ok: true; duplicate: boolean; consequences: Array<{ kind: string }> }
+  | { ok: false; refusal: { because: string; fix: string; goes: string } };
+
 export const api = {
   login: (email: string, password: string) =>
     post<{ displayLabel: string; roleCodes: string[] }>('/api/v1/auth/login', { email, password }),
@@ -823,6 +880,21 @@ export const api = {
     post<PatientProcedure>(`/api/v1/patient-procedures/${id}/start`, {}),
   overridePatientProcedure: (id: string, reason: string) =>
     post<PatientProcedure>(`/api/v1/patient-procedures/${id}/override`, { reason }),
+
+  /** What this person must decide now. The whole of one role's clinic. */
+  now: () => call<NowView>('/api/v1/now'),
+  /** One clinic, not seven modules: every decision, the board, what is late. */
+  clinic: () => call<ClinicView>('/api/v1/clinic'),
+  /**
+   * Record something that happened.
+   *
+   * The idempotency key is generated here and reused on retry, so a double tap
+   * on a slow connection records one arrival rather than two.
+   */
+  recordEvent: (type: string, subjectId: string, idempotencyKey: string, subjectLabel?: string) =>
+    post<RecordResult>('/api/v1/events', {
+      type, subjectId, idempotencyKey, ...(subjectLabel ? { subjectLabel } : {}),
+    }),
 
   retention: () => call<Retention>('/api/v1/retention'),
   openRetention: (patientId: string) =>

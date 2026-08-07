@@ -82,6 +82,7 @@ const CONVERTED = [
   'patient-360.tsx',
   // Built on the vocabulary from the first line rather than converted onto it
   // afterwards, which is the point of having one.
+  'now.tsx',
   'retention.tsx',
   'rules.tsx',
   'today.tsx',
