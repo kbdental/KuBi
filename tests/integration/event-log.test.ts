@@ -80,8 +80,7 @@ async function openTheClinic(tx: never, store: EventStore, tag: string) {
     await say(tx, store, ClinicEvent.OPERATORY_READY, room.id,
       RoleCode.DENTAL_ASSISTANT, T(8, 35), room.label);
   }
-  await say(tx, store, ClinicEvent.EQUIPMENT_VERIFIED, day, RoleCode.DENTAL_ASSISTANT, T(8, 36));
-  await say(tx, store, ClinicEvent.STOCK_VERIFIED, day, RoleCode.DENTAL_ASSISTANT, T(8, 37));
+  await say(tx, store, ClinicEvent.EQUIPMENT_VERIFIED, day, RoleCode.SENIOR_ASSISTANT, T(8, 36));
   await say(tx, store, ClinicEvent.RECEPTION_READY, day, RoleCode.RECEPTION, T(8, 38));
   await say(tx, store, ClinicEvent.COMMON_AREAS_READY, day, RoleCode.HOUSEKEEPING, T(8, 39));
 

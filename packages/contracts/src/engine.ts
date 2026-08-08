@@ -209,8 +209,11 @@ const RULES: Partial<Record<ClinicEvent, readonly Requirement[]>> = {
   [ClinicEvent.OPERATORY_READY]: [
     mine('Preparing an operatory', RoleCode.DENTAL_ASSISTANT, RoleCode.SENIOR_ASSISTANT),
   ],
+  // "Equipment round is to be done by head dental nurse or Head dental
+  // assistant" — narrower than the other assistant work on purpose, and the
+  // one block a dental assistant may not report.
   [ClinicEvent.EQUIPMENT_VERIFIED]: [
-    mine('Checking the equipment', RoleCode.DENTAL_ASSISTANT, RoleCode.SENIOR_ASSISTANT),
+    mine('The equipment round', RoleCode.SENIOR_ASSISTANT),
   ],
   [ClinicEvent.STOCK_VERIFIED]: [
     mine('Verifying the stock', RoleCode.DENTAL_ASSISTANT, RoleCode.SENIOR_ASSISTANT),

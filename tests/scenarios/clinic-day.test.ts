@@ -65,9 +65,8 @@ function openTheClinic(now = T(8, 45)): World {
   for (const o of OPERATORIES) {
     w = must(w, ClinicEvent.OPERATORY_READY, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
   }
-  w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-  w = must(w, ClinicEvent.STOCK_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-  w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
+  w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
+    w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
   w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
   w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
   return must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
@@ -105,10 +104,14 @@ describe('Scenario 1 · 08:45, clinic opening', () => {
 
     // Four people, four different mornings, from one unlock.
     const assistant = decisionsFor(w, RoleCode.DENTAL_ASSISTANT, T(8, 46)).map((d) => d.question);
-    expect(assistant).toEqual([
-      'Prepare Operatory 1', 'Prepare Operatory 2',
-      'Check the equipment', 'Verify the day’s stock',
-    ]);
+    expect(assistant).toEqual(['Prepare Operatory 1', 'Prepare Operatory 2']);
+    // The stock check is not here on purpose. It is done "as per requirement",
+    // so it is listed in the readiness picture and never pushed at somebody as
+    // today's work — putting it on her list every morning would invent a daily
+    // task the owner has said is not daily.
+    // The equipment round belongs to the head assistant, not to any assistant.
+    expect(decisionsFor(w, RoleCode.SENIOR_ASSISTANT, T(8, 46)).map((d) => d.question))
+      .toEqual(['Check the equipment']);
     expect(decisionsFor(w, RoleCode.HOUSEKEEPING, T(8, 46)).map((d) => d.question))
       .toEqual(['Clean the floors, pantry and washroom']);
     expect(decisionsFor(w, RoleCode.STERILIZATION_TECHNICIAN, T(8, 46)).map((d) => d.question))

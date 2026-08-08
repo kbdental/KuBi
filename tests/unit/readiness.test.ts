@@ -9,7 +9,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   ClinicEvent, RoleCode, Verdict, decisionsFor, emptyWorld, record, readiness, whyNotReady,
-  OPERATORY_MINUTES, type Operatory, type World,
+  OPERATORY_MINUTES, HOUSEKEEPING_MINUTES, STERILIZATION_MINUTES, READINESS_MINUTES,
+  type Operatory, type World,
 } from '@kubi/contracts';
 
 const T = (h: number, m: number) => h * 60 + m;
@@ -52,9 +53,8 @@ function fullMorning(ops: Operatory[] = FOUR): World {
     w = must(w, ClinicEvent.OPERATORY_READY, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
   }
   w = sterilise(w);
-  w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-  w = must(w, ClinicEvent.STOCK_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-  w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
+  w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
+    w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
   return must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
 }
 
@@ -95,10 +95,15 @@ describe('the morning is built from the master, not from a constant', () => {
     expect(room.expectMinutes).toBe(OPERATORY_MINUTES);
     expect(room.expectMinutes).toBe(15);
 
-    // Every other block's duration is genuinely unknown — the procedure gives
-    // waits (5 min warm-up, 15 min soak) but no total for "ready the waiting
-    // area". A plausible number here would be a guess wearing a fact's clothes.
-    for (const id of ['STERILE', 'EQUIPMENT', 'STOCK', 'RECEPTION', 'COMMON_AREAS']) {
+    // The owner's other two measured figures.
+    expect(r.blocks.find((b) => b.id === 'COMMON_AREAS')!.expectMinutes)
+      .toBe(HOUSEKEEPING_MINUTES);
+    expect(r.blocks.find((b) => b.id === 'STERILE')!.expectMinutes)
+      .toBe(STERILIZATION_MINUTES);
+
+    // Still genuinely unknown, and still not invented: the equipment round,
+    // the waiting area and the stock check have no stated duration.
+    for (const id of ['EQUIPMENT', 'STOCK', 'RECEPTION']) {
       expect(r.blocks.find((b) => b.id === id)!.expectMinutes, id).toBeNull();
     }
   });
@@ -127,9 +132,8 @@ describe('readiness is calculated, and cannot be asserted', () => {
       w = must(w, ClinicEvent.OPERATORY_READY, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
     }
     w = sterilise(w);
-    w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.STOCK_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
+    w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
+        w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
     w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
 
     const r = record(w, {
@@ -147,9 +151,8 @@ describe('readiness is calculated, and cannot be asserted', () => {
     for (const o of FOUR) {
       w = must(w, ClinicEvent.OPERATORY_READY, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
     }
-    w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.STOCK_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
+    w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
+        w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
     w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
 
     expect(whyNotReady(read(w)))
@@ -177,23 +180,24 @@ describe('readiness is calculated, and cannot be asserted', () => {
 });
 
 describe('who owns which part of the morning', () => {
-  it('puts the rooms, the equipment and the stock on the dental assistant', () => {
+  it('puts the rooms on the dental assistant, and the stock check with her', () => {
     const r = read(world());
     const hers = r.blocks.filter((b) => b.owner === RoleCode.DENTAL_ASSISTANT).map((b) => b.id);
     expect(hers).toEqual([
       'OPERATORY:op-1', 'OPERATORY:op-2', 'OPERATORY:op-3', 'OPERATORY:op-4',
-      'EQUIPMENT', 'STOCK',
+      'STOCK',
     ]);
   });
 
-  it('keeps the special equipment with her rather than inside a room', () => {
-    // The owner: "keep the special equipments in this only as a task for
-    // dental assistant as she is the one who checks the working" — and it is
-    // one task, not four, because the trolley moves between rooms.
+  it('gives the equipment round to the head assistant, not to any assistant', () => {
+    // "Equipment round is to be done by head dental nurse or Head dental
+    // assistant" — narrower than the earlier instruction, and the one block a
+    // dental assistant may not report. Still one task and not four, because
+    // the trolley moves between rooms.
     const r = read(world());
     expect(r.blocks.filter((b) => b.id === 'EQUIPMENT')).toHaveLength(1);
     expect(r.blocks.find((b) => b.id === 'EQUIPMENT')!.owner)
-      .toBe(RoleCode.DENTAL_ASSISTANT);
+      .toBe(RoleCode.SENIOR_ASSISTANT);
   });
 
   it('gives the floors and shared areas to housekeeping, and the front to reception', () => {
@@ -231,16 +235,17 @@ describe('the owner’s two readiness measures', () => {
     expect(r.varianceMinutes).toBeNull();
   });
 
-  it('counts opening-checklist compliance over blocks', () => {
+  it('counts opening-checklist compliance over the blocks that gate the door', () => {
     let w = world(FOUR, T(9, 0));
     expect(read(w).compliance).toBe(0);
     for (const o of FOUR) {
       w = must(w, ClinicEvent.OPERATORY_READY, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
     }
-    // Four of nine blocks: the four rooms, of rooms + sterile + equipment +
-    // stock + reception + common areas.
+    // Nine blocks listed; eight of them mandatory. Compliance is four of the
+    // eight — the stock check is real work and is not part of "may the clinic
+    // open", so counting it would make a complete morning read as 88%.
     expect(read(w).blocks).toHaveLength(9);
-    expect(read(w).compliance).toBeCloseTo(4 / 9);
+    expect(read(w).compliance).toBe(4 / 8);
     expect(read(fullMorning()).compliance).toBe(1);
   });
 
@@ -260,6 +265,72 @@ describe('the owner’s two readiness measures', () => {
   });
 });
 
+describe('the morning has two paths, and the longer one decides the start', () => {
+  /**
+   * The owner's numbers: *"total time for clinic readiness should be put as 45
+   * to 50 min that should include all tasks leaving the sterilization cycle
+   * which takes 1 hour 15 minutes uptill cooling in an autoclave."*
+   *
+   * So the clinic is not ready fifty minutes after somebody unlocks the door —
+   * it is ready when the autoclave has cooled, and the start time has to be
+   * worked back from that.
+   */
+  it('works back from the sterilisation cycle while the run is outstanding', () => {
+    const r = read(world(FOUR, T(8, 0)));
+    // Ten o'clock patient, seventy-five minute cycle.
+    expect(r.startBy).toBe(T(8, 45));
+    expect(r.startDrivenBy).toBe('the sterilisation cycle');
+  });
+
+  it('works back from the rest of the morning once the packs are out', () => {
+    let w = world(FOUR, T(8, 0));
+    w = sterilise(w);
+    const r = read(w);
+    // Fifty minutes of work left, so there is more room than there was.
+    expect(r.startBy).toBe(T(9, 10));
+    expect(r.startDrivenBy).toBe('the rest of the morning');
+  });
+
+  it('does not add the blocks up — more than one person is working', () => {
+    // Four rooms at fifteen minutes is sixty minutes of work inside a fifty
+    // minute morning. Summing them would push the start time a quarter of an
+    // hour earlier than the clinic needs and make every morning look late.
+    expect(READINESS_MINUTES).toBe(50);
+    expect(FOUR.length * OPERATORY_MINUTES).toBeGreaterThan(READINESS_MINUTES);
+  });
+
+  it('has no start time to give when nobody is booked', () => {
+    const r = readiness([], FOUR, null, T(8, 0));
+    expect(r.startBy).toBeNull();
+    expect(r.startDrivenBy).toBeNull();
+  });
+});
+
+describe('work that is listed but does not hold the door', () => {
+  /** *"Inventory is just checked as per requirement."* */
+  it('keeps the stock check out of what is stopping the clinic opening', () => {
+    const w = fullMorning();          // everything except the stock check
+    const r = read(w);
+    expect(r.ready).toBe(true);
+    expect(r.outstanding).toHaveLength(0);
+    // Still real, still listed, still somebody's job.
+    expect(r.advisory.map((b) => b.id)).toEqual(['STOCK']);
+  });
+
+  it('lets the clinic open with the stock uncounted', () => {
+    expect(record(fullMorning(), {
+      type: ClinicEvent.ROOMS_READY, subjectId: 'today', by: RoleCode.DENTAL_ASSISTANT,
+    }).ok).toBe(true);
+  });
+
+  it('never names it as the reason the clinic is not ready', () => {
+    let w = world(FOUR, T(9, 0));
+    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
+    // Nothing done at all: the first thing said must be a room, never stock.
+    expect(whyNotReady(read(w))).not.toContain('Stock');
+  });
+});
+
 describe('only the person whose job it is may report it done', () => {
   /**
    * Found by driving a real morning over HTTP rather than by reading the code:
@@ -270,6 +341,23 @@ describe('only the person whose job it is may report it done', () => {
    */
   const opened = () => must(world(FOUR, T(8, 45)),
     ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
+
+  it('refuses a dental assistant doing the head assistant’s equipment round', () => {
+    // The one block narrowed by the owner after the first pass: "Equipment
+    // round is to be done by head dental nurse or Head dental assistant".
+    const r = record(opened(), {
+      type: ClinicEvent.EQUIPMENT_VERIFIED, subjectId: 'today',
+      by: RoleCode.DENTAL_ASSISTANT,
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.refusal.because).toBe('The equipment round is not your part of the morning');
+    // And the head assistant may.
+    expect(record(opened(), {
+      type: ClinicEvent.EQUIPMENT_VERIFIED, subjectId: 'today',
+      by: RoleCode.SENIOR_ASSISTANT,
+    }).ok).toBe(true);
+  });
 
   it('refuses the assistant reporting housekeeping’s floors', () => {
     const r = record(opened(), {
@@ -344,9 +432,8 @@ describe('a day with nobody booked has no deadline, and says so', () => {
       w = must(w, ClinicEvent.OPERATORY_READY, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
     }
     w = sterilise(w);
-    w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.STOCK_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
+    w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
+        w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
     w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
 
     const r = read(w);
@@ -363,9 +450,8 @@ describe('a day with nobody booked has no deadline, and says so', () => {
       w = must(w, ClinicEvent.OPERATORY_READY, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
     }
     w = sterilise(w);
-    w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.STOCK_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
+    w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
+        w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
     w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
     expect(record(w, {
       type: ClinicEvent.ROOMS_READY, subjectId: 'today', by: RoleCode.DENTAL_ASSISTANT,

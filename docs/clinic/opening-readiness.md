@@ -20,6 +20,33 @@ close them.
 | Five steps or sixteen? | *"it is called the 5 step protocol, 16 as a number is sub steps"* | Recorded; the five headline steps are still needed |
 | How to measure readiness | *"i leave it upto you to decide how to check"* | Opening‑checklist compliance as a share of blocks, and first‑patient readiness vs target as a signed variance |
 
+### Second round of answers
+
+| Question | Answer | Where it lives now |
+|---|---|---|
+| Who owns the sterilisation run? | **Sterilization Technician** for the morning run; **Technician or Dental Assistant** for the per‑patient runs | `STERILE` block owned by the technician. Per‑patient runs are turnover, not opening, so they are not readiness blocks — see the limitation below |
+| Inventory | *"just checked as per requirement"* | Listed, **not gating**. It appears under `advisory`, never under what is stopping the clinic opening, and is not pushed at anybody as today's work |
+| Equipment round | *"head dental nurse or Head dental assistant"* | Moved from Dental Assistant to **Senior Assistant** — the one block a dental assistant may not report. This narrows the earlier *"a task for dental assistant"* |
+| Housekeeping | **~45 minutes** for mopping and the rest | `HOUSEKEEPING_MINUTES` |
+| Whole morning | **45–50 min**, everything except sterilisation | `READINESS_MINUTES = 50`, the upper bound — finishing early is fine, running late is not |
+| Sterilisation cycle | **1 h 15 min**, to cooling in the autoclave | `STERILIZATION_MINUTES = 75`. Cooling is inside the figure, so the clinic is not called ready twenty minutes early |
+
+**The morning is two paths, not one queue.** Housekeeping's 45 minutes and the
+75‑minute cycle run side by side, so the clinic is ready when the longer one
+finishes. `startBy` subtracts the long pole from the first appointment and
+names which path decided it — and it switches once the packs are out:
+
+```
+first patient  : 10:00
+must start by  : 08:45  — driven by the sterilisation cycle
+…once released : 09:10  — driven by the rest of the morning
+```
+
+The blocks are deliberately **not** added up. Four operatories at fifteen
+minutes is sixty minutes of work inside a fifty‑minute morning, because more
+than one person is doing it. KuBi does not model who is rostered, so it takes
+the owner's whole‑clinic figure rather than summing.
+
 Everything below is the owner's document restructured so it can be counted,
 sequenced and checked — not a new design. Where the document does not say who
 does something, the Owner column reads **`INFERRED`** and needs confirming.
@@ -307,31 +334,33 @@ week's end.
 
 1. ~~How many operatories, and what is in each?~~ **Answered** — four, from a
    master. See above.
-2. **Sterilization Technician vs Dental Assistant.** The document assigns the
-   16‑step run to "all Dental Assistants" and "the team in‑charge"; you have
-   named a Sterilization Technician as a separate person. Who owns the morning
-   run, and who owns the per‑patient run? *Currently the `STERILE` block is
-   owned by the Sterilization Technician, and the release stays with the
-   Senior Assistant — an operator may not release their own batch.*
-3. **Owners for the remaining blocks — now enforced, so worth confirming.**
-   The document names a role only for janitors (§1 g) and Dental Assistants
-   (PPE, manual cleaning). What is in force today, and refused if anybody else
-   tries: rooms, equipment and stock → **Dental Assistant** (or Senior
-   Assistant); waiting and billing → **Reception**; floors, pantry, washroom →
-   **Housekeeping**. Correct any of these and it is a one‑line change.
-4. **How long does each block take?** 15 minutes for an operatory is now
-   known. Still unknown: the waiting area, the shared areas, the equipment
-   round, the stock count and the sterilisation run. Everything is anchored
-   *before first patient*, so until those exist KuBi can say the morning is
-   late but cannot say when it should have started. *(D‑05.)*
+2. ~~Sterilization Technician vs Dental Assistant~~ **Answered.** The
+   technician owns the morning run; either does the per‑patient runs.
+3. ~~Owners for the remaining blocks~~ **Answered and enforced.** In force
+   today, and refused if anybody else tries: rooms and stock → **Dental
+   Assistant** (or Senior); equipment round → **Senior Assistant only**;
+   waiting and billing → **Reception**; floors, pantry, washroom →
+   **Housekeeping**; morning run → **Sterilization Technician**, with the
+   release still held by the Senior Assistant so nobody releases their own
+   batch.
+4. **Two durations are still unknown**: the equipment round and the waiting
+   area. Neither blocks the schedule — the whole‑morning figure of 50 minutes
+   covers them — but the individual blocks carry `null` rather than a guess.
 5. **The two named documents we do not have:** the *K. B. Dental Hand Hygiene
    Protocol* and the *K. B. Dental Five Step Sterilization Protocol*. Which
    five are the headline steps that the sixteen sit under?
 6. **Is the first appointment the right target?** Readiness is measured
    against the day's first booked patient. If the clinic's real target is a
    fixed time — "ready by 09:30 whoever is booked" — that is a different
-   measure and a one‑line change. On a day with nothing booked KuBi currently
-   reports *no target* rather than inventing one.
+   measure and a one‑line change. On a day with nothing booked KuBi reports
+   *no target* rather than inventing one.
+7. **Per‑patient sterilisation has one owner, and you have named two.** The
+   sterilisation flow gives each step a single owning role, so KuBi shows the
+   turnover run as the technician's even though a dental assistant may do it.
+   Nothing is refused — role ownership is only enforced on the readiness
+   blocks — but the displayed owner is narrower than the clinic. Widening it
+   means letting a node have two owners, which is a change to the frozen
+   model, so it is raised rather than done.
 
 ### Ordering the document does not state
 

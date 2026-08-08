@@ -24,13 +24,32 @@
  *   per operatory   dental chair, x-ray, hand instruments, suction —
  *                   *"do not put special instruments and equipments as they
  *                   can be taken any where on a movable trolley"*
- *   equipment       exactly those movable and central items, checked once —
- *                   *"as she is the one who checks the working"*, so it is
- *                   the assistant's task and not the operatory's
+ *   equipment       exactly those movable and central items, checked once,
+ *                   by the head assistant — *"Equipment round is to be done
+ *                   by head dental nurse or Head dental assistant"*
  *
  * That distinction is why an operatory block is a fixed four checks however
  * much kit the clinic owns, and why buying a second intraoral scanner does
  * not change the shape of anybody's morning.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Two paths, not one list
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * The morning is not a queue. Housekeeping's forty-five minutes and the
+ * seventy-five-minute sterilisation cycle run side by side, and the clinic is
+ * ready when the longer one finishes — which is why `startBy` subtracts the
+ * long pole from the first appointment rather than adding the blocks up, and
+ * why it names which path decided.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Mandatory, and merely listed
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Stock is checked *"as per requirement"*, so it appears as work and does not
+ * hold the door. `outstanding` is what is stopping the clinic opening;
+ * `advisory` is what else is on somebody's list. Keeping them apart is what
+ * stops "the clinic cannot open" from being said about a stock count.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * UNKNOWN is never PASS
@@ -77,15 +96,45 @@ export interface Operatory {
   position: number;
 }
 
-/**
- * How long one operatory takes to prepare.
+/* -------------------------------------------------------------------------
+ * How long the morning takes
  *
- * The owner, measured rather than estimated: *"I have given the steps and it
- * normally takes 15 minutes to get the things ready"*. It is the only duration
- * in the opening procedure that has been stated, which is why every other
- * block below carries `null` instead of a plausible-looking number.
- */
+ * All measured by the owner rather than estimated here. The important shape
+ * is that the morning has two paths of very different lengths running side by
+ * side, and the clinic is not ready until the longer one finishes.
+ * ---------------------------------------------------------------------- */
+
+/** *"it normally takes 15 minutes to get the things ready"* — per operatory. */
 export const OPERATORY_MINUTES = 15;
+
+/** *"The house keeping staff would take around 45 minutes"* — mopping and the rest. */
+export const HOUSEKEEPING_MINUTES = 45;
+
+/**
+ * Everything except the sterilisation cycle.
+ *
+ * The owner: *"total time for clinic readiness should be put as 45 to 50 min
+ * that should include all tasks leaving the sterilization cycle"*. The upper
+ * bound is used, because a morning that finishes early is fine and one that
+ * runs late is not.
+ *
+ * This is a whole-clinic figure, not the sum of the blocks: four operatories
+ * at fifteen minutes each is sixty minutes of work done inside fifty minutes
+ * of morning, because more than one person is doing it. KuBi does not model
+ * who is rostered, so it takes the owner's number rather than adding up.
+ */
+export const READINESS_MINUTES = 50;
+
+/**
+ * The sterilisation cycle, which is the long pole of the morning.
+ *
+ * The owner: *"the sterilization cycle which takes 1 hour 15 minutes uptill
+ * cooling in an autoclave"*. Cooling is inside that figure deliberately — a
+ * pack that has not cooled is not a pack you can use, and a system that
+ * called the run finished at the end of the autoclave stage would declare the
+ * clinic ready twenty minutes early.
+ */
+export const STERILIZATION_MINUTES = 75;
 
 /* -------------------------------------------------------------------------
  * The blocks
@@ -104,6 +153,15 @@ export interface ReadinessBlock {
   subjectId: string | null;
   /** Minutes it should take, or null where the owner has not said. */
   expectMinutes: number | null;
+  /**
+   * Whether the clinic may open without it.
+   *
+   * Everything in the opening procedure is "before first patient", but the
+   * owner has since separated two kinds of thing: work the morning cannot be
+   * finished without, and work done *"as per requirement"*. Stock is the
+   * second — it is real, it is listed, and it does not hold the door.
+   */
+  mandatory: boolean;
   done: boolean;
   /** The minute it was reported, or null while outstanding. */
   doneAt: number | null;
@@ -138,6 +196,27 @@ export interface Readiness {
    * reports and a share of half-done blocks would not mean anything.
    */
   compliance: number;
+  /**
+   * Work that is listed and does not hold the door — stock, checked *"as per
+   * requirement"*. Separate from `outstanding` so that "what is stopping the
+   * clinic opening" and "what else is on somebody's list" are never the same
+   * number.
+   */
+  advisory: readonly ReadinessBlock[];
+  /**
+   * The latest minute the morning can begin and still be ready on time, and
+   * the block that decides it.
+   *
+   * Two paths run side by side: the sterilisation cycle at 75 minutes, and
+   * everything else at 50. The clinic is ready when the longer one finishes,
+   * so the start time is the target minus the longer one — and naming which
+   * block drives it is the difference between "start at 08:45" and knowing
+   * that starting the autoclave late is what makes the morning late.
+   *
+   * Null when nothing is booked, for the same reason `targetAt` is.
+   */
+  startBy: number | null;
+  startDrivenBy: string | null;
   /** Master data we need and do not have. Non-empty means `ready` is false. */
   unconfigured: readonly string[];
   /**
@@ -169,8 +248,10 @@ const block = (
   id: string, label: string, owner: RoleCode, objective: Objective,
   completedBy: ClinicEvent,
   subjectId: string | null, expectMinutes: number | null, ifOutstanding: string,
+  mandatory = true,
 ): Omit<ReadinessBlock, 'done' | 'doneAt'> =>
-  ({ id, label, owner, objective, completedBy, subjectId, expectMinutes, ifOutstanding });
+  ({ id, label, owner, objective, completedBy, subjectId, expectMinutes,
+    ifOutstanding, mandatory });
 
 /**
  * Every block this clinic's morning consists of, in the order it is worked.
@@ -190,26 +271,38 @@ function planFor(operatories: readonly Operatory[]): Array<Omit<ReadinessBlock, 
 
   return [
     ...rooms,
+    // The long pole. Owned by the sterilisation technician for the morning
+    // run; the per-patient runs during the day may be done by either the
+    // technician or a dental assistant, which is turnover rather than opening
+    // and so is not one of these blocks.
     block('STERILE', 'Release the morning sterilisation run',
       RoleCode.STERILIZATION_TECHNICIAN, Objective.PATIENT_SAFE,
-      ClinicEvent.BATCH_RELEASED, null, null,
+      ClinicEvent.BATCH_RELEASED, null, STERILIZATION_MINUTES,
       'There are no sterile packs in the cabinets for today'),
+    // "Equipment round is to be done by head dental nurse or Head dental
+    // assistant" — the senior assistant, which is the role this clinic has
+    // for that person. It is one round for the whole clinic because the kit
+    // travels on a trolley.
     block('EQUIPMENT', 'Check the equipment',
-      RoleCode.DENTAL_ASSISTANT, Objective.PATIENT_SAFE,
+      RoleCode.SENIOR_ASSISTANT, Objective.PATIENT_SAFE,
       ClinicEvent.EQUIPMENT_VERIFIED, null, null,
       'The equipment has not been checked, so a fault would be found on a patient'),
     block('COMMON_AREAS', 'Clean the floors, pantry and washroom',
       RoleCode.HOUSEKEEPING, Objective.PATIENT_SAFE,
-      ClinicEvent.COMMON_AREAS_READY, null, null,
+      ClinicEvent.COMMON_AREAS_READY, null, HOUSEKEEPING_MINUTES,
       'The floors and shared areas have not been done'),
     block('RECEPTION', 'Ready the waiting and billing area',
       RoleCode.RECEPTION, Objective.PATIENT_HAPPY,
       ClinicEvent.RECEPTION_READY, null, null,
       'The waiting area is not ready for the first patient'),
-    block('STOCK', 'Verify the day’s stock',
+    // As required, not every morning: "Inventory is just checked as per
+    // requirement". Listed so it is visible and countable, and deliberately
+    // not allowed to hold the clinic shut.
+    block('STOCK', 'Check stock, as required',
       RoleCode.DENTAL_ASSISTANT, Objective.CLINIC_EFFICIENT,
       ClinicEvent.STOCK_VERIFIED, null, null,
-      'Stock has not been counted, so a shortage would be found mid-treatment'),
+      'Stock has not been counted, so a shortage would be found mid-treatment',
+      false),
   ];
 }
 
@@ -243,15 +336,26 @@ export function readiness(
     return { ...b, done: ev !== undefined, doneAt: ev ? ev.at : null };
   });
 
-  const outstanding = blocks.filter((b) => !b.done);
-  const done = blocks.filter((b) => b.done);
+  const required = blocks.filter((b) => b.mandatory);
+  const outstanding = required.filter((b) => !b.done);
+  const advisory = blocks.filter((b) => !b.mandatory && !b.done);
+  const done = required.filter((b) => b.done);
   const ready = unconfigured.length === 0 && outstanding.length === 0;
 
-  // The minute the *last* block landed — when the clinic actually became
-  // ready, not when somebody noticed.
+  // The minute the *last* mandatory block landed — when the clinic actually
+  // became ready, not when somebody noticed.
   const readyAt = ready
     ? done.reduce((latest, b) => Math.max(latest, b.doneAt ?? 0), 0)
     : null;
+
+  // The long pole decides the start. Sterilisation only counts towards it
+  // while it is still outstanding: once the packs are out, the morning is a
+  // fifty-minute job and saying otherwise would push the start time earlier
+  // than the work needs.
+  const sterileOutstanding = outstanding.some((b) => b.id === 'STERILE');
+  const lead = sterileOutstanding
+    ? Math.max(STERILIZATION_MINUTES, READINESS_MINUTES)
+    : READINESS_MINUTES;
 
   const staffEntered = new Set(
     events.filter((e) => e.type === ClinicEvent.STAFF_READY).map((e) => e.subjectId),
@@ -264,7 +368,12 @@ export function readiness(
     readyAt,
     targetAt,
     varianceMinutes: readyAt === null || targetAt === null ? null : readyAt - targetAt,
-    compliance: blocks.length === 0 ? 0 : done.length / blocks.length,
+    advisory,
+    startBy: targetAt === null ? null : targetAt - lead,
+    startDrivenBy: targetAt === null
+      ? null
+      : sterileOutstanding ? 'the sterilisation cycle' : 'the rest of the morning',
+    compliance: required.length === 0 ? 0 : done.length / required.length,
     unconfigured,
     staffEntered,
     // The first patient is due and the clinic is not ready. Reported as its

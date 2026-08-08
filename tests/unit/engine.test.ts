@@ -57,9 +57,8 @@ function openClinic(now = T(9, 0)): World {
   for (const o of OPERATORIES) {
     w = must(w, ClinicEvent.OPERATORY_READY, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
   }
-  w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-  w = must(w, ClinicEvent.STOCK_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
-  w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
+  w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
+    w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
   w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
   w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
   // The huddle too. Leaving it out made the first escalation test fail, and
