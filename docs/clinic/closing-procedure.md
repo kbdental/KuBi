@@ -3,12 +3,43 @@
 Built the same way as `opening-readiness.md`: your controls restructured so
 they can be counted, sequenced and checked.
 
-**Status: structure only. Nothing here is in the code yet.** Opening went
-proposal → your corrections → build, and this is the proposal.
+**Status: built and running**, against the owner's *Clinic closing drill*
+supplied 2026‑08‑08. Seven sections, nine blocks, enforced server‑side.
 
-Source: the activity matrix, sheet 15, **`CLOSE-001` to `CLOSE-016`** — a real
-closing block with owners and priorities already attached — plus the closing
-items in the infection-control document (waste, fumigation, floors).
+Sources: the owner's closing drill (the seven protocols), the activity matrix
+sheet 15 (`CLOSE-001`–`CLOSE-016`), and the closing items in the
+infection‑control document.
+
+## The nine blocks, from the seven protocols
+
+| Block | Protocol | Owner | Critical |
+|---|---|---|---|
+| `OPERATORY_CLOSED` × 4 | Operatory Closing (a–g) | Dental Assistant | ✔ |
+| `PAYMENTS` | End‑of‑Day Payment Reconciliation (a–f) | Reception | |
+| `REPORT` | Daily Report Submission (a–b) | Reception | |
+| `WASTE` | BMW Closing (a–e) | Housekeeping | ✔ |
+| `ENVIRONMENT` | Clinic Environment Closing (a–g), incl. fumigation | Housekeeping | ✔ |
+| `SECURITY` | Security & Lockdown (a–h) | Reception | |
+
+`STAFF_LEFT` counts people out through the End‑of‑Day Staff Protocol —
+reported, not enforced, the same limit as staff entry.
+
+`CLINIC_LOCKED` is refused until all nine are reported, and the refusal names
+the section: *"The waste bins are not closed and the logbook is not written"*.
+The three existing refusals — unfinished visit, unwritten note, instruments in
+the loop — still fire first, because a manager who has left a patient
+mid‑visit should be told about the patient and not about the bins.
+
+## Two things the document settled
+
+**Fumigation is not the long pole.** The hour the rooms stay shut is spent
+with nobody in the building — it constrains re‑entry, not departure, and the
+clinic does not reopen inside it. The earlier guess that it would drive the
+closing schedule has been dropped.
+
+**Revenue reconciliation is a closing control after all**, with a Discrepancy
+Log and a petty‑cash balance behind it. That closes the gap between your KPI
+list and the matrix, which had no `CLOSE-` row for it.
 
 ---
 

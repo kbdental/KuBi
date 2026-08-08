@@ -72,6 +72,25 @@ function openTheClinic(now = T(8, 45)): World {
   return must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
 }
 
+/**
+ * The closing drill, so the day may be locked up.
+ *
+ * The mirror of `openTheClinic`. Before the owner's closing drill arrived,
+ * `CLINIC_LOCKED` was refused only on the patient, the note and the instrument
+ * loop; it now also asks whether the building was actually closed down.
+ */
+function closeTheClinic(w: World): World {
+  let x = w;
+  for (const o of OPERATORIES) {
+    x = must(x, ClinicEvent.OPERATORY_CLOSED, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
+  }
+  x = must(x, ClinicEvent.PAYMENTS_RECONCILED, 'today', RoleCode.RECEPTION);
+  x = must(x, ClinicEvent.DAY_REPORTED, 'today', RoleCode.RECEPTION);
+  x = must(x, ClinicEvent.WASTE_CLOSED, 'today', RoleCode.HOUSEKEEPING);
+  x = must(x, ClinicEvent.ENVIRONMENT_CLOSED, 'today', RoleCode.HOUSEKEEPING);
+  return must(x, ClinicEvent.PREMISES_SECURED, 'today', RoleCode.RECEPTION);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    1 — 08:45, the clinic opening
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -517,6 +536,7 @@ describe('Scenario 8b · ranking orders work; it never makes a record optional',
     // keyed on the note and not on the flow being finished.
     let w = visitClosedNoteUnwritten();
     w = must(w, ClinicEvent.NOTES_COMPLETED, 'p1', RoleCode.TREATING_DOCTOR);
+    w = closeTheClinic(w);
 
     const clinical = w.flows.find((f) => f.kind === 'CLINICAL')!;
     expect(clinical.done, 'the follow-up call is still open, as it should be').toBe(false);
@@ -560,9 +580,10 @@ describe('Scenario 10 · closing with sterilisation unresolved', () => {
     expect(r.refusal.because).toBe('Instruments are still in the loop');
   });
 
-  it('locks up once the loop is clear', () => {
+  it('locks up once the loop is clear and the drill is done', () => {
     let w = openTheClinic();
     w = sterileReady(w, 'STER-0915', 'b3');
+    w = closeTheClinic(w);
     w = at(w, T(19, 30));
     expect(record(w, {
       type: ClinicEvent.CLINIC_LOCKED, subjectId: 'today', by: RoleCode.CLINIC_MANAGER,

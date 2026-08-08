@@ -39,6 +39,7 @@ import {
   type FlowNode,
 } from './operating-model.js';
 import { readiness, whyNotReady, type Operatory } from './readiness.js';
+import { closing, whyNotClosed } from './closing.js';
 
 /* -------------------------------------------------------------------------
  * The world
@@ -205,6 +206,11 @@ const mine = (label: string, ...roles: readonly RoleCode[]): Requirement =>
   req(onlyBy(...roles), `${label} is not your part of the morning`,
     'Open clinic readiness', 'Readiness');
 
+/** The same rule for the evening, said in the evening's words. */
+const mineAtClose = (label: string, ...roles: readonly RoleCode[]): Requirement =>
+  req(onlyBy(...roles), `${label} is not your part of the closing`,
+    'Open clinic closing', 'Closing');
+
 const RULES: Partial<Record<ClinicEvent, readonly Requirement[]>> = {
   [ClinicEvent.OPERATORY_READY]: [
     mine('Preparing an operatory', RoleCode.DENTAL_ASSISTANT, RoleCode.SENIOR_ASSISTANT),
@@ -220,6 +226,24 @@ const RULES: Partial<Record<ClinicEvent, readonly Requirement[]>> = {
   ],
   [ClinicEvent.RECEPTION_READY]: [
     mine('Readying the waiting area', RoleCode.RECEPTION),
+  ],
+  [ClinicEvent.OPERATORY_CLOSED]: [
+    mineAtClose('Closing down an operatory', RoleCode.DENTAL_ASSISTANT, RoleCode.SENIOR_ASSISTANT),
+  ],
+  [ClinicEvent.PAYMENTS_RECONCILED]: [
+    mineAtClose('Reconciling the day’s takings', RoleCode.RECEPTION),
+  ],
+  [ClinicEvent.DAY_REPORTED]: [
+    mineAtClose('The daily collection report', RoleCode.RECEPTION),
+  ],
+  [ClinicEvent.WASTE_CLOSED]: [
+    mineAtClose('Closing the bio-medical waste', RoleCode.HOUSEKEEPING),
+  ],
+  [ClinicEvent.ENVIRONMENT_CLOSED]: [
+    mineAtClose('Closing the clinic down', RoleCode.HOUSEKEEPING),
+  ],
+  [ClinicEvent.PREMISES_SECURED]: [
+    mineAtClose('Securing the premises', RoleCode.RECEPTION),
   ],
   [ClinicEvent.COMMON_AREAS_READY]: [
     mine('Cleaning the floors and shared areas', RoleCode.HOUSEKEEPING),
@@ -299,6 +323,21 @@ const RULES: Partial<Record<ClinicEvent, readonly Requirement[]>> = {
       'Instruments are still in the loop', 'Open sterilisation', 'Operations'),
     req((w) => !w.flows.some((f) => f.kind === FlowKind.PATIENT && !f.done),
       'A visit has not been finished', 'Open the board', 'Board'),
+    /**
+     * The closing drill itself.
+     *
+     * Last of the four deliberately: the three above are about the patient and
+     * the instruments, and they should be what a person is told first. This
+     * one is about the building.
+     *
+     * It refuses rather than offering the manager acknowledgement the matrix
+     * describes. That is not an oversight — see `closing.ts` — it is the
+     * absence of an override path that has not been authorised.
+     */
+    req((w) => closing(w.events, w.operatories).clear,
+      (w) => whyNotClosed(closing(w.events, w.operatories))
+        ?? 'The closing drill is not finished',
+      'Open clinic closing', 'Closing'),
   ],
 };
 

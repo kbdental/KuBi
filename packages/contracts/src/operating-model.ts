@@ -77,6 +77,35 @@ export const ClinicEvent = {
   EQUIPMENT_VERIFIED: 'EQUIPMENT_VERIFIED',
   STOCK_VERIFIED: 'STOCK_VERIFIED',
 
+  /* ── Closing ─────────────────────────────────────────────────────────
+   * The owner's closing drill, one event per section of it. The day ends
+   * with `CLINIC_LOCKED`, which is refused until these are reported — the
+   * same shape as the morning, because the matrix asks the same thing of
+   * both: *"distinguish Task Completed from Clinic Safe to Close"*.
+   *
+   *   OPERATORY_CLOSED    trays cleared, chair wiped, film binned, power
+   *                       off, floor mopped (Operatory Closing Protocol)
+   *   PAYMENTS_RECONCILED cash, card, TPA tallied against the software,
+   *                       discrepancies logged, petty cash balanced, cash
+   *                       in the safe (End-of-Day Payment Reconciliation)
+   *   DAY_REPORTED        the five figures handed to the manager
+   *                       (Daily Report Submission)
+   *   WASTE_CLOSED        bins closed, vendor collection, liners replaced,
+   *                       logbook written (BMW Closing Protocol)
+   *   ENVIRONMENT_CLOSED  waiting area, pantry, washroom, utilities, and
+   *                       fumigation (Clinic Environment Closing Protocol)
+   *   PREMISES_SECURED    machines down, alarms armed, doors locked, key
+   *                       handed over (Security & Lockdown Protocol)
+   *   STAFF_LEFT          one person out through the exit protocol
+   * ------------------------------------------------------------------ */
+  OPERATORY_CLOSED: 'OPERATORY_CLOSED',
+  PAYMENTS_RECONCILED: 'PAYMENTS_RECONCILED',
+  DAY_REPORTED: 'DAY_REPORTED',
+  WASTE_CLOSED: 'WASTE_CLOSED',
+  ENVIRONMENT_CLOSED: 'ENVIRONMENT_CLOSED',
+  PREMISES_SECURED: 'PREMISES_SECURED',
+  STAFF_LEFT: 'STAFF_LEFT',
+
   // A patient's visit
   PATIENT_ARRIVED: 'PATIENT_ARRIVED',
   PATIENT_REGISTERED: 'PATIENT_REGISTERED',

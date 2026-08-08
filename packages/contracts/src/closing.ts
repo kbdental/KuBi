@@ -1,0 +1,214 @@
+/**
+ * Clinic closing — the end of the day, as the owner actually runs it.
+ *
+ * The mirror of `readiness.ts`, and deliberately its own module rather than a
+ * flag on that one: the morning and the evening share a shape but almost
+ * nothing else. Different people, different order, and one question the
+ * morning never asks.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * The question the morning never asks
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * The activity matrix: *"KuBi should distinguish **Task Completed** from
+ * **Clinic Safe to Close**. If a critical sterilization or patient-safety task
+ * remains unresolved, the system should display 🔴 CLOSING WITH CRITICAL
+ * EXCEPTION and require manager acknowledgement."*
+ *
+ * That is an override path, and this file does not build one. Constitution
+ * rule 2: a BLOCK_HARD gate has no override, enforced by the absence of a
+ * permission rather than by a runtime check. Inventing an acknowledgement
+ * that lets a patient-safety failure through would be exactly the thing that
+ * rule exists to prevent, so `criticalException` below *names* the state and
+ * `CLINIC_LOCKED` still refuses. Whether the owner wants an acknowledged
+ * close is an open decision, and an open decision is never silently resolved.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Why fumigation is not the long pole
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * It looked like it would be: fumigation is last and the rooms stay shut for
+ * an hour. But the hour is spent with nobody in the building — it constrains
+ * *re-entry*, not departure, and the clinic does not reopen inside it. So it
+ * adds nothing to how long closing takes, and the guess that it would has
+ * been dropped rather than carried forward.
+ *
+ * The real long pole is the instrument loop, and it is a genuine problem the
+ * owner has to settle — see `SAME_DAY_STERILISATION_NOTE`.
+ */
+import { RoleCode } from './enums.js';
+import { Objective } from './objectives.js';
+import { ClinicEvent } from './operating-model.js';
+import type { Operatory, ReadinessEvent } from './readiness.js';
+
+/**
+ * The timing problem, recorded where somebody will find it.
+ *
+ * The closing drill sends used instruments to the sterilisation room at
+ * closing: *"All instrument trays cleared; used instruments placed in the
+ * sterilization room"*. The matrix demands *"Sterilization complete — same
+ * day"* at 100%. The cycle takes seventy-five minutes to cooling.
+ *
+ * Those three cannot all hold. A tray cleared at 19:00 is not stored before
+ * 20:15, so either somebody stays, or there is a collection cut-off, or
+ * same-day is not really the rule and the morning run is what catches
+ * yesterday's instruments — which would explain why the opening procedure has
+ * one. KuBi does not choose; it refuses to close with instruments in the loop,
+ * which is the existing behaviour, and this note says why that will bite.
+ */
+export const SAME_DAY_STERILISATION_NOTE =
+  'Instruments go to the sterilisation room at closing and the cycle takes 75 '
+  + 'minutes to cooling, so same-day completion needs a collection cut-off.';
+
+/* -------------------------------------------------------------------------
+ * The blocks
+ * ---------------------------------------------------------------------- */
+
+export interface ClosingBlock {
+  id: string;
+  label: string;
+  owner: RoleCode;
+  objective: Objective;
+  completedBy: ClinicEvent;
+  subjectId: string | null;
+  /**
+   * Whether this one is patient-safety critical.
+   *
+   * The matrix's exception is specifically about *"a critical sterilization or
+   * patient-safety task"*, so the distinction has to exist in the data before
+   * any decision about acknowledgement can be made about it.
+   */
+  critical: boolean;
+  done: boolean;
+  doneAt: number | null;
+  ifOutstanding: string;
+}
+
+export interface Closing {
+  blocks: readonly ClosingBlock[];
+  outstanding: readonly ClosingBlock[];
+  /** Calculated. Nobody ticks "clinic closed" any more than they tick ready. */
+  clear: boolean;
+  /** The minute the last block was reported, once all are. */
+  closedAt: number | null;
+  /**
+   * Outstanding work that is patient-safety critical.
+   *
+   * Named rather than acted on. This is the matrix's 🔴 CLOSING WITH CRITICAL
+   * EXCEPTION, reported so that the state is visible and countable — the
+   * acknowledgement path it asks for is an open owner decision and is not
+   * built.
+   */
+  criticalException: readonly ClosingBlock[];
+  /** The share of blocks reported — *"Compliance with Closing Checklist"*. */
+  compliance: number;
+  unconfigured: readonly string[];
+  /**
+   * Staff out through the exit protocol (§ End-of-Day Staff Protocol),
+   * reported rather than enforced — the same limit as staff entry, for the
+   * same reason: an event carries a role, not a person.
+   */
+  staffLeft: number;
+}
+
+const block = (
+  id: string, label: string, owner: RoleCode, objective: Objective,
+  completedBy: ClinicEvent, subjectId: string | null, critical: boolean,
+  ifOutstanding: string,
+): Omit<ClosingBlock, 'done' | 'doneAt'> =>
+  ({ id, label, owner, objective, completedBy, subjectId, critical, ifOutstanding });
+
+/**
+ * The closing drill, in the order the clinic works it.
+ *
+ * Operatories first because they feed the instrument loop; money next because
+ * reception can do it while the rooms are being turned round; the premises
+ * after the rooms are empty, since fumigation cannot happen with people in
+ * them; and lockdown last, because it is the act of leaving.
+ */
+function planFor(operatories: readonly Operatory[]): Array<Omit<ClosingBlock, 'done' | 'doneAt'>> {
+  const rooms = [...operatories]
+    .sort((a, b) => a.position - b.position)
+    .map((o) => block(
+      `OPERATORY_CLOSED:${o.id}`, `Close down ${o.label}`,
+      RoleCode.DENTAL_ASSISTANT, Objective.PATIENT_SAFE,
+      ClinicEvent.OPERATORY_CLOSED, o.id, true,
+      `${o.label} has not been closed down — instruments, film, power and floor`,
+    ));
+
+  return [
+    ...rooms,
+    block('PAYMENTS', 'Reconcile the day’s takings',
+      RoleCode.RECEPTION, Objective.MONEY_COLLECTED,
+      ClinicEvent.PAYMENTS_RECONCILED, null, false,
+      'The day’s cash, card and TPA payments have not been reconciled'),
+    block('REPORT', 'Send the daily collection report',
+      RoleCode.RECEPTION, Objective.RECORDS_COMPLETE,
+      ClinicEvent.DAY_REPORTED, null, false,
+      'The manager has not been sent today’s figures'),
+    block('WASTE', 'Close the bio-medical waste',
+      RoleCode.HOUSEKEEPING, Objective.PATIENT_SAFE,
+      ClinicEvent.WASTE_CLOSED, null, true,
+      'The waste bins are not closed and the logbook is not written'),
+    block('ENVIRONMENT', 'Close the clinic down and fumigate',
+      RoleCode.HOUSEKEEPING, Objective.PATIENT_SAFE,
+      ClinicEvent.ENVIRONMENT_CLOSED, null, true,
+      'The waiting area, pantry, washroom and fumigation are not done'),
+    block('SECURITY', 'Secure the premises and hand over the key',
+      RoleCode.RECEPTION, Objective.CLINIC_EFFICIENT,
+      ClinicEvent.PREMISES_SECURED, null, false,
+      'The clinic is not locked and the key has not been handed over'),
+  ];
+}
+
+/**
+ * Where the clinic's evening has got to.
+ *
+ * Pure, like the morning. It takes no `now` and no target, because the owner
+ * has not given a lock-up time: closing has no backward schedule until there
+ * is one, and inventing a plausible hour would repeat the mistake the
+ * readiness target already made once.
+ */
+export function closing(
+  events: readonly ReadinessEvent[],
+  operatories: readonly Operatory[],
+): Closing {
+  const unconfigured: string[] = [];
+  if (operatories.length === 0) {
+    unconfigured.push('No operatory has been set up for this clinic');
+  }
+
+  const blocks: ClosingBlock[] = planFor(operatories).map((b) => {
+    const ev = events.find((e) => e.type === b.completedBy
+      && (b.subjectId === null || e.subjectId === b.subjectId));
+    return { ...b, done: ev !== undefined, doneAt: ev ? ev.at : null };
+  });
+
+  const outstanding = blocks.filter((b) => !b.done);
+  const done = blocks.filter((b) => b.done);
+  const clear = unconfigured.length === 0 && outstanding.length === 0;
+
+  const staffLeft = new Set(
+    events.filter((e) => e.type === ClinicEvent.STAFF_LEFT).map((e) => e.subjectId),
+  ).size;
+
+  return {
+    blocks,
+    outstanding,
+    clear,
+    closedAt: clear ? done.reduce((latest, b) => Math.max(latest, b.doneAt ?? 0), 0) : null,
+    criticalException: outstanding.filter((b) => b.critical),
+    compliance: blocks.length === 0 ? 0 : done.length / blocks.length,
+    unconfigured,
+    staffLeft,
+  };
+}
+
+/** The one sentence to put in front of whoever is trying to lock up. */
+export function whyNotClosed(c: Closing): string | null {
+  if (c.clear) return null;
+  if (c.unconfigured.length > 0) return c.unconfigured[0]!;
+  // Patient safety first, whatever order the list happens to be in.
+  const first = c.criticalException[0] ?? c.outstanding[0]!;
+  return first.ifOutstanding;
+}

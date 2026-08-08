@@ -43,7 +43,7 @@ import {
   ActivityStatus, ExceptionStatus, DAILY_STANDARD,
   DORMANT_AFTER_DAYS, type OutreachOutcome, headlineFor,
   ClinicEvent, FLOWS,
-  decisions, decisionsFor, escalatedTo, mostImportant, sweep, board, readiness,
+  decisions, decisionsFor, escalatedTo, mostImportant, sweep, board, readiness, closing,
   type RoleCode as Role,
 } from '@kubi/contracts';
 
@@ -940,6 +940,9 @@ export async function buildServer(): Promise<FastifyInstance> {
         // ready, and readiness against the first appointment. Calculated
         // here and rendered there — the screen computes nothing.
         readiness: readiness(world.events, world.operatories, world.firstPatientAt, now),
+        // The evening, on the same terms: which sections of the drill are
+        // outstanding, and which of those are patient-safety critical.
+        closing: closing(world.events, world.operatories),
         board: board(world, now),
         late: sweep(world, now).alerts,
         flows: world.flows.filter((f) => !f.done).map((f) => ({

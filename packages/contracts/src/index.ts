@@ -21,6 +21,7 @@ export * from './retention.js';
 export * from './objectives.js';
 export * from './operating-model.js';
 export * from './readiness.js';
+export * from './closing.js';
 export * from './engine.js';
 export * from './decisions.js';
 export * from './briefing-headline.js';

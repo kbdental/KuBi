@@ -33,6 +33,7 @@ import type { RoleCode } from './enums.js';
 import { rank, OBJECTIVE_WORD, type Objective } from './objectives.js';
 import { ClinicEvent, FlowKind, FLOWS } from './operating-model.js';
 import { readiness, type ReadinessBlock } from './readiness.js';
+import { closing, type ClosingBlock } from './closing.js';
 import { admit, lateness, type World, type Flow } from './engine.js';
 
 /* -------------------------------------------------------------------------
@@ -232,6 +233,50 @@ function readinessDecision(
   };
 }
 
+/**
+ * One outstanding piece of the closing drill, as a decision.
+ *
+ * Appears only once the last patient has left. Before that the evening has not
+ * started, and putting "close down Operatory 2" in front of an assistant at
+ * two in the afternoon is a to-do list rather than a clinic.
+ *
+ * No lateness: the owner has not given a lock-up time, so there is no deadline
+ * to be late against. A made-up one would be the readiness-target mistake all
+ * over again.
+ */
+function closingDecision(w: World, b: ClosingBlock): Decision {
+  const subjectId = b.subjectId ?? 'today';
+  return {
+    id: `CLOSING#${b.id}`,
+    question: b.label,
+    owner: b.owner,
+    objective: b.objective,
+    priority: rank(b.objective),
+
+    verdict: Verdict.PROCEED,
+    because: null,
+    fix: null,
+    goes: null,
+
+    heldFor: 0,
+    lateBy: 0,
+
+    why: `This is about ${OBJECTIVE_WORD[b.objective]}.`,
+    evidence: w.events.filter((e) => e.subjectId === subjectId).map((e) => e.seq),
+    protocol: `Closing drill · ${b.id}`,
+    ifIgnored: b.critical
+      ? `${b.ifOutstanding}. The day cannot be closed until it is.`
+      : `${b.ifOutstanding}.`,
+
+    flowId: 'CLOSING',
+    flowKind: FlowKind.CLINIC,
+    subjectId,
+    subjectLabel: b.label,
+    node: b.id,
+    completedBy: b.completedBy,
+  };
+}
+
 /* -------------------------------------------------------------------------
  * The list
  * ---------------------------------------------------------------------- */
@@ -265,6 +310,17 @@ export function decisions(w: World, now: number): Decision[] {
   const unlocked = w.events.find((e) => e.type === ClinicEvent.CLINIC_UNLOCKED);
   if (unlocked && !r.ready) {
     for (const b of r.outstanding) out.push(readinessDecision(w, b, unlocked, now));
+  }
+
+  // The evening. Only once every visit is finished — the closing drill is what
+  // happens after the last patient leaves, not something running alongside
+  // them.
+  const patientsDone = r.ready
+    && w.flows.some((f) => f.kind === FlowKind.PATIENT)
+    && !w.flows.some((f) => f.kind === FlowKind.PATIENT && !f.done);
+  if (patientsDone) {
+    const c = closing(w.events, w.operatories);
+    for (const b of c.outstanding) out.push(closingDecision(w, b));
   }
 
   return out.sort(
