@@ -151,7 +151,16 @@ export interface ReadinessBlock {
   completedBy: ClinicEvent;
   /** The operatory or other subject it is about, where it has one. */
   subjectId: string | null;
-  /** Minutes it should take, or null where the owner has not said. */
+  /**
+   * Minutes it should take on its own, where that has a separate figure.
+   *
+   * Null does not mean unknown. The equipment round and the waiting area
+   * *"happen in that 50 min"* — they sit inside the whole-morning window
+   * rather than carrying a clock of their own, and the stock check is done as
+   * required rather than to a duration. Only the three the owner timed
+   * separately — an operatory, housekeeping, the sterilisation cycle — have a
+   * number here, and only those can drive the start time.
+   */
   expectMinutes: number | null;
   /**
    * Whether the clinic may open without it.

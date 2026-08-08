@@ -101,8 +101,10 @@ describe('the morning is built from the master, not from a constant', () => {
     expect(r.blocks.find((b) => b.id === 'STERILE')!.expectMinutes)
       .toBe(STERILIZATION_MINUTES);
 
-    // Still genuinely unknown, and still not invented: the equipment round,
-    // the waiting area and the stock check have no stated duration.
+    // No separate figure, which is not the same as unknown: the equipment
+    // round and the waiting area "happen in that 50 min" — inside the
+    // whole-morning window rather than on a clock of their own — and the
+    // stock check is done as required rather than to a duration.
     for (const id of ['EQUIPMENT', 'STOCK', 'RECEPTION']) {
       expect(r.blocks.find((b) => b.id === id)!.expectMinutes, id).toBeNull();
     }

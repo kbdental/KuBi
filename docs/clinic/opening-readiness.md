@@ -17,7 +17,7 @@ close them.
 | What is in each? | Dental chair, x‑ray, hand instruments, suction. *"do not put special instruments and equipments as they can be taken any where on a movable trolley"* | Four columns on the master, all true for this clinic |
 | The special equipment? | Still checked — *"as a task for dental assistant as she is the one who checks the working"* | One `EQUIPMENT` block owned by the assistant, not four per‑room ones |
 | How long? | **15 minutes** per operatory | `OPERATORY_MINUTES`. Every other block carries `null`, because no other duration was stated |
-| Five steps or sixteen? | *"it is called the 5 step protocol, 16 as a number is sub steps"* | Recorded; the five headline steps are still needed |
+| Five steps or sixteen? | *"NO NEED FOR HEAD LINE JUST PUT THE 16 STEPS AS IT IS"* | The sixteen stand as the protocol. No headline grouping will be invented over them |
 | How to measure readiness | *"i leave it upto you to decide how to check"* | Opening‑checklist compliance as a share of blocks, and first‑patient readiness vs target as a signed variance |
 
 ### Second round of answers
@@ -343,17 +343,16 @@ week's end.
    **Housekeeping**; morning run → **Sterilization Technician**, with the
    release still held by the Senior Assistant so nobody releases their own
    batch.
-4. **Two durations are still unknown**: the equipment round and the waiting
-   area. Neither blocks the schedule — the whole‑morning figure of 50 minutes
-   covers them — but the individual blocks carry `null` rather than a guess.
-5. **The two named documents we do not have:** the *K. B. Dental Hand Hygiene
-   Protocol* and the *K. B. Dental Five Step Sterilization Protocol*. Which
-   five are the headline steps that the sixteen sit under?
-6. **Is the first appointment the right target?** Readiness is measured
-   against the day's first booked patient. If the clinic's real target is a
-   fixed time — "ready by 09:30 whoever is booked" — that is a different
-   measure and a one‑line change. On a day with nothing booked KuBi reports
-   *no target* rather than inventing one.
+4. ~~Two durations still unknown~~ **Answered.** The equipment round and the
+   waiting area *"happen in that 50 min"* — inside the whole‑morning window
+   rather than on clocks of their own. They carry no separate figure because
+   there is none to carry, which is different from unknown.
+5. **The Hand Hygiene Protocol** — *"will provide later"*. The Five Step
+   Sterilization Protocol is closed: the sixteen steps stand as written.
+6. ~~Is the first appointment the right target?~~ **Answered** — *"yes it is
+   this way only"*. Readiness is measured against the day's first booked
+   patient, and a day with nothing booked reports no target rather than an
+   invented one.
 7. **Per‑patient sterilisation has one owner, and you have named two.** The
    sterilisation flow gives each step a single owning role, so KuBi shows the
    turnover run as the technician's even though a dental assistant may do it.
