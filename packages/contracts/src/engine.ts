@@ -110,15 +110,29 @@ export interface World {
    * report a variance against it, which is worse than reporting nothing.
    */
   firstPatientAt: number | null;
+  /**
+   * The minute the clinic shuts today — the normal time, or the exception if
+   * today is one of those days.
+   *
+   * The bookend to `firstPatientAt`: one says when the morning has to be
+   * finished by, the other says when the evening begins. Null when nobody has
+   * set one, and null stays null.
+   */
+  shutAt: number | null;
 }
 
 export const emptyWorld = (
   now: number,
-  setup: { operatories?: readonly Operatory[]; firstPatientAt?: number | null } = {},
+  setup: {
+    operatories?: readonly Operatory[];
+    firstPatientAt?: number | null;
+    shutAt?: number | null;
+  } = {},
 ): World => ({
   now, flows: [], events: [], facts: {}, metrics: { seen: 0, collected: 0, waits: [] },
   operatories: setup.operatories ?? [],
   firstPatientAt: setup.firstPatientAt ?? null,
+  shutAt: setup.shutAt ?? null,
 });
 
 /* -------------------------------------------------------------------------
@@ -334,8 +348,8 @@ const RULES: Partial<Record<ClinicEvent, readonly Requirement[]>> = {
      * describes. That is not an oversight — see `closing.ts` — it is the
      * absence of an override path that has not been authorised.
      */
-    req((w) => closing(w.events, w.operatories).clear,
-      (w) => whyNotClosed(closing(w.events, w.operatories))
+    req((w) => closing(w.events, w.operatories, w.shutAt, w.now).clear,
+      (w) => whyNotClosed(closing(w.events, w.operatories, w.shutAt, w.now))
         ?? 'The closing drill is not finished',
       'Open clinic closing', 'Closing'),
   ],

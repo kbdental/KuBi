@@ -70,6 +70,28 @@ export class EventStore {
   constructor(private readonly clock: Clock, private readonly timezone = 'Asia/Kolkata') {}
 
   /**
+   * When the clinic shuts today.
+   *
+   * The owner: *"clinic shut time is 6.30 normally with exceptions of some
+   * days that is 7"*. So the override for today wins, and the clinic's normal
+   * time stands behind it. Null when neither has been set, because a guessed
+   * shut time would report an overrun against an evening nobody agreed to.
+   */
+  async shutAt(tx: TenantPrisma, clinicId: string): Promise<number | null> {
+    const today = new Date(this.clock.now());
+    today.setUTCHours(0, 0, 0, 0);
+
+    const [clinic, override] = await Promise.all([
+      tx.clinic.findUnique({ where: { id: clinicId }, select: { shutMinute: true } }),
+      tx.clinicShutOverride.findFirst({
+        where: { clinicId, onDate: today },
+        select: { shutMinute: true },
+      }),
+    ]);
+    return override?.shutMinute ?? clinic?.shutMinute ?? null;
+  }
+
+  /**
    * Rebuild the world from the log.
    *
    * `now` is passed in rather than read, so a caller can ask what the world
@@ -78,7 +100,7 @@ export class EventStore {
   async replay(
     tx: TenantPrisma, clinicId: string, now: number, firstPatientAt?: number,
   ): Promise<World> {
-    const [rows, operatories, firstPatient] = await Promise.all([
+    const [rows, operatories, firstPatient, shutAt] = await Promise.all([
       tx.clinicEventRow.findMany({ where: { clinicId }, orderBy: { seq: 'asc' } }),
       // Master data, not event data: an operatory exists because the clinic
       // has one. Read alongside the log rather than folded out of it, and
@@ -93,6 +115,7 @@ export class EventStore {
       // that forgot to pass it would otherwise gate on a different morning
       // from the one it displays.
       firstPatientAt === undefined ? this.firstPatientAt(tx, clinicId) : firstPatientAt,
+      this.shutAt(tx, clinicId),
     ]);
 
     let w: World = emptyWorld(rows[0]?.occurredMinute ?? now, {
@@ -100,6 +123,7 @@ export class EventStore {
         id: o.id, label: o.label, position: o.position,
       })),
       ...(firstPatient === null ? {} : { firstPatientAt: firstPatient }),
+      ...(shutAt === null ? {} : { shutAt }),
     });
     for (const r of rows) {
       // Each event is applied at the minute it happened, so waiting times and

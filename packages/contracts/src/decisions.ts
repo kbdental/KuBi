@@ -315,11 +315,15 @@ export function decisions(w: World, now: number): Decision[] {
   // The evening. Only once every visit is finished — the closing drill is what
   // happens after the last patient leaves, not something running alongside
   // them.
+  // Either every visit is finished, or the clinic has shut. Both are real
+  // starts: some evenings the last patient leaves early, and on others the
+  // door closes at 18:30 with the drill still to do.
   const patientsDone = r.ready
     && w.flows.some((f) => f.kind === FlowKind.PATIENT)
     && !w.flows.some((f) => f.kind === FlowKind.PATIENT && !f.done);
-  if (patientsDone) {
-    const c = closing(w.events, w.operatories);
+  const shut = w.shutAt !== null && now >= w.shutAt;
+  if (patientsDone || shut) {
+    const c = closing(w.events, w.operatories, w.shutAt, now);
     for (const b of c.outstanding) out.push(closingDecision(w, b));
   }
 

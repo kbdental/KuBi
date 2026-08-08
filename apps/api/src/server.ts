@@ -942,7 +942,7 @@ export async function buildServer(): Promise<FastifyInstance> {
         readiness: readiness(world.events, world.operatories, world.firstPatientAt, now),
         // The evening, on the same terms: which sections of the drill are
         // outstanding, and which of those are patient-safety critical.
-        closing: closing(world.events, world.operatories),
+        closing: closing(world.events, world.operatories, world.shutAt, now),
         board: board(world, now),
         late: sweep(world, now).alerts,
         flows: world.flows.filter((f) => !f.done).map((f) => ({

@@ -81,15 +81,42 @@ model Clinic {
   name           String
   /// IANA timezone. All trigger evaluation is clinic-local and DST-aware.
   timezone       String   @default("Asia/Kolkata")
+  /// Clinic-local minutes since midnight at which the clinic normally shuts.
+  /// Null means nobody has said, and the closing target is reported unknown.
+  shutMinute     Int?     @map("shut_minute")
   status         String   @default("ACTIVE")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization @relation(fields: [organizationId], references: [id])
+  organization  Organization           @relation(fields: [organizationId], references: [id])
+  shutOverrides ClinicShutOverride[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
   @@map("clinics")
+}
+
+/// The days the clinic does not shut at its normal time.
+///
+/// "6.30 normally with exceptions of some days that is 7" — the exceptions are
+/// the point. Without them every late evening reads as an overrun.
+model ClinicShutOverride {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  clinicId       String @map("clinic_id") @db.Uuid
+
+  /// The day this applies to, in the clinic's own calendar.
+  onDate     DateTime @map("on_date") @db.Date
+  /// Clinic-local minutes since midnight. 19:00 is 1140.
+  shutMinute Int      @map("shut_minute")
+  reason     String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@unique([organizationId, clinicId, onDate])
+  @@map("clinic_shut_overrides")
 }
 
 /// Present in Phase 1 ONLY as the RLS spike fixture (Step 6).

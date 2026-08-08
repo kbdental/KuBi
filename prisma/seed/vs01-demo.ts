@@ -98,6 +98,13 @@ export async function seedVs01Demo(suffix: string): Promise<DemoEnvironment> {
           },
         });
       }
+      // 18:30 — "clinic shut time is 6.30 normally". The exception days live
+      // in clinic_shut_overrides, so nothing here has to know about them.
+      await tx.clinic.update({
+        where: { id: boot.clinicId },
+        data: { shutMinute: 18 * 60 + 30 },
+      });
+
       // The operatory master. Four, because the owner has four — and as rows
       // rather than a constant, so a fifth is an INSERT. Readiness is
       // calculated per room from this, which is why an empty master reports

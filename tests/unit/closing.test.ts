@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  ClinicEvent, RoleCode, emptyWorld, record, closing, whyNotClosed,
+  ClinicEvent, RoleCode, decisionsFor, emptyWorld, record, closing, whyNotClosed,
   SAME_DAY_STERILISATION_NOTE, type Operatory, type World,
 } from '@kubi/contracts';
 
@@ -21,8 +21,13 @@ const FOUR: Operatory[] = [
   { id: 'op-4', label: 'Operatory 4', position: 4 },
 ];
 
-const evening = (ops: Operatory[] = FOUR, now = T(19, 0)): World =>
-  emptyWorld(now, { operatories: ops, firstPatientAt: T(10, 0) });
+/** 18:30 — "clinic shut time is 6.30 normally". */
+const SHUT = T(18, 30);
+/** 19:00 — "with exceptions of some days that is 7". */
+const LATE_SHUT = T(19, 0);
+
+const evening = (ops: Operatory[] = FOUR, now = T(19, 0), shutAt: number | null = SHUT): World =>
+  emptyWorld(now, { operatories: ops, firstPatientAt: T(10, 0), shutAt });
 
 function must(w: World, type: ClinicEvent, id: string, by: RoleCode, label?: string): World {
   const r = record(w, { type, subjectId: id, by, ...(label ? { subjectLabel: label } : {}) });
@@ -43,7 +48,7 @@ function wholeDrill(w = evening()): World {
   return must(x, ClinicEvent.PREMISES_SECURED, 'today', RoleCode.RECEPTION);
 }
 
-const shut = (w: World) => closing(w.events, w.operatories);
+const shut = (w: World) => closing(w.events, w.operatories, w.shutAt, w.now);
 
 /* ═══════════════════════════════════════════════════════════════════════ */
 
@@ -218,6 +223,60 @@ describe('the critical exception is named, and not acted on', () => {
     // rather than resolved.
     expect(SAME_DAY_STERILISATION_NOTE).toContain('75');
     expect(SAME_DAY_STERILISATION_NOTE).toContain('cut-off');
+  });
+});
+
+describe('when the clinic shuts', () => {
+  /**
+   * The owner: *"clinic shut time is 6.30 normally with exceptions of some
+   * days that is 7"*. Both facts are data — the normal time on the clinic, the
+   * exception days in their own table — because a clinic that only knew 18:30
+   * would call every one of those evenings an overrun.
+   */
+  it('carries today’s shut time, whichever one it is', () => {
+    expect(shut(evening()).shutAt).toBe(SHUT);
+    expect(shut(evening(FOUR, T(19, 0), LATE_SHUT)).shutAt).toBe(LATE_SHUT);
+  });
+
+  it('measures how long closing took, not how late it was', () => {
+    // The drill starts when the clinic shuts, so finishing after 18:30 is the
+    // normal case and not a failure. What is worth knowing is the gap.
+    const w = wholeDrill(evening(FOUR, T(19, 20)));
+    expect(shut(w).closedAt).toBe(T(19, 20));
+    expect(shut(w).overrunMinutes).toBe(50);
+  });
+
+  it('measures a late day against its own shut time, not the normal one', () => {
+    // Seven o'clock day. Leaving at 19:50 is the same fifty minutes of work,
+    // and reporting eighty would blame the team for the exception.
+    const w = wholeDrill(evening(FOUR, T(19, 50), LATE_SHUT));
+    expect(shut(w).overrunMinutes).toBe(50);
+  });
+
+  it('reports no overrun when nobody has set a shut time', () => {
+    const w = wholeDrill(evening(FOUR, T(19, 20), null));
+    expect(shut(w).shutAt).toBeNull();
+    expect(shut(w).overrunMinutes).toBeNull();
+    expect(shut(w).closedAt).toBe(T(19, 20));   // we still know when they left
+  });
+
+  it('knows the clinic is mid-closing, and when it is not', () => {
+    expect(shut(evening(FOUR, T(18, 45))).closingNow).toBe(true);
+    // Before the door shuts, the evening has not started.
+    expect(shut(evening(FOUR, T(17, 0))).closingNow).toBe(false);
+    // And once the drill is done it is not closing any more, whatever the hour.
+    expect(shut(wholeDrill(evening(FOUR, T(19, 30)))).closingNow).toBe(false);
+  });
+
+  it('puts the drill on people the moment the clinic shuts', () => {
+    // Not "once the last patient leaves" — some evenings the door closes at
+    // 18:30 with the drill still to do and nobody in the chair.
+    const before = decisionsFor(evening(FOUR, T(18, 0)), RoleCode.HOUSEKEEPING, T(18, 0));
+    expect(before).toHaveLength(0);
+    const after = decisionsFor(evening(FOUR, T(18, 31)), RoleCode.HOUSEKEEPING, T(18, 31));
+    expect(after.map((d) => d.question)).toEqual([
+      'Close the bio-medical waste', 'Close the clinic down and fumigate',
+    ]);
   });
 });
 

@@ -92,6 +92,28 @@ export interface Closing {
   /** The minute the last block was reported, once all are. */
   closedAt: number | null;
   /**
+   * The minute the clinic shuts today.
+   *
+   * The owner: *"clinic shut time is 6.30 normally with exceptions of some
+   * days that is 7"*. Both facts are data — the normal time on the clinic, the
+   * exception days in their own table — because a system that only knew the
+   * normal time would call every late Thursday an overrun.
+   *
+   * Null when nobody has set one, and null is not a plausible hour.
+   */
+  shutAt: number | null;
+  /**
+   * Minutes between the clinic shutting and the team actually leaving.
+   *
+   * Deliberately not "lateness". The closing drill *starts* when the clinic
+   * shuts, so finishing after 18:30 is the normal case and not a failure —
+   * what is worth knowing is how long it takes, which is this. Null until the
+   * drill is finished, or when there is no shut time to measure from.
+   */
+  overrunMinutes: number | null;
+  /** The clinic has shut and the drill is not finished. */
+  closingNow: boolean;
+  /**
    * Outstanding work that is patient-safety critical.
    *
    * Named rather than acted on. This is the matrix's 🔴 CLOSING WITH CRITICAL
@@ -164,14 +186,17 @@ function planFor(operatories: readonly Operatory[]): Array<Omit<ClosingBlock, 'd
 /**
  * Where the clinic's evening has got to.
  *
- * Pure, like the morning. It takes no `now` and no target, because the owner
- * has not given a lock-up time: closing has no backward schedule until there
- * is one, and inventing a plausible hour would repeat the mistake the
- * readiness target already made once.
+ * Pure, like the morning. `shutAt` is when the clinic shuts today — the normal
+ * time unless this is one of the exception days — and it is the moment the
+ * drill begins rather than a deadline it has to beat. Both it and `now` are
+ * optional and default to null, so a caller that has neither gets a truthful
+ * answer about the work with no invented clock attached to it.
  */
 export function closing(
   events: readonly ReadinessEvent[],
   operatories: readonly Operatory[],
+  shutAt: number | null = null,
+  now: number | null = null,
 ): Closing {
   const unconfigured: string[] = [];
   if (operatories.length === 0) {
@@ -192,11 +217,18 @@ export function closing(
     events.filter((e) => e.type === ClinicEvent.STAFF_LEFT).map((e) => e.subjectId),
   ).size;
 
+  const closedAt = clear
+    ? done.reduce((latest, b) => Math.max(latest, b.doneAt ?? 0), 0)
+    : null;
+
   return {
     blocks,
     outstanding,
     clear,
-    closedAt: clear ? done.reduce((latest, b) => Math.max(latest, b.doneAt ?? 0), 0) : null,
+    closedAt,
+    shutAt,
+    overrunMinutes: closedAt === null || shutAt === null ? null : closedAt - shutAt,
+    closingNow: shutAt !== null && now !== null && now >= shutAt && !clear,
     criticalException: outstanding.filter((b) => b.critical),
     compliance: blocks.length === 0 ? 0 : done.length / blocks.length,
     unconfigured,

@@ -420,6 +420,53 @@ describe('the operatory master drives the morning', () => {
   });
 });
 
+describe('when the clinic shuts, from the database', () => {
+  /**
+   * *"6.30 normally with exceptions of some days that is 7."* Two facts, two
+   * places, and the exception has to win or every one of those evenings reads
+   * as a thirty-minute overrun by the team that stayed late.
+   */
+  it('takes the clinic’s normal shut time', async () => {
+    await inClinic(async (tx) => {
+      const w = await freshStore().replay(tx as never, env.clinicId, T(19, 0));
+      expect(w.shutAt).toBe(T(18, 30));
+    });
+  });
+
+  it('lets today’s override beat the normal time', async () => {
+    await inClinic(async (tx) => {
+      const today = new Date(NOW);
+      today.setUTCHours(0, 0, 0, 0);
+      await db(tx).clinicShutOverride.create({
+        data: {
+          organizationId: env.organizationId, clinicId: env.clinicId,
+          onDate: today, shutMinute: T(19, 0), reason: 'Late list',
+        },
+      });
+      const w = await freshStore().replay(tx as never, env.clinicId, T(19, 30));
+      expect(w.shutAt).toBe(T(19, 0));
+    });
+  });
+
+  it('does not let another day’s override leak into today', async () => {
+    await inClinic(async (tx) => {
+      const other = new Date(NOW);
+      other.setUTCHours(0, 0, 0, 0);
+      other.setUTCDate(other.getUTCDate() + 3);
+      await db(tx).clinicShutOverride.create({
+        data: {
+          organizationId: env.organizationId, clinicId: env.clinicId,
+          onDate: other, shutMinute: T(20, 0), reason: 'A different evening',
+        },
+      });
+      const w = await freshStore().replay(tx as never, env.clinicId, T(19, 30));
+      // Today's override from the test above still stands; the future one does
+      // not reach back.
+      expect(w.shutAt).not.toBe(T(20, 0));
+    });
+  });
+});
+
 describe('the clinic-local minute', () => {
   it('reads the clinic zone rather than the server one', () => {
     // 04:00 UTC is 09:30 in Kolkata. A server in another timezone must not

@@ -24,6 +24,31 @@ infection‑control document.
 `STAFF_LEFT` counts people out through the End‑of‑Day Staff Protocol —
 reported, not enforced, the same limit as staff entry.
 
+## When the clinic shuts
+
+*"Clinic shut time is 6.30 normally with exceptions of some days that is 7."*
+Two facts, so two places — and the exception days are the point, because a
+clinic that only knew 18:30 would call every one of those evenings an overrun
+by the team that stayed late.
+
+| | |
+|---|---|
+| `clinics.shut_minute` | the normal time — **18:30** for this clinic |
+| `clinic_shut_overrides` | the days it is not, with a date and a reason |
+
+Today's override wins; the normal time stands behind it. Neither set means
+`shutAt` is null, and null is not a plausible hour.
+
+**Shutting is when the drill starts, not a deadline it has to beat.** So the
+measure is `overrunMinutes` — the gap between the door closing and the team
+leaving — not lateness. On a seven o'clock day, leaving at 19:50 is the same
+fifty minutes of work as leaving at 19:20 on a normal one, and reporting eighty
+would blame the team for the exception.
+
+The drill now appears on people's lists **the moment the clinic shuts**, as
+well as when the last visit finishes. Some evenings the door closes at 18:30
+with nobody in the chair and the drill still to do.
+
 `CLINIC_LOCKED` is refused until all nine are reported, and the refusal names
 the section: *"The waste bins are not closed and the logbook is not written"*.
 The three existing refusals — unfinished visit, unwritten note, instruments in
