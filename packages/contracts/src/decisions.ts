@@ -244,8 +244,13 @@ function readinessDecision(
  * to be late against. A made-up one would be the readiness-target mistake all
  * over again.
  */
-function closingDecision(w: World, b: ClosingBlock): Decision {
+function closingDecision(w: World, b: ClosingBlock, expectedCloseAt: number | null, now: number): Decision {
   const subjectId = b.subjectId ?? 'today';
+  // The drill takes thirty minutes from the moment the clinic shuts, so there
+  // is a time the team should be out by and work can genuinely be late
+  // against it. With no shut time there is no such moment, and the work is
+  // simply not yet done.
+  const lateBy = expectedCloseAt === null ? 0 : Math.max(0, now - expectedCloseAt);
   return {
     id: `CLOSING#${b.id}`,
     question: b.label,
@@ -253,20 +258,22 @@ function closingDecision(w: World, b: ClosingBlock): Decision {
     objective: b.objective,
     priority: rank(b.objective),
 
-    verdict: Verdict.PROCEED,
+    verdict: lateBy > 0 ? Verdict.ESCALATE : Verdict.PROCEED,
     because: null,
     fix: null,
     goes: null,
 
-    heldFor: 0,
-    lateBy: 0,
+    heldFor: w.shutAt === null ? 0 : Math.max(0, now - w.shutAt),
+    lateBy,
 
     why: `This is about ${OBJECTIVE_WORD[b.objective]}.`,
     evidence: w.events.filter((e) => e.subjectId === subjectId).map((e) => e.seq),
     protocol: `Closing drill · ${b.id}`,
-    ifIgnored: b.critical
-      ? `${b.ifOutstanding}. The day cannot be closed until it is.`
-      : `${b.ifOutstanding}.`,
+    ifIgnored: lateBy > 0
+      ? `${lateBy} min past when the team should have left. ${b.ifOutstanding}.`
+      : b.critical
+        ? `${b.ifOutstanding}. The day cannot be closed until it is.`
+        : `${b.ifOutstanding}.`,
 
     flowId: 'CLOSING',
     flowKind: FlowKind.CLINIC,
@@ -324,7 +331,7 @@ export function decisions(w: World, now: number): Decision[] {
   const shut = w.shutAt !== null && now >= w.shutAt;
   if (patientsDone || shut) {
     const c = closing(w.events, w.operatories, w.shutAt, now);
-    for (const b of c.outstanding) out.push(closingDecision(w, b));
+    for (const b of c.outstanding) out.push(closingDecision(w, b, c.expectedCloseAt, now));
   }
 
   return out.sort(

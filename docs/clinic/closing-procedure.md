@@ -49,6 +49,50 @@ The drill now appears on people's lists **the moment the clinic shuts**, as
 well as when the last visit finishes. Some evenings the door closes at 18:30
 with nobody in the chair and the drill still to do.
 
+## Thirty minutes
+
+The drill takes **30 minutes**, so the team should be out by **19:00** — or
+19:30 on a seven o'clock day. Like the morning's fifty, it is a whole‑clinic
+figure and not the sum of the blocks: reception reconciles while housekeeping
+mops.
+
+That gives closing the measure the morning already had. `overrunMinutes` says
+how long it took; `varianceMinutes` says whether that was longer than thirty,
+negative when the team got out early. Outstanding work escalates once the hour
+passes — *"15 min past when the team should have left"*.
+
+## Same-day sterilisation does not fit — this is arithmetic, not a worry
+
+Three of your own numbers, put together:
+
+| | |
+|---|---|
+| clinic shuts | 18:30 |
+| closing drill | 30 min → team leaves **19:00** |
+| sterilisation cycle | 75 min to cooling |
+
+Working back from when the team leaves, the **last instrument that can be
+stored the same day must be collected by 17:45** — three quarters of an hour
+*before the clinic shuts*. Instruments used in the last treatment of the day
+cannot be stored the same day. Not through carelessness; the numbers do not
+leave room.
+
+The seven o'clock day is no better: the whole schedule shifts and the shortfall
+stays at 45 minutes.
+
+`lastCollection(shutAt)` computes this, and reports `reachable: false` with the
+shortfall rather than a plausible-looking cut-off time. **KuBi still refuses to
+close with instruments in the loop** — the arithmetic is a finding, not a
+licence — so until you rule, the behaviour is exactly as before.
+
+Three ways out, and it is your call which:
+
+1. **Somebody stays.** The sterilisation technician works past 19:45.
+2. **The morning run catches yesterday.** Which is what the opening procedure
+   already has, and would make "same-day at 100%" the wrong target rather than
+   a failure.
+3. **A collection cut-off**, with anything after it explicitly tomorrow's.
+
 `CLINIC_LOCKED` is refused until all nine are reported, and the refusal names
 the section: *"The waste bins are not closed and the logbook is not written"*.
 The three existing refusals — unfinished visit, unwritten note, instruments in

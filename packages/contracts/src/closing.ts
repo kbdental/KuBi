@@ -60,6 +60,52 @@ export const SAME_DAY_STERILISATION_NOTE =
   'Instruments go to the sterilisation room at closing and the cycle takes 75 '
   + 'minutes to cooling, so same-day completion needs a collection cut-off.';
 
+/**
+ * How long the closing drill takes.
+ *
+ * The owner: **30 minutes**. Like the morning's fifty, it is a whole-clinic
+ * figure rather than the sum of the blocks — reception is reconciling while
+ * housekeeping is mopping — so it is taken as given rather than added up.
+ */
+export const CLOSING_MINUTES = 30;
+
+/**
+ * The sterilisation cycle, repeated here from `readiness.ts` because the
+ * evening's arithmetic needs it and importing the morning for one number
+ * would tie two modules together for no reason.
+ */
+const STERILISATION_MINUTES = 75;
+
+/**
+ * The latest an instrument can be collected and still be stored before the
+ * team leaves — and whether that time is reachable at all.
+ *
+ * This is the same-day sterilisation problem, done as arithmetic instead of
+ * worried about in prose. The drill takes thirty minutes from the moment the
+ * clinic shuts, so the team leaves at `shutAt + 30`. A cycle takes
+ * seventy-five minutes to cooling. Working back:
+ *
+ *     18:30 shut  →  19:00 leave  →  17:45 last possible collection
+ *
+ * which is **forty-five minutes before the clinic shuts**. Instruments used in
+ * the last treatment of the day cannot be stored the same day, by arithmetic
+ * and not by anybody's carelessness. `reachable` is false whenever the cut-off
+ * lands before the clinic shuts, which on these numbers is always.
+ */
+export function lastCollection(shutAt: number | null): {
+  at: number | null;
+  reachable: boolean;
+  shortfallMinutes: number | null;
+} {
+  if (shutAt === null) return { at: null, reachable: false, shortfallMinutes: null };
+  const at = shutAt + CLOSING_MINUTES - STERILISATION_MINUTES;
+  return {
+    at,
+    reachable: at >= shutAt,
+    shortfallMinutes: at >= shutAt ? null : shutAt - at,
+  };
+}
+
 /* -------------------------------------------------------------------------
  * The blocks
  * ---------------------------------------------------------------------- */
@@ -113,6 +159,21 @@ export interface Closing {
   overrunMinutes: number | null;
   /** The clinic has shut and the drill is not finished. */
   closingNow: boolean;
+  /**
+   * The minute the team should be out by — `shutAt` plus the thirty minutes
+   * the drill takes. Null when there is no shut time to add them to.
+   */
+  expectedCloseAt: number | null;
+  /**
+   * Actual minus expected, in minutes. Negative is early, positive is late.
+   *
+   * The evening's mirror of the morning's *"Time of First Patient Readiness
+   * vs. Target"*: `overrunMinutes` says how long closing took, this says
+   * whether that was longer than it should have been.
+   */
+  varianceMinutes: number | null;
+  /** Past the time the team should have left, and still not finished. */
+  runningLate: boolean;
   /**
    * Outstanding work that is patient-safety critical.
    *
@@ -221,14 +282,20 @@ export function closing(
     ? done.reduce((latest, b) => Math.max(latest, b.doneAt ?? 0), 0)
     : null;
 
+  const expectedCloseAt = shutAt === null ? null : shutAt + CLOSING_MINUTES;
+
   return {
     blocks,
     outstanding,
     clear,
     closedAt,
     shutAt,
+    expectedCloseAt,
     overrunMinutes: closedAt === null || shutAt === null ? null : closedAt - shutAt,
+    varianceMinutes: closedAt === null || expectedCloseAt === null
+      ? null : closedAt - expectedCloseAt,
     closingNow: shutAt !== null && now !== null && now >= shutAt && !clear,
+    runningLate: expectedCloseAt !== null && now !== null && now > expectedCloseAt && !clear,
     criticalException: outstanding.filter((b) => b.critical),
     compliance: blocks.length === 0 ? 0 : done.length / blocks.length,
     unconfigured,

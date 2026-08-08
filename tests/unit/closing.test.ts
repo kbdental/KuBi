@@ -8,8 +8,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  ClinicEvent, RoleCode, decisionsFor, emptyWorld, record, closing, whyNotClosed,
-  SAME_DAY_STERILISATION_NOTE, type Operatory, type World,
+  ClinicEvent, RoleCode, Verdict, decisionsFor, emptyWorld, record, closing, whyNotClosed,
+  SAME_DAY_STERILISATION_NOTE, CLOSING_MINUTES, lastCollection,
+  type Operatory, type World,
 } from '@kubi/contracts';
 
 const T = (h: number, m: number) => h * 60 + m;
@@ -277,6 +278,81 @@ describe('when the clinic shuts', () => {
     expect(after.map((d) => d.question)).toEqual([
       'Close the bio-medical waste', 'Close the clinic down and fumigate',
     ]);
+  });
+});
+
+describe('thirty minutes, and what follows from it', () => {
+  it('expects the team out half an hour after the clinic shuts', () => {
+    expect(CLOSING_MINUTES).toBe(30);
+    expect(shut(evening()).expectedCloseAt).toBe(T(19, 0));
+    // And on a seven o'clock day, half past seven.
+    expect(shut(evening(FOUR, T(19, 0), LATE_SHUT)).expectedCloseAt).toBe(T(19, 30));
+  });
+
+  it('reports variance against the expectation, early as a negative', () => {
+    const early = wholeDrill(evening(FOUR, T(18, 50)));
+    expect(shut(early).varianceMinutes).toBe(-10);
+    const late = wholeDrill(evening(FOUR, T(19, 25)));
+    expect(shut(late).varianceMinutes).toBe(25);
+  });
+
+  it('knows when the team should have gone home and has not', () => {
+    expect(shut(evening(FOUR, T(18, 50))).runningLate).toBe(false);
+    expect(shut(evening(FOUR, T(19, 10))).runningLate).toBe(true);
+    // Finished is finished, however late the hour.
+    expect(shut(wholeDrill(evening(FOUR, T(20, 0)))).runningLate).toBe(false);
+  });
+
+  it('escalates outstanding closing work past the expected close', () => {
+    const onTime = decisionsFor(evening(FOUR, T(18, 45)), RoleCode.HOUSEKEEPING, T(18, 45));
+    expect(onTime.every((d) => d.verdict === Verdict.PROCEED)).toBe(true);
+
+    const over = decisionsFor(evening(FOUR, T(19, 15)), RoleCode.HOUSEKEEPING, T(19, 15));
+    expect(over.every((d) => d.verdict === Verdict.ESCALATE)).toBe(true);
+    expect(over[0]!.lateBy).toBe(15);
+    expect(over[0]!.ifIgnored).toContain('past when the team should have left');
+  });
+
+  it('is never late when the clinic has no shut time', () => {
+    const d = decisionsFor(evening(FOUR, T(23, 0), null), RoleCode.HOUSEKEEPING, T(23, 0));
+    expect(d.every((x) => x.lateBy === 0)).toBe(true);
+  });
+});
+
+describe('same-day sterilisation does not fit, and the arithmetic says so', () => {
+  /**
+   * Three of the owner's own numbers, put together for the first time:
+   * shut at 18:30, thirty minutes of closing, seventy-five minutes of
+   * sterilisation to cooling. Working back from when the team leaves gives a
+   * last-collection time *before* the clinic shuts.
+   */
+  it('puts the last possible collection before the clinic even shuts', () => {
+    const c = lastCollection(T(18, 30));
+    expect(c.at).toBe(T(17, 45));          // 19:00 leave − 75 min
+    expect(c.reachable).toBe(false);
+    expect(c.shortfallMinutes).toBe(45);
+  });
+
+  it('is no better on a seven o’clock day — the whole schedule just shifts', () => {
+    const c = lastCollection(T(19, 0));
+    expect(c.at).toBe(T(18, 15));
+    expect(c.reachable).toBe(false);
+    expect(c.shortfallMinutes).toBe(45);   // the same gap, an hour later
+  });
+
+  it('says nothing when there is no shut time to work back from', () => {
+    expect(lastCollection(null)).toEqual({ at: null, reachable: false, shortfallMinutes: null });
+  });
+
+  it('still refuses to close with instruments in the loop', () => {
+    // The arithmetic is a finding, not a licence. Until the owner rules on it,
+    // the clinic behaves exactly as before.
+    expect(SAME_DAY_STERILISATION_NOTE).toContain('cut-off');
+    let w = evening();
+    w = must(w, ClinicEvent.BATCH_COLLECTED, 'b1', RoleCode.STERILIZATION_TECHNICIAN, 'STER-1');
+    expect(record(w, {
+      type: ClinicEvent.CLINIC_LOCKED, subjectId: 'today', by: RoleCode.CLINIC_MANAGER,
+    }).ok).toBe(false);
   });
 });
 
