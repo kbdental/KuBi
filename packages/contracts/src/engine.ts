@@ -33,11 +33,12 @@
  * The world is never mutated. Each call returns a new one, so the event log
  * and the world can never disagree about what happened.
  */
-import type { RoleCode } from './enums.js';
+import { RoleCode } from './enums.js';
 import {
   ClinicEvent, FlowKind, FLOWS, COMPLETES, STARTS, OPENS,
   type FlowNode,
 } from './operating-model.js';
+import { readiness, whyNotReady, type Operatory } from './readiness.js';
 
 /* -------------------------------------------------------------------------
  * The world
@@ -84,10 +85,39 @@ export interface World {
     collected: number;
     waits: readonly number[];
   }>;
+  /**
+   * The clinic's operatories, from its master.
+   *
+   * Master data rather than event data: an operatory exists because the
+   * clinic has one, not because something happened to it. It lives in the
+   * world so that governance can refuse `ROOMS_READY` for a room nobody has
+   * prepared — a rule that cannot be written without knowing which rooms
+   * there are.
+   *
+   * Empty is not "no rooms to worry about". It is an unconfigured clinic,
+   * and `readiness()` says so rather than passing.
+   */
+  operatories: readonly Operatory[];
+  /**
+   * The minute the first patient is due, from the day's schedule — the target
+   * readiness is measured against.
+   *
+   * **Null when nothing is booked, and null is not a default hour.** The
+   * working agreement is explicit: *"Never imply a state you do not have —
+   * absent appointment data is not a guessed first-patient time."* A
+   * placeholder here would put a made-up deadline on somebody's morning and
+   * report a variance against it, which is worse than reporting nothing.
+   */
+  firstPatientAt: number | null;
 }
 
-export const emptyWorld = (now: number): World => ({
+export const emptyWorld = (
+  now: number,
+  setup: { operatories?: readonly Operatory[]; firstPatientAt?: number | null } = {},
+): World => ({
   now, flows: [], events: [], facts: {}, metrics: { seen: 0, collected: 0, waits: [] },
+  operatories: setup.operatories ?? [],
+  firstPatientAt: setup.firstPatientAt ?? null,
 });
 
 /* -------------------------------------------------------------------------
@@ -136,17 +166,82 @@ export type EventOutcome =
  * ---------------------------------------------------------------------- */
 
 interface Requirement {
-  holds: (w: World, subjectId: string) => boolean;
-  because: string;
+  holds: (w: World, subjectId: string, by: RoleCode | null) => boolean;
+  /**
+   * The one sentence the person is told.
+   *
+   * A function where the sentence depends on the world — readiness has to say
+   * *which* operatory is outstanding, and "3 items remain" tells somebody they
+   * are blocked without telling them by what.
+   */
+  because: string | ((w: World) => string);
   fix: string;
   goes: string;
 }
 
 const req = (
-  holds: Requirement['holds'], because: string, fix: string, goes: string,
+  holds: Requirement['holds'], because: Requirement['because'], fix: string, goes: string,
 ): Requirement => ({ holds, because, fix, goes });
 
+/**
+ * Only the person whose job it is may report it done.
+ *
+ * Found live, and worth writing down: the dental assistant recorded
+ * `COMMON_AREAS_READY` — housekeeping's floors — and the clinic accepted it,
+ * because `record()` had never compared the recording role against the role
+ * that owns the work. A readiness report is somebody's word that they did a
+ * thing; taken from the wrong person it is worth nothing, and worse, it turns
+ * the readiness calculation into a formality.
+ *
+ * `SENIOR_ASSISTANT` counts as an assistant here, and nowhere else — a senior
+ * assistant preparing an operatory is the same act. It deliberately does not
+ * extend to releasing a batch, which stays a separation-of-duties gate held by
+ * the shape of the sterilisation flow.
+ */
+const onlyBy = (...roles: readonly RoleCode[]): Requirement['holds'] =>
+  (_w, _id, by) => by === null || roles.includes(by);
+
+const mine = (label: string, ...roles: readonly RoleCode[]): Requirement =>
+  req(onlyBy(...roles), `${label} is not your part of the morning`,
+    'Open clinic readiness', 'Readiness');
+
 const RULES: Partial<Record<ClinicEvent, readonly Requirement[]>> = {
+  [ClinicEvent.OPERATORY_READY]: [
+    mine('Preparing an operatory', RoleCode.DENTAL_ASSISTANT, RoleCode.SENIOR_ASSISTANT),
+  ],
+  [ClinicEvent.EQUIPMENT_VERIFIED]: [
+    mine('Checking the equipment', RoleCode.DENTAL_ASSISTANT, RoleCode.SENIOR_ASSISTANT),
+  ],
+  [ClinicEvent.STOCK_VERIFIED]: [
+    mine('Verifying the stock', RoleCode.DENTAL_ASSISTANT, RoleCode.SENIOR_ASSISTANT),
+  ],
+  [ClinicEvent.RECEPTION_READY]: [
+    mine('Readying the waiting area', RoleCode.RECEPTION),
+  ],
+  [ClinicEvent.COMMON_AREAS_READY]: [
+    mine('Cleaning the floors and shared areas', RoleCode.HOUSEKEEPING),
+  ],
+  /**
+   * The clinic is ready when the morning has been done, not when somebody
+   * says so.
+   *
+   * The activity matrix: *"The staff should not manually tick 'Clinic Ready.'
+   * KuBi calculates it: Clinic Ready = all mandatory opening controls
+   * passed."* Before the owner's opening procedure arrived, `ROOMS_READY` was
+   * a single button an assistant pressed at the end of a checklist nobody
+   * checked. It is now refused until every operatory in the master has been
+   * prepared, the sterilisation run has been released, equipment and stock
+   * have been verified, and reception and the shared areas have been done.
+   *
+   * The refusal carries the block's own sentence, so the assistant is told
+   * *which* room is outstanding rather than that a count is non-zero.
+   */
+  [ClinicEvent.ROOMS_READY]: [
+    req((w) => readiness(w.events, w.operatories, w.firstPatientAt, w.now).ready,
+      (w) => whyNotReady(readiness(w.events, w.operatories, w.firstPatientAt, w.now))
+        ?? 'The morning is not finished yet',
+      'Open clinic readiness', 'Readiness'),
+  ],
   [ClinicEvent.PATIENT_SEATED]: [
     req((w) => w.facts.rooms === true,
       'The rooms are not ready yet', 'Open room readiness', 'Operations'),
@@ -211,9 +306,23 @@ const RULES: Partial<Record<ClinicEvent, readonly Requirement[]>> = {
  * is not a satisfied one. That is ADR-013's rule with the jargon removed:
  * UNKNOWN is never PASS.
  */
-export function admit(w: World, type: ClinicEvent, subjectId: string): Refusal | null {
+/**
+ * `by` is the role recording it, and it is optional on purpose.
+ *
+ * `decisions()` asks *"could this be recorded?"* about work that already has
+ * an owner, so it passes nothing and the ownership rules stand aside — a
+ * decision on the assistant's list must not read BLOCKED because the question
+ * was asked without a name attached. `record()` always passes it, which is
+ * where the enforcement actually happens.
+ */
+export function admit(
+  w: World, type: ClinicEvent, subjectId: string, by: RoleCode | null = null,
+): Refusal | null {
   for (const r of RULES[type] ?? []) {
-    if (!r.holds(w, subjectId)) return { because: r.because, fix: r.fix, goes: r.goes };
+    if (!r.holds(w, subjectId, by)) {
+      const because = typeof r.because === 'function' ? r.because(w) : r.because;
+      return { because, fix: r.fix, goes: r.goes };
+    }
   }
   return null;
 }
@@ -248,7 +357,7 @@ export function record(
   w: World,
   ev: { type: ClinicEvent; subjectId: string; subjectLabel?: string; by: RoleCode },
 ): EventOutcome {
-  const refusal = admit(w, ev.type, ev.subjectId);
+  const refusal = admit(w, ev.type, ev.subjectId, ev.by);
   if (refusal) return { ok: false, refusal };
 
   const out: Consequence[] = [];
@@ -351,6 +460,10 @@ export function record(
     ok: true,
     consequences: out,
     world: {
+      // Spread first so master data — the operatories, the first appointment —
+      // survives an event. Listing fields by hand is how a new one silently
+      // stops existing the moment anybody records anything.
+      ...w,
       now, flows, facts, metrics,
       events: [...w.events, {
         seq: w.events.length + 1, type: ev.type, subjectId: ev.subjectId, at: now, by: ev.by,

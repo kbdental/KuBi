@@ -16,7 +16,7 @@ import { seedVs01Demo, type DemoEnvironment } from '../../prisma/seed/vs01-demo.
 import { EventStore, EventStoreError, clinicMinute } from '../../apps/api/src/platform/events/event-store.js';
 import { FixedClock } from '../../apps/api/src/shared/clock.js';
 import {
-  ClinicEvent, RoleCode, decisions, decisionsFor, sweep, ownerOf,
+  ClinicEvent, RoleCode, decisions, decisionsFor, sweep, ownerOf, readiness,
 } from '../../packages/contracts/src/index.js';
 
 const T = (h: number, m: number) => h * 60 + m;
@@ -55,17 +55,38 @@ async function say(
   return r;
 }
 
-/** Open the clinic and release a batch, so patients may be seated. */
+/**
+ * Do the morning, against the operatories this clinic actually has.
+ *
+ * The room ids come from the seeded master rather than from a list here, so
+ * this fixture is doing the same thing an assistant does: preparing the rooms
+ * that exist. Add a fifth operatory to the seed and this prepares five.
+ */
 async function openTheClinic(tx: never, store: EventStore, tag: string) {
-  await say(tx, store, ClinicEvent.CLINIC_UNLOCKED, `day-${tag}`, RoleCode.RECEPTION, T(8, 30), 'the clinic');
-  await say(tx, store, ClinicEvent.ROOMS_READY, `day-${tag}`, RoleCode.DENTAL_ASSISTANT, T(8, 40));
-  await say(tx, store, ClinicEvent.HUDDLE_HELD, `day-${tag}`, RoleCode.CLINIC_MANAGER, T(8, 50));
+  const day = `day-${tag}`;
+  await say(tx, store, ClinicEvent.CLINIC_UNLOCKED, day, RoleCode.RECEPTION, T(8, 30), 'the clinic');
+
   const b = `batch-${tag}`;
   await say(tx, store, ClinicEvent.BATCH_COLLECTED, b, RoleCode.STERILIZATION_TECHNICIAN, T(8, 0), 'STER-1');
   await say(tx, store, ClinicEvent.BATCH_ULTRASONIC_DONE, b, RoleCode.STERILIZATION_TECHNICIAN, T(8, 10));
   await say(tx, store, ClinicEvent.BATCH_PACKED, b, RoleCode.STERILIZATION_TECHNICIAN, T(8, 20));
   await say(tx, store, ClinicEvent.BATCH_AUTOCLAVED, b, RoleCode.STERILIZATION_TECHNICIAN, T(8, 25));
   await say(tx, store, ClinicEvent.BATCH_RELEASED, b, RoleCode.SENIOR_ASSISTANT, T(8, 30));
+
+  const rooms = await db(tx).operatory.findMany({
+    where: { clinicId: env.clinicId, archivedAt: null }, orderBy: { position: 'asc' },
+  });
+  for (const room of rooms) {
+    await say(tx, store, ClinicEvent.OPERATORY_READY, room.id,
+      RoleCode.DENTAL_ASSISTANT, T(8, 35), room.label);
+  }
+  await say(tx, store, ClinicEvent.EQUIPMENT_VERIFIED, day, RoleCode.DENTAL_ASSISTANT, T(8, 36));
+  await say(tx, store, ClinicEvent.STOCK_VERIFIED, day, RoleCode.DENTAL_ASSISTANT, T(8, 37));
+  await say(tx, store, ClinicEvent.RECEPTION_READY, day, RoleCode.RECEPTION, T(8, 38));
+  await say(tx, store, ClinicEvent.COMMON_AREAS_READY, day, RoleCode.HOUSEKEEPING, T(8, 39));
+
+  await say(tx, store, ClinicEvent.ROOMS_READY, day, RoleCode.DENTAL_ASSISTANT, T(8, 40));
+  await say(tx, store, ClinicEvent.HUDDLE_HELD, day, RoleCode.CLINIC_MANAGER, T(8, 50));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════ */
@@ -342,6 +363,61 @@ describe('the log cannot be rewritten', () => {
       `SELECT rolbypassrls FROM pg_roles WHERE rolname = 'kubi_app'`,
     );
     expect(rows[0]?.rolbypassrls).toBe(false);
+  });
+});
+
+describe('the operatory master drives the morning', () => {
+  it('builds the readiness plan from the rows, not from a constant', async () => {
+    await inClinic(async (tx) => {
+      const rooms = await db(tx).operatory.findMany({
+        where: { clinicId: env.clinicId, archivedAt: null },
+      });
+      // The owner has four. If the seed ever says otherwise this fails, which
+      // is the point — the number is data.
+      expect(rooms).toHaveLength(4);
+
+      const w = await freshStore().replay(tx as never, env.clinicId, T(9, 0));
+      const r = readiness(w.events, w.operatories, w.firstPatientAt, T(9, 0));
+      const perRoom = r.blocks.filter((b) => b.id.startsWith('OPERATORY:'));
+      expect(perRoom).toHaveLength(4);
+      expect(perRoom.map((b) => b.label).sort())
+        .toEqual(['Prepare Operatory 1', 'Prepare Operatory 2',
+          'Prepare Operatory 3', 'Prepare Operatory 4']);
+    });
+  });
+
+  it('picks up a fifth operatory on the next request, not the next restart', async () => {
+    const label = `Operatory 5 ${randomUUID().slice(0, 4)}`;
+    await inClinic(async (tx) => {
+      await db(tx).operatory.create({
+        data: {
+          organizationId: env.organizationId, clinicId: env.clinicId,
+          label, position: 5,
+        },
+      });
+      // Same store, no restart. Master data is read every replay.
+      const w = await freshStore().replay(tx as never, env.clinicId, T(9, 0));
+      expect(w.operatories.map((o) => o.label)).toContain(label);
+      expect(readiness(w.events, w.operatories, w.firstPatientAt, T(9, 0))
+        .blocks.filter((b) => b.id.startsWith('OPERATORY:'))).toHaveLength(5);
+    });
+  });
+
+  it('leaves an archived operatory out of the morning', async () => {
+    await inClinic(async (tx) => {
+      const extra = await db(tx).operatory.create({
+        data: {
+          organizationId: env.organizationId, clinicId: env.clinicId,
+          label: `Decommissioned ${randomUUID().slice(0, 4)}`, position: 9,
+        },
+      });
+      // Archived, never deleted — the working agreement for master data.
+      await db(tx).operatory.update({
+        where: { id: extra.id }, data: { archivedAt: new Date('2026-08-08T00:00:00Z') },
+      });
+      const w = await freshStore().replay(tx as never, env.clinicId, T(9, 0));
+      expect(w.operatories.map((o) => o.id)).not.toContain(extra.id);
+    });
   });
 });
 

@@ -75,13 +75,32 @@ export class EventStore {
    * `now` is passed in rather than read, so a caller can ask what the world
    * looked like at 10:14 as easily as what it looks like now.
    */
-  async replay(tx: TenantPrisma, clinicId: string, now: number): Promise<World> {
-    const rows = await tx.clinicEventRow.findMany({
-      where: { clinicId },
-      orderBy: { seq: 'asc' },
-    });
+  async replay(
+    tx: TenantPrisma, clinicId: string, now: number, firstPatientAt?: number,
+  ): Promise<World> {
+    const [rows, operatories, firstPatient] = await Promise.all([
+      tx.clinicEventRow.findMany({ where: { clinicId }, orderBy: { seq: 'asc' } }),
+      // Master data, not event data: an operatory exists because the clinic
+      // has one. Read alongside the log rather than folded out of it, and
+      // read every replay so that adding a fifth room takes effect on the
+      // next request rather than on the next restart.
+      tx.operatory.findMany({
+        where: { clinicId, archivedAt: null },
+        orderBy: { position: 'asc' },
+      }),
+      // Resolved here rather than by each caller, so the world governance runs
+      // against and the world a screen renders are the same world. A route
+      // that forgot to pass it would otherwise gate on a different morning
+      // from the one it displays.
+      firstPatientAt === undefined ? this.firstPatientAt(tx, clinicId) : firstPatientAt,
+    ]);
 
-    let w: World = emptyWorld(rows[0]?.occurredMinute ?? now);
+    let w: World = emptyWorld(rows[0]?.occurredMinute ?? now, {
+      operatories: operatories.map((o) => ({
+        id: o.id, label: o.label, position: o.position,
+      })),
+      ...(firstPatient === null ? {} : { firstPatientAt: firstPatient }),
+    });
     for (const r of rows) {
       // Each event is applied at the minute it happened, so waiting times and
       // lateness come out of the log rather than out of the replay's own
@@ -174,5 +193,31 @@ export class EventStore {
   /** The clinic-local minute right now. */
   minuteNow(): number {
     return clinicMinute(this.clock.now(), this.timezone);
+  }
+
+  /**
+   * The minute the first patient is due today.
+   *
+   * The whole opening procedure is anchored to this — every block in it is due
+   * *"before first patient"* — so the readiness target is read from the day's
+   * actual schedule rather than set to a plausible hour. `null` when nothing
+   * is booked, because a clinic with no appointments has no deadline to be
+   * measured against, and inventing one would report a variance nobody owes.
+   */
+  async firstPatientAt(tx: TenantPrisma, clinicId: string): Promise<number | null> {
+    const start = this.clock.now();
+    const dayStart = new Date(start); dayStart.setUTCHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart); dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+
+    const first = await tx.appointment.findFirst({
+      where: {
+        clinicId,
+        scheduledStart: { gte: dayStart, lt: dayEnd },
+        status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+      },
+      orderBy: { scheduledStart: 'asc' },
+      select: { scheduledStart: true },
+    });
+    return first ? clinicMinute(first.scheduledStart, this.timezone) : null;
   }
 }

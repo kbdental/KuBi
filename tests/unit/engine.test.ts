@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ClinicEvent, FlowKind, FLOWS, COMPLETES, STARTS, IMPERATIVE_PREFIXES,
   emptyWorld, record, sweep, deskOf, board, ownerOf, lateness, admit,
-  RoleCode, type World,
+  RoleCode, type World, type Operatory,
 } from '@kubi/contracts';
 
 const T = (h: number, m: number) => h * 60 + m;
@@ -30,20 +30,42 @@ function must(w: World, type: ClinicEvent, subjectId: string, by: RoleCode, labe
 
 const at = (w: World, now: number): World => ({ ...w, now });
 
-/** A clinic that is open, with rooms ready and a batch released. */
+/** This clinic's operatories, from its master. */
+const OPERATORIES: Operatory[] = [
+  { id: 'op-1', label: 'Operatory 1', position: 1 },
+  { id: 'op-2', label: 'Operatory 2', position: 2 },
+];
+
+const newDay = (now = T(8, 30)): World =>
+  emptyWorld(now, { operatories: OPERATORIES, firstPatientAt: T(10, 0) });
+
+/**
+ * A clinic that is open, because the morning was actually done.
+ *
+ * `ROOMS_READY` used to be the second line of this fixture and is now the
+ * last: readiness is calculated from the blocks beneath it, so a fixture
+ * cannot declare a ready clinic any more than an assistant can.
+ */
 function openClinic(now = T(9, 0)): World {
-  let w = emptyWorld(T(8, 30));
+  let w = newDay();
   w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
-  w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
-  // The huddle too. Leaving it out made the first escalation test fail, and
-  // the engine was right: a clinic that unlocked at 08:30 and had not held its
-  // huddle by 09:14 is twenty-nine minutes late, and somebody should know.
-  w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
   w = must(w, ClinicEvent.BATCH_COLLECTED, 'b1', RoleCode.STERILIZATION_TECHNICIAN, 'STER-0912');
   w = must(w, ClinicEvent.BATCH_ULTRASONIC_DONE, 'b1', RoleCode.STERILIZATION_TECHNICIAN);
   w = must(w, ClinicEvent.BATCH_PACKED, 'b1', RoleCode.STERILIZATION_TECHNICIAN);
   w = must(w, ClinicEvent.BATCH_AUTOCLAVED, 'b1', RoleCode.STERILIZATION_TECHNICIAN);
   w = must(w, ClinicEvent.BATCH_RELEASED, 'b1', RoleCode.SENIOR_ASSISTANT);
+  for (const o of OPERATORIES) {
+    w = must(w, ClinicEvent.OPERATORY_READY, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
+  }
+  w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
+  w = must(w, ClinicEvent.STOCK_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
+  w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
+  w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
+  w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
+  // The huddle too. Leaving it out made the first escalation test fail, and
+  // the engine was right: a clinic that unlocked at 08:30 and had not held its
+  // huddle by 09:14 is twenty-nine minutes late, and somebody should know.
+  w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
   return at(w, now);
 }
 
@@ -301,10 +323,14 @@ describe('the same world, eight different clinics', () => {
 });
 
 describe('governance, and the four words it never says', () => {
-  it('refuses to seat a patient before a sterile pack exists, in one sentence', () => {
-    let w = emptyWorld(T(9, 0));
+  it('refuses to seat a patient into a room nobody has prepared, in one sentence', () => {
+    // This used to reach the sterile clause of law L-3 by standing up a clinic
+    // whose rooms were ready and whose instruments were not. Readiness is now
+    // calculated from a released run among other things, so that state cannot
+    // be built — rooms-ready implies sterile-released. The sterile clause is
+    // kept as defence in depth and is simply no longer the first to fire.
+    let w = newDay(T(9, 0));
     w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
-    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
     w = must(w, ClinicEvent.PATIENT_ARRIVED, 'p1', RoleCode.RECEPTION, 'Meera R.');
     w = must(w, ClinicEvent.PATIENT_REGISTERED, 'p1', RoleCode.RECEPTION);
 
@@ -313,8 +339,25 @@ describe('governance, and the four words it never says', () => {
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
-    expect(r.refusal.because).toBe('No sterile pack has been released today');
-    expect(r.refusal.fix).toBe('Open sterilisation');
+    expect(r.refusal.because).toBe('The rooms are not ready yet');
+    expect(r.refusal.fix).toBe('Open room readiness');
+  });
+
+  it('names the room, not a count, when the morning is unfinished', () => {
+    // The refusal a governance rule gives has to be actionable. "One of four
+    // outstanding" tells an assistant she is blocked without telling her by
+    // what; the rule computes its own sentence so it can say which room.
+    let w = newDay(T(9, 0));
+    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
+    w = must(w, ClinicEvent.OPERATORY_READY, 'op-1', RoleCode.DENTAL_ASSISTANT, 'Operatory 1');
+
+    const r = record(w, {
+      type: ClinicEvent.ROOMS_READY, subjectId: 'today', by: RoleCode.DENTAL_ASSISTANT,
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.refusal.because)
+      .toBe('Operatory 2 is not prepared, so nobody can be seated in it');
   });
 
   it('says one thing, never a list', () => {

@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ClinicEvent, RoleCode, Verdict, Objective,
   emptyWorld, record, sweep, decisions, decisionsFor, escalatedTo, mostImportant,
-  type World,
+  type World, type Operatory,
 } from '@kubi/contracts';
 
 const T = (h: number, m: number) => h * 60 + m;
@@ -38,15 +38,52 @@ function sterileReady(w: World, ref = 'STER-0912', id = 'b1'): World {
   return must(x, ClinicEvent.BATCH_RELEASED, id, RoleCode.SENIOR_ASSISTANT);
 }
 
+
+/** This clinic's operatories, from its master. Two is enough to prove "each". */
+const OPERATORIES: Operatory[] = [
+  { id: 'op-1', label: 'Operatory 1', position: 1 },
+  { id: 'op-2', label: 'Operatory 2', position: 2 },
+];
+
+const newDay = (now = T(8, 45)): World =>
+  emptyWorld(now, { operatories: OPERATORIES, firstPatientAt: T(10, 0) });
+
+/**
+ * The morning, done properly.
+ *
+ * Every scenario below used to open the clinic by recording ROOMS_READY, which
+ * was a single button. Since the owner's opening procedure arrived it is
+ * calculated instead — every operatory in the master prepared, the run
+ * released, equipment and stock verified, reception and the shared areas done
+ * — so a fixture that skips the work no longer gets a ready clinic, and these
+ * scenarios say what a real morning is.
+ */
+function openTheClinic(now = T(8, 45)): World {
+  let w = newDay(now);
+  w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
+  w = sterileReady(w);
+  for (const o of OPERATORIES) {
+    w = must(w, ClinicEvent.OPERATORY_READY, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
+  }
+  w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
+  w = must(w, ClinicEvent.STOCK_VERIFIED, 'today', RoleCode.DENTAL_ASSISTANT);
+  w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
+  w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
+  w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
+  return must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    1 — 08:45, the clinic opening
    ═══════════════════════════════════════════════════════════════════════════ */
 
 describe('Scenario 1 · 08:45, clinic opening', () => {
   it('tells reception to unlock, and nobody else anything', () => {
-    const w = emptyWorld(T(8, 45));
+    const w = newDay();
     // Nothing has happened yet, so there is nothing to do — which is a real
-    // state and is reported as one rather than as a welcome screen.
+    // state and is reported as one rather than as a welcome screen. The
+    // morning's work does not appear before the clinic is unlocked: a list of
+    // readiness jobs at 06:00 is a to-do list, not a clinic.
     expect(decisions(w, T(8, 45))).toHaveLength(0);
 
     const opened = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
@@ -54,22 +91,57 @@ describe('Scenario 1 · 08:45, clinic opening', () => {
 
     // Unlocking hands the day to the assistant. Nobody performed a handover.
     expect(next.owner).toBe(RoleCode.DENTAL_ASSISTANT);
-    expect(next.question).toContain('Make the rooms ready');
+    // Her first job is a room, not a summary. Before the owner's opening
+    // procedure arrived this said "Make the rooms ready" — one item, which is
+    // not a morning, and which she could tick without having done anything.
+    expect(next.question).toBe('Prepare Operatory 1');
     expect(next.verdict).toBe(Verdict.PROCEED);
     expect(decisionsFor(opened, RoleCode.TREATING_DOCTOR, T(8, 46))).toHaveLength(0);
   });
 
+  it('gives every person their own part of the morning, unprompted', () => {
+    const w = must(newDay(), ClinicEvent.CLINIC_UNLOCKED, 'today',
+      RoleCode.RECEPTION, 'the clinic');
+
+    // Four people, four different mornings, from one unlock.
+    const assistant = decisionsFor(w, RoleCode.DENTAL_ASSISTANT, T(8, 46)).map((d) => d.question);
+    expect(assistant).toEqual([
+      'Prepare Operatory 1', 'Prepare Operatory 2',
+      'Check the equipment', 'Verify the day’s stock',
+    ]);
+    expect(decisionsFor(w, RoleCode.HOUSEKEEPING, T(8, 46)).map((d) => d.question))
+      .toEqual(['Clean the floors, pantry and washroom']);
+    expect(decisionsFor(w, RoleCode.STERILIZATION_TECHNICIAN, T(8, 46)).map((d) => d.question))
+      .toEqual(['Release the morning sterilisation run']);
+    expect(decisionsFor(w, RoleCode.RECEPTION, T(8, 46)).map((d) => d.question))
+      .toEqual(['Ready the waiting and billing area']);
+  });
+
   it('says what the rooms are for, and what happens if they are not done', () => {
-    let w = emptyWorld(T(8, 45));
+    let w = newDay();
     w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
     const d = mostImportant(w, T(8, 46))!;
 
     // Decision quality, §13.4: four answers, always.
     expect(d.objective).toBe(Objective.PATIENT_SAFE);
     expect(d.why).toContain('keeping the patient safe');
-    expect(d.protocol).toContain('ROOMS');
-    expect(d.ifIgnored).toMatch(/then the .* is told/);
+    expect(d.protocol).toContain('Opening readiness');
+    // Due before the first patient — the only deadline the opening procedure
+    // states — and it says what happens to the clinic if it is skipped.
+    expect(d.ifIgnored).toContain('Due before the first patient');
+    expect(d.ifIgnored).toContain('nobody can be seated in it');
     expect(d.evidence.length).toBeGreaterThan(0);
+  });
+
+  it('escalates the morning against the first patient, not against a wish', () => {
+    const w = must(newDay(), ClinicEvent.CLINIC_UNLOCKED, 'today',
+      RoleCode.RECEPTION, 'the clinic');
+    // 09:30 — half an hour in hand, nothing is late.
+    expect(decisions(w, T(9, 30)).every((d) => d.verdict === Verdict.PROCEED)).toBe(true);
+    // 10:10 — the first patient was due at ten.
+    const late = decisions(w, T(10, 10));
+    expect(late.every((d) => d.verdict === Verdict.ESCALATE)).toBe(true);
+    expect(late[0]!.lateBy).toBe(10);
   });
 });
 
@@ -79,11 +151,7 @@ describe('Scenario 1 · 08:45, clinic opening', () => {
 
 describe('Scenario 2 · patient arrives twelve minutes early', () => {
   it('starts their visit and puts registration on reception, unprompted', () => {
-    let w = emptyWorld(T(8, 45));
-    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
-    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
-    w = sterileReady(w);
+    let w = openTheClinic();
     w = at(w, T(9, 0));
 
     // Reception marks her arrived. That is all anybody does.
@@ -97,11 +165,7 @@ describe('Scenario 2 · patient arrives twelve minutes early', () => {
   });
 
   it('moves the patient to the assistant the moment registration is recorded', () => {
-    let w = emptyWorld(T(8, 45));
-    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
-    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
-    w = sterileReady(w);
+    let w = openTheClinic();
     w = at(w, T(9, 0));
     w = must(w, ClinicEvent.PATIENT_ARRIVED, 'p1', RoleCode.RECEPTION, 'Meera R.');
     w = must(w, ClinicEvent.PATIENT_REGISTERED, 'p1', RoleCode.RECEPTION);
@@ -119,11 +183,7 @@ describe('Scenario 2 · patient arrives twelve minutes early', () => {
 
 describe('Scenario 3 · doctor running twenty minutes late', () => {
   const waiting = () => {
-    let w = emptyWorld(T(8, 45));
-    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
-    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
-    w = sterileReady(w);
+    let w = openTheClinic();
     w = at(w, T(9, 0));
     w = must(w, ClinicEvent.PATIENT_ARRIVED, 'p1', RoleCode.RECEPTION, 'Meera R.');
     w = must(w, ClinicEvent.PATIENT_REGISTERED, 'p1', RoleCode.RECEPTION);
@@ -160,11 +220,7 @@ describe('Scenario 3 · doctor running twenty minutes late', () => {
 
 describe('Scenario 4 · treatment needed, consent missing', () => {
   const readyToTreat = () => {
-    let w = emptyWorld(T(8, 45));
-    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
-    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
-    w = sterileReady(w);
+    let w = openTheClinic();
     w = at(w, T(9, 0));
     w = must(w, ClinicEvent.PATIENT_ARRIVED, 'p1', RoleCode.RECEPTION, 'Meera R.');
     w = must(w, ClinicEvent.PATIENT_REGISTERED, 'p1', RoleCode.RECEPTION);
@@ -241,22 +297,46 @@ describe('Scenario 6 · autoclave cycle completes', () => {
     expect(release!.objective).toBe(Objective.PATIENT_SAFE);
   });
 
-  it('unblocks seating a patient once a batch is released', () => {
-    let w = emptyWorld(T(8, 45));
+  it('unblocks seating a patient once the morning is done', () => {
+    // This scenario used to read "once a batch is released", and set up a
+    // clinic whose rooms were ready while no pack had been released. Since
+    // the owner's opening procedure arrived that state cannot exist: a
+    // released run is one of the blocks readiness is calculated from, so
+    // rooms-ready now implies sterile-released and the two can no longer be
+    // pulled apart. The scenario is the same morning told correctly, not a
+    // weakened one — seating is still refused, and still for a safety reason.
+    let w = newDay();
     w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
-    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
     w = must(w, ClinicEvent.PATIENT_ARRIVED, 'p9', RoleCode.RECEPTION, 'Kabir S.');
     w = must(w, ClinicEvent.PATIENT_REGISTERED, 'p9', RoleCode.RECEPTION);
 
-    // Law L-3: no sterile pack, no patient in a chair.
-    expect(record(w, {
+    const refused = record(w, {
       type: ClinicEvent.PATIENT_SEATED, subjectId: 'p9', by: RoleCode.DENTAL_ASSISTANT,
-    }).ok).toBe(false);
+    });
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    expect(refused.refusal.because).toBe('The rooms are not ready yet');
 
-    w = sterileReady(w);
+    // Do the morning. Nobody declares anything ready.
+    w = openTheClinic();
+    w = must(w, ClinicEvent.PATIENT_ARRIVED, 'p9', RoleCode.RECEPTION, 'Kabir S.');
+    w = must(w, ClinicEvent.PATIENT_REGISTERED, 'p9', RoleCode.RECEPTION);
     expect(record(w, {
       type: ClinicEvent.PATIENT_SEATED, subjectId: 'p9', by: RoleCode.DENTAL_ASSISTANT,
     }).ok).toBe(true);
+  });
+
+  it('keeps law L-3 even though readiness now subsumes it', () => {
+    // Defence in depth, on purpose. `PATIENT_SEATED` still checks for a
+    // released pack of its own accord, and in a correctly-run clinic that
+    // check can never be the one that fires — readiness got there first.
+    // It stays because L-3 is a patient-safety law and should not depend on
+    // a projection being right.
+    const w = must(newDay(), ClinicEvent.CLINIC_UNLOCKED, 'today',
+      RoleCode.RECEPTION, 'the clinic');
+    expect(w.facts.sterile).not.toBe(true);
+    const sterilised = sterileReady(w);
+    expect(sterilised.facts.sterile).toBe(true);
   });
 });
 
@@ -299,11 +379,7 @@ describe('Scenario 7 · lab case has not arrived', () => {
 
 describe('Scenario 8 · treatment complete, billing outstanding', () => {
   const treated = () => {
-    let w = emptyWorld(T(8, 45));
-    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
-    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
-    w = sterileReady(w);
+    let w = openTheClinic();
     w = at(w, T(10, 0));
     w = must(w, ClinicEvent.PATIENT_ARRIVED, 'p1', RoleCode.RECEPTION, 'Meera R.');
     w = must(w, ClinicEvent.PATIENT_REGISTERED, 'p1', RoleCode.RECEPTION);
@@ -361,11 +437,7 @@ describe('Scenario 8 · treatment complete, billing outstanding', () => {
 describe('Scenario 8b · ranking orders work; it never makes a record optional', () => {
   /** A visit taken to the end, deliberately leaving the clinical note undone. */
   const visitClosedNoteUnwritten = () => {
-    let w = emptyWorld(T(8, 45));
-    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
-    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
-    w = sterileReady(w);
+    let w = openTheClinic();
     w = at(w, T(10, 0));
     w = must(w, ClinicEvent.PATIENT_ARRIVED, 'p1', RoleCode.RECEPTION, 'Meera R.');
     w = must(w, ClinicEvent.PATIENT_REGISTERED, 'p1', RoleCode.RECEPTION);
@@ -386,11 +458,7 @@ describe('Scenario 8b · ranking orders work; it never makes a record optional',
     // The owner's scenario, stated exactly: clinical record, billing, patient
     // instructions and follow-up all arise from TREATMENT_FINISHED. None is a
     // step somebody has to remember.
-    let w = emptyWorld(T(8, 45));
-    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
-    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
-    w = sterileReady(w);
+    let w = openTheClinic();
     w = at(w, T(10, 0));
     w = must(w, ClinicEvent.PATIENT_ARRIVED, 'p1', RoleCode.RECEPTION, 'Meera R.');
     w = must(w, ClinicEvent.PATIENT_REGISTERED, 'p1', RoleCode.RECEPTION);
@@ -477,10 +545,7 @@ describe('Scenario 8b · ranking orders work; it never makes a record optional',
 
 describe('Scenario 10 · closing with sterilisation unresolved', () => {
   it('refuses to lock up, and says which loop is still open', () => {
-    let w = emptyWorld(T(8, 45));
-    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
-    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
+    let w = openTheClinic();
     w = must(w, ClinicEvent.BATCH_COLLECTED, 'b3', RoleCode.STERILIZATION_TECHNICIAN, 'STER-0915');
     w = at(w, T(19, 30));
 
@@ -493,10 +558,7 @@ describe('Scenario 10 · closing with sterilisation unresolved', () => {
   });
 
   it('locks up once the loop is clear', () => {
-    let w = emptyWorld(T(8, 45));
-    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
-    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
+    let w = openTheClinic();
     w = sterileReady(w, 'STER-0915', 'b3');
     w = at(w, T(19, 30));
     expect(record(w, {
@@ -512,11 +574,7 @@ describe('Scenario 10 · closing with sterilisation unresolved', () => {
 describe('Scenario 9 · emergency arrives while the clinic is full', () => {
   /** Two chairs' worth of work in flight, and a third patient waiting. */
   const busyClinic = () => {
-    let w = emptyWorld(T(8, 45));
-    w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
-    w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
-    w = must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
-    w = sterileReady(w);
+    let w = openTheClinic();
     w = at(w, T(10, 0));
 
     // A — in the chair, mid-assessment.

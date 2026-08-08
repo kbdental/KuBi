@@ -43,7 +43,7 @@ import {
   ActivityStatus, ExceptionStatus, DAILY_STANDARD,
   DORMANT_AFTER_DAYS, type OutreachOutcome, headlineFor,
   ClinicEvent, FLOWS,
-  decisions, decisionsFor, escalatedTo, mostImportant, sweep, board,
+  decisions, decisionsFor, escalatedTo, mostImportant, sweep, board, readiness,
   type RoleCode as Role,
 } from '@kubi/contracts';
 
@@ -928,12 +928,18 @@ export async function buildServer(): Promise<FastifyInstance> {
       const clinicId = s.tenancy.clinicIds[0];
       if (!clinicId) return null;
       const now = events.minuteNow();
+      // The readiness target is the day's first appointment, resolved inside
+      // replay. Everything in the opening procedure is due before it.
       const world = await events.replay(tx, clinicId, now);
       const all = decisions(world, now);
       return {
         now,
         first: mostImportant(world, now),
         decisions: all,
+        // The morning: which blocks are outstanding, whether the clinic is
+        // ready, and readiness against the first appointment. Calculated
+        // here and rendered there — the screen computes nothing.
+        readiness: readiness(world.events, world.operatories, world.firstPatientAt, now),
         board: board(world, now),
         late: sweep(world, now).alerts,
         flows: world.flows.filter((f) => !f.done).map((f) => ({

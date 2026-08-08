@@ -68,6 +68,7 @@ model Organization {
   labCases             LabCase[]
   retentionOutreach    RetentionOutreach[]
   clinicEvents         ClinicEventRow[]
+  operatories          Operatory[]
 
   @@map("organizations")
 }
@@ -1428,4 +1429,34 @@ model ClinicEventRow {
   @@index([organizationId, clinicId, seq])
   @@index([organizationId, subjectId])
   @@map("clinic_events")
+}
+
+/// The operatory master. Four for this clinic, but a row count rather than a
+/// constant — a fifth operatory is an INSERT, not a release.
+model Operatory {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  clinicId       String @map("clinic_id") @db.Uuid
+
+  label    String
+  /// Left to right along the corridor.
+  position Int
+
+  /// The four standard checks. Master data, so a room without an x-ray is
+  /// configuration rather than something a person has to remember.
+  hasChair       Boolean @default(true) @map("has_chair")
+  hasXray        Boolean @default(true) @map("has_xray")
+  hasSuction     Boolean @default(true) @map("has_suction")
+  hasInstruments Boolean @default(true) @map("has_instruments")
+
+  /// Archived, never deleted.
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, clinicId])
+  @@map("operatories")
 }

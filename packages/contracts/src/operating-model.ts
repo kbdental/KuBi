@@ -52,6 +52,31 @@ export const ClinicEvent = {
   HUDDLE_HELD: 'HUDDLE_HELD',
   CLINIC_LOCKED: 'CLINIC_LOCKED',
 
+  /* ── Opening readiness ───────────────────────────────────────────────
+   * The owner's opening procedure, which turned `ROOMS_READY` from a
+   * checkbox into the thing that is calculated from these.
+   *
+   * Each one is a block of the real morning, and each has one owner:
+   *
+   *   STAFF_READY        one person through the hygiene protocol (§1)
+   *   OPERATORY_READY    one operatory prepared — the 24 disinfection
+   *                      actions and the cling-film pass (§2.1)
+   *   RECEPTION_READY    waiting and billing area (§2.2)
+   *   COMMON_AREAS_READY pantry, washroom, floors (§2.3, §2.4, §2.3-floor)
+   *   EQUIPMENT_VERIFIED the movable and central equipment (§3). Kept
+   *                      apart from the operatory because it travels on a
+   *                      trolley — owner: *"keep the special equipments in
+   *                      this only as a task for dental assistant as she is
+   *                      the one who checks the working"*
+   *   STOCK_VERIFIED     the twelve consumable lines (§4)
+   * ------------------------------------------------------------------ */
+  STAFF_READY: 'STAFF_READY',
+  OPERATORY_READY: 'OPERATORY_READY',
+  RECEPTION_READY: 'RECEPTION_READY',
+  COMMON_AREAS_READY: 'COMMON_AREAS_READY',
+  EQUIPMENT_VERIFIED: 'EQUIPMENT_VERIFIED',
+  STOCK_VERIFIED: 'STOCK_VERIFIED',
+
   // A patient's visit
   PATIENT_ARRIVED: 'PATIENT_ARRIVED',
   PATIENT_REGISTERED: 'PATIENT_REGISTERED',

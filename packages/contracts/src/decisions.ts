@@ -31,7 +31,8 @@
  */
 import type { RoleCode } from './enums.js';
 import { rank, OBJECTIVE_WORD, type Objective } from './objectives.js';
-import { FLOWS, type FlowKind, type ClinicEvent } from './operating-model.js';
+import { ClinicEvent, FlowKind, FLOWS } from './operating-model.js';
+import { readiness, type ReadinessBlock } from './readiness.js';
 import { admit, lateness, type World, type Flow } from './engine.js';
 
 /* -------------------------------------------------------------------------
@@ -160,6 +161,78 @@ function decisionFor(w: World, f: Flow, now: number): Decision | null {
 const role = (r: RoleCode) => String(r).replace(/_/g, ' ').toLowerCase();
 
 /* -------------------------------------------------------------------------
+ * The morning
+ * ---------------------------------------------------------------------- */
+
+/**
+ * One outstanding piece of the opening, as a decision.
+ *
+ * Readiness blocks are not flow nodes and deliberately never became any: the
+ * morning is four operatories in parallel, not a queue, and modelling it as a
+ * chain would invent an order the clinic does not work in. They surface here
+ * so that an assistant at 08:46 is told *"Prepare Operatory 1"* rather than
+ * being shown one summary item she cannot act on.
+ *
+ * Lateness is measured against the first appointment, because that is the only
+ * deadline the opening procedure actually states — everything in it is due
+ * *"before first patient"*.
+ */
+function readinessDecision(
+  w: World, b: ReadinessBlock, unlock: { seq: number; at: number }, now: number,
+): Decision {
+  // Late against the first appointment, which is the only deadline the
+  // opening procedure states. With nothing booked there is no deadline, so
+  // the work is not late — it is simply not yet done.
+  const lateBy = w.firstPatientAt === null ? 0 : Math.max(0, now - w.firstPatientAt);
+  const heldFor = Math.max(0, now - unlock.at);
+  const subjectId = b.subjectId ?? 'today';
+
+  // What the system is going by: the clinic was unlocked, and nothing has
+  // been recorded about this block since. The unlock is always part of it —
+  // it is what put the morning on anybody at all, and a decision that can
+  // show no record of why it exists is one a person is entitled to distrust.
+  const evidence = [
+    unlock.seq,
+    ...w.events.filter((e) => e.subjectId === subjectId && e.seq !== unlock.seq)
+      .map((e) => e.seq),
+  ];
+
+  return {
+    id: `READINESS#${b.id}`,
+    question: b.label,
+    owner: b.owner,
+    objective: b.objective,
+    priority: rank(b.objective),
+
+    // A readiness block has nothing gating it — it is the work, and the work
+    // can always be started. What it gates is `ROOMS_READY`.
+    verdict: lateBy > 0 ? Verdict.ESCALATE : Verdict.PROCEED,
+    because: null,
+    fix: null,
+    goes: null,
+
+    heldFor,
+    lateBy,
+
+    why: `This is about ${OBJECTIVE_WORD[b.objective]}.`,
+    evidence,
+    protocol: `Opening readiness · ${b.id}`,
+    ifIgnored: lateBy > 0
+      ? `The first patient was due ${lateBy} min ago. ${b.ifOutstanding}.`
+      : w.firstPatientAt === null
+        ? `Nobody is booked yet. ${b.ifOutstanding}.`
+        : `Due before the first patient, in ${w.firstPatientAt - now} min. ${b.ifOutstanding}.`,
+
+    flowId: 'READINESS',
+    flowKind: FlowKind.CLINIC,
+    subjectId,
+    subjectLabel: b.label,
+    node: b.id,
+    completedBy: b.completedBy,
+  };
+}
+
+/* -------------------------------------------------------------------------
  * The list
  * ---------------------------------------------------------------------- */
 
@@ -174,10 +247,26 @@ const role = (r: RoleCode) => String(r).replace(/_/g, ' ').toLowerCase();
  */
 export function decisions(w: World, now: number): Decision[] {
   const out: Decision[] = [];
+  const r = readiness(w.events, w.operatories, w.firstPatientAt, now);
+
   for (const f of w.flows) {
     const d = decisionFor(w, f, now);
-    if (d) out.push(d);
+    if (!d) continue;
+    // While the morning is outstanding, the `ROOMS` node is a summary of work
+    // that is itself listed below — showing both would put a blocked item a
+    // person cannot act on above the six things they can.
+    if (!r.ready && d.flowKind === FlowKind.CLINIC && d.node === 'ROOMS') continue;
+    out.push(d);
   }
+
+  // Only once the clinic has been unlocked. Before that the morning has not
+  // started, and a list of readiness work at 06:00 is a to-do list, not a
+  // clinic.
+  const unlocked = w.events.find((e) => e.type === ClinicEvent.CLINIC_UNLOCKED);
+  if (unlocked && !r.ready) {
+    for (const b of r.outstanding) out.push(readinessDecision(w, b, unlocked, now));
+  }
+
   return out.sort(
     (a, b) => a.priority - b.priority || b.lateBy - a.lateBy || b.heldFor - a.heldFor,
   );

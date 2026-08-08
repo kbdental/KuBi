@@ -98,6 +98,19 @@ export async function seedVs01Demo(suffix: string): Promise<DemoEnvironment> {
           },
         });
       }
+      // The operatory master. Four, because the owner has four — and as rows
+      // rather than a constant, so a fifth is an INSERT. Readiness is
+      // calculated per room from this, which is why an empty master reports
+      // an unconfigured clinic instead of a ready one.
+      await tx.operatory.createMany({
+        data: [1, 2, 3, 4].map((n) => ({
+          organizationId: boot.organizationId,
+          clinicId: boot.clinicId,
+          label: `Operatory ${n}`,
+          position: n,
+        })),
+      });
+
       // VS-02: a synthetic day's schedule, so the clinic has a shape.
       await seedScheduleForToday(tx, systemClock, {
         organizationId: boot.organizationId,
