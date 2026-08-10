@@ -84,8 +84,10 @@ function closeTheClinic(w: World): World {
   for (const o of OPERATORIES) {
     x = must(x, ClinicEvent.OPERATORY_CLOSED, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
   }
+  x = must(x, ClinicEvent.CONSUMABLES_RESTOCKED, 'today', RoleCode.DENTAL_ASSISTANT);
   x = must(x, ClinicEvent.PAYMENTS_RECONCILED, 'today', RoleCode.RECEPTION);
   x = must(x, ClinicEvent.DAY_REPORTED, 'today', RoleCode.RECEPTION);
+  x = must(x, ClinicEvent.TOMORROW_REVIEWED, 'today', RoleCode.RECEPTION);
   x = must(x, ClinicEvent.WASTE_CLOSED, 'today', RoleCode.HOUSEKEEPING);
   x = must(x, ClinicEvent.ENVIRONMENT_CLOSED, 'today', RoleCode.HOUSEKEEPING);
   return must(x, ClinicEvent.PREMISES_SECURED, 'today', RoleCode.RECEPTION);

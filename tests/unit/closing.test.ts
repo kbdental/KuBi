@@ -43,8 +43,10 @@ function wholeDrill(w = evening()): World {
   for (const o of FOUR) {
     x = must(x, ClinicEvent.OPERATORY_CLOSED, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
   }
+  x = must(x, ClinicEvent.CONSUMABLES_RESTOCKED, 'today', RoleCode.DENTAL_ASSISTANT);
   x = must(x, ClinicEvent.PAYMENTS_RECONCILED, 'today', RoleCode.RECEPTION);
   x = must(x, ClinicEvent.DAY_REPORTED, 'today', RoleCode.RECEPTION);
+  x = must(x, ClinicEvent.TOMORROW_REVIEWED, 'today', RoleCode.RECEPTION);
   x = must(x, ClinicEvent.WASTE_CLOSED, 'today', RoleCode.HOUSEKEEPING);
   x = must(x, ClinicEvent.ENVIRONMENT_CLOSED, 'today', RoleCode.HOUSEKEEPING);
   return must(x, ClinicEvent.PREMISES_SECURED, 'today', RoleCode.RECEPTION);
@@ -65,11 +67,16 @@ describe('the evening is built from the master, like the morning', () => {
   });
 
   it('has one block per section of the owner’s drill', () => {
+    // Grouped by owner rather than interleaved: the assistant's rooms and
+    // restock, then reception's money and tomorrow, then housekeeping's
+    // building, then the act of leaving. Two people working at once is what
+    // makes thirty minutes possible.
     const ids = shut(evening()).blocks.map((b) => b.id);
     expect(ids).toEqual([
       'OPERATORY_CLOSED:op-1', 'OPERATORY_CLOSED:op-2',
       'OPERATORY_CLOSED:op-3', 'OPERATORY_CLOSED:op-4',
-      'PAYMENTS', 'REPORT', 'WASTE', 'ENVIRONMENT', 'SECURITY',
+      'RESTOCK', 'PAYMENTS', 'REPORT', 'TOMORROW',
+      'WASTE', 'ENVIRONMENT', 'SECURITY',
     ]);
   });
 
@@ -85,8 +92,10 @@ describe('who does what in the evening', () => {
     const c = shut(evening());
     const by = (id: string) => c.blocks.find((b) => b.id === id)!.owner;
     expect(by('OPERATORY_CLOSED:op-1')).toBe(RoleCode.DENTAL_ASSISTANT);
+    expect(by('RESTOCK')).toBe(RoleCode.DENTAL_ASSISTANT);
     expect(by('PAYMENTS')).toBe(RoleCode.RECEPTION);
     expect(by('REPORT')).toBe(RoleCode.RECEPTION);
+    expect(by('TOMORROW')).toBe(RoleCode.RECEPTION);
     expect(by('SECURITY')).toBe(RoleCode.RECEPTION);
     expect(by('WASTE')).toBe(RoleCode.HOUSEKEEPING);
     expect(by('ENVIRONMENT')).toBe(RoleCode.HOUSEKEEPING);
@@ -127,8 +136,10 @@ describe('the day cannot be locked up on somebody’s word', () => {
     for (const o of [FOUR[0]!, FOUR[1]!, FOUR[2]!]) {
       w = must(w, ClinicEvent.OPERATORY_CLOSED, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
     }
+    w = must(w, ClinicEvent.CONSUMABLES_RESTOCKED, 'today', RoleCode.DENTAL_ASSISTANT);
     w = must(w, ClinicEvent.PAYMENTS_RECONCILED, 'today', RoleCode.RECEPTION);
     w = must(w, ClinicEvent.DAY_REPORTED, 'today', RoleCode.RECEPTION);
+    w = must(w, ClinicEvent.TOMORROW_REVIEWED, 'today', RoleCode.RECEPTION);
     w = must(w, ClinicEvent.WASTE_CLOSED, 'today', RoleCode.HOUSEKEEPING);
     w = must(w, ClinicEvent.ENVIRONMENT_CLOSED, 'today', RoleCode.HOUSEKEEPING);
     w = must(w, ClinicEvent.PREMISES_SECURED, 'today', RoleCode.RECEPTION);
@@ -200,6 +211,40 @@ describe('the critical exception is named, and not acted on', () => {
     // The takings and the report matter; they are not patient safety.
     expect(c.blocks.find((b) => b.id === 'PAYMENTS')!.critical).toBe(false);
     expect(c.blocks.find((b) => b.id === 'REPORT')!.critical).toBe(false);
+    // Nor is handing the day on. The matrix scores CLOSE-009 and CLOSE-013 as
+    // I and CLOSE-014 as C; only PS is patient safety, and calling anything
+    // else critical would empty the word out.
+    expect(c.blocks.find((b) => b.id === 'RESTOCK')!.critical).toBe(false);
+    expect(c.blocks.find((b) => b.id === 'TOMORROW')!.critical).toBe(false);
+  });
+
+  it('still holds the door for work that is merely important', () => {
+    // Not critical is not optional. Every block gates the lockup; what
+    // `critical` decides is whether the manager is told about this one first.
+    const w = wholeDrill();
+    let x = evening();
+    for (const o of FOUR) {
+      x = must(x, ClinicEvent.OPERATORY_CLOSED, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
+    }
+    x = must(x, ClinicEvent.PAYMENTS_RECONCILED, 'today', RoleCode.RECEPTION);
+    x = must(x, ClinicEvent.DAY_REPORTED, 'today', RoleCode.RECEPTION);
+    x = must(x, ClinicEvent.TOMORROW_REVIEWED, 'today', RoleCode.RECEPTION);
+    x = must(x, ClinicEvent.WASTE_CLOSED, 'today', RoleCode.HOUSEKEEPING);
+    x = must(x, ClinicEvent.ENVIRONMENT_CLOSED, 'today', RoleCode.HOUSEKEEPING);
+    x = must(x, ClinicEvent.PREMISES_SECURED, 'today', RoleCode.RECEPTION);
+
+    expect(shut(x).clear).toBe(false);
+    expect(shut(x).criticalException).toHaveLength(0);
+    expect(whyNotClosed(shut(x)))
+      .toBe('The operatories have not been replenished for tomorrow');
+    expect(record(x, {
+      type: ClinicEvent.CLINIC_LOCKED, subjectId: 'today', by: RoleCode.CLINIC_MANAGER,
+    }).ok).toBe(false);
+
+    // And with it done, the same day locks up.
+    expect(record(w, {
+      type: ClinicEvent.CLINIC_LOCKED, subjectId: 'today', by: RoleCode.CLINIC_MANAGER,
+    }).ok).toBe(true);
   });
 
   it('reports the exception when safety work is outstanding', () => {
@@ -418,21 +463,46 @@ describe('every one of the matrix’s sixteen controls is accounted for', () => 
     }
   });
 
-  it('names the four the drill has no home for, rather than quietly dropping them', () => {
-    // Three of the four are "get ready for tomorrow" work. The drill is
-    // thorough about shutting the building down and silent about handing the
-    // day on, and that is worth seeing rather than papering over.
-    expect(UNCOVERED_CLOSING_CONTROLS)
-      .toEqual(['CLOSE-009', 'CLOSE-012', 'CLOSE-013', 'CLOSE-014']);
+  it('leaves nothing the drill has no home for', () => {
+    // Four used to be uncovered — CLOSE-009, 012, 013, 014 — and three of the
+    // four were "get ready for tomorrow" work: the drill was thorough about
+    // shutting the building down and silent about handing the day on. The
+    // owner's instruction was to add them, and this is the assertion that the
+    // gap actually closed rather than being described as closed.
+    expect(UNCOVERED_CLOSING_CONTROLS).toEqual([]);
   });
 
   it('resolves the seven that used to read "Assigned Staff"', () => {
-    // Six now derive from a section of the drill; the water pump does not
-    // appear in the drill at all and stays open.
+    // Six derived from a section of the drill. The water pump derived from
+    // nothing — it appeared in the matrix and in no section — so it was added,
+    // folded into Environment: same protocol, same hands, one switch.
     const wasAssignedStaff = ['CLOSE-007', 'CLOSE-010', 'CLOSE-011', 'CLOSE-012', 'CLOSE-015'];
-    const resolved = wasAssignedStaff.filter((id) => CLOSING_CONTROLS[id]!.covers !== null);
-    expect(resolved).toEqual(['CLOSE-007', 'CLOSE-010', 'CLOSE-011', 'CLOSE-015']);
-    expect(CLOSING_CONTROLS['CLOSE-012']!.covers).toBeNull();
+    expect(wasAssignedStaff.filter((id) => CLOSING_CONTROLS[id]!.covers !== null))
+      .toEqual(wasAssignedStaff);
+    expect(CLOSING_CONTROLS['CLOSE-012']!.covers).toBe('ENVIRONMENT');
+  });
+
+  it('adds four controls as two blocks and a fold, not as four blocks', () => {
+    // The judgement worth being able to check: CLOSE-013 and CLOSE-014 are one
+    // sit-down at reception — you cannot review tomorrow's list without
+    // noticing which case is at the lab — and the water pump is one switch in
+    // housekeeping's existing round. Four rows, two new blocks.
+    expect(CLOSING_CONTROLS['CLOSE-009']!.covers).toBe('RESTOCK');
+    expect(CLOSING_CONTROLS['CLOSE-013']!.covers).toBe('TOMORROW');
+    expect(CLOSING_CONTROLS['CLOSE-014']!.covers).toBe('TOMORROW');
+    expect(CLOSING_CONTROLS['CLOSE-012']!.covers).toBe('ENVIRONMENT');
+
+    // And the fold has to be visible to whoever is doing the round, or it is a
+    // control covered on paper and dropped in the building.
+    const env = shut(evening()).blocks.find((b) => b.id === 'ENVIRONMENT')!;
+    expect(env.ifOutstanding).toContain('water pump');
+  });
+
+  it('costs the day no extra time, because the work was already being done', () => {
+    // The rooms were being restocked and tomorrow was being looked at on the
+    // way out of the door. What changed is that the system can see it, so the
+    // owner's thirty minutes stands.
+    expect(CLOSING_MINUTES).toBe(30);
   });
 
   it('puts the waste on housekeeping and the lockdown on reception', () => {
@@ -464,7 +534,7 @@ describe('the closing measures', () => {
     for (const o of FOUR) {
       w = must(w, ClinicEvent.OPERATORY_CLOSED, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
     }
-    expect(shut(w).compliance).toBeCloseTo(4 / 9);
+    expect(shut(w).compliance).toBeCloseTo(4 / 11);
     expect(shut(wholeDrill()).compliance).toBe(1);
   });
 

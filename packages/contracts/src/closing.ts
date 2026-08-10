@@ -137,10 +137,30 @@ export function lastCollection(shutAt: number | null): {
  * `CLINIC_LOCKED` refuses on directly, `MORNING` for work the owner moved to
  * the next day, or **null** where the drill genuinely has no home for it.
  *
- * The nulls are the point. Four controls have no place in the closing drill,
- * and three of those four are "get ready for tomorrow" work — which suggests
- * the drill is complete about shutting the building down and silent about
- * handing the day on. That is the owner's to settle; nothing here invents it.
+ * There are no nulls left. Four controls once had no place in the drill —
+ * CLOSE-009, 012, 013 and 014 — and the reading held up: three of the four
+ * were "hand the day on" work, so the drill was complete about shutting the
+ * building down and silent about tomorrow. The owner's instruction was to add
+ * them, and they became **two blocks and one fold**, not four blocks:
+ *
+ *   - `RESTOCK` — consumables replenished for tomorrow (CLOSE-009), the
+ *     assistant, since it is the same hands that just cleared the trays.
+ *   - `TOMORROW` — lab cases due *and* tomorrow's special requirements
+ *     (CLOSE-013, CLOSE-014), reception, one sit-down rather than two. They
+ *     are the same act: you cannot review tomorrow's list without noticing
+ *     which case is at the lab.
+ *   - The water pump (CLOSE-012) folded into `ENVIRONMENT` rather than
+ *     standing alone — same protocol section, same hands, and one switch does
+ *     not earn its own block in a thirty-minute drill.
+ *
+ * None of them is `critical`. The matrix's priorities are PS / C / I, and only
+ * **PS** is patient safety; CLOSE-009, 012 and 013 are I and CLOSE-014 is C.
+ * A block that is merely important still holds the door — every block does —
+ * but it is not a 🔴 CLOSING WITH CRITICAL EXCEPTION, and calling it one would
+ * make that flag mean nothing.
+ *
+ * `CLOSING_MINUTES` stays 30: this work was being done already, on the way out
+ * of the door. What changed is that the system can now see it.
  */
 export const CLOSING_CONTROLS: Readonly<Record<string, {
   covers: string | null;
@@ -154,12 +174,12 @@ export const CLOSING_CONTROLS: Readonly<Record<string, {
   'CLOSE-006': { covers: 'MORNING', why: 'storage happens after the morning run is released' },
   'CLOSE-007': { covers: 'WASTE', why: 'BMW Closing Protocol — housekeeping' },
   'CLOSE-008': { covers: 'OPERATORY_CLOSED', why: 'Operatory Closing (b) — chair surfaces re-wiped, per room' },
-  'CLOSE-009': { covers: null, why: 'replenishing consumables is nowhere in the closing drill' },
+  'CLOSE-009': { covers: 'RESTOCK', why: 'added to the drill: the rooms are stocked for tomorrow before the assistant leaves' },
   'CLOSE-010': { covers: 'OPERATORY_CLOSED', why: 'Operatory Closing (d, e) — light, compressor and suction off; the board is Security (c) and the chairs are Environment (a)' },
   'CLOSE-011': { covers: 'ENVIRONMENT', why: 'Clinic Environment Closing (d) — windows, fans and ACs' },
-  'CLOSE-012': { covers: null, why: 'the water pump appears in the matrix and in no section of the drill' },
-  'CLOSE-013': { covers: null, why: 'reviewing lab cases is nowhere in the closing drill' },
-  'CLOSE-014': { covers: null, why: 'reviewing tomorrow’s list is nowhere in the closing drill' },
+  'CLOSE-012': { covers: 'ENVIRONMENT', why: 'added to the drill: the water pump is one switch in the same protocol and the same hands as the fans and ACs' },
+  'CLOSE-013': { covers: 'TOMORROW', why: 'added to the drill: lab cases due are reviewed with tomorrow’s list' },
+  'CLOSE-014': { covers: 'TOMORROW', why: 'added to the drill: reception reviews tomorrow’s list and its special requirements' },
   'CLOSE-015': { covers: 'SECURITY', why: 'Security & Lockdown Protocol — reception, ending in the key handover' },
   'CLOSE-016': { covers: 'GOVERNANCE', why: 'CLINIC_LOCKED is the day closing; there is no separate tick' },
 };
@@ -267,10 +287,16 @@ const block = (
 /**
  * The closing drill, in the order the clinic works it.
  *
- * Operatories first because they feed the instrument loop; money next because
- * reception can do it while the rooms are being turned round; the premises
- * after the rooms are empty, since fumigation cannot happen with people in
- * them; and lockdown last, because it is the act of leaving.
+ * Operatories first because they feed the instrument loop, and the restock
+ * immediately after them because it is the same person in the same room; money
+ * and tomorrow's list next, because reception can do both while the rooms are
+ * being turned round; the premises after the rooms are empty, since fumigation
+ * cannot happen with people in them; and lockdown last, because it is the act
+ * of leaving.
+ *
+ * The order groups by owner rather than interleaving them. Two people working
+ * at once is what makes thirty minutes possible, and a list that alternates
+ * between them reads like a queue when it is not one.
  */
 function planFor(operatories: readonly Operatory[]): Array<Omit<ClosingBlock, 'done' | 'doneAt'>> {
   const rooms = [...operatories]
@@ -284,6 +310,10 @@ function planFor(operatories: readonly Operatory[]): Array<Omit<ClosingBlock, 'd
 
   return [
     ...rooms,
+    block('RESTOCK', 'Restock the rooms for tomorrow',
+      RoleCode.DENTAL_ASSISTANT, Objective.CLINIC_EFFICIENT,
+      ClinicEvent.CONSUMABLES_RESTOCKED, null, false,
+      'The operatories have not been replenished for tomorrow'),
     block('PAYMENTS', 'Reconcile the day’s takings',
       RoleCode.RECEPTION, Objective.MONEY_COLLECTED,
       ClinicEvent.PAYMENTS_RECONCILED, null, false,
@@ -292,6 +322,10 @@ function planFor(operatories: readonly Operatory[]): Array<Omit<ClosingBlock, 'd
       RoleCode.RECEPTION, Objective.RECORDS_COMPLETE,
       ClinicEvent.DAY_REPORTED, null, false,
       'The manager has not been sent today’s figures'),
+    block('TOMORROW', 'Review tomorrow’s list and the lab cases due',
+      RoleCode.RECEPTION, Objective.CLINIC_EFFICIENT,
+      ClinicEvent.TOMORROW_REVIEWED, null, false,
+      'Tomorrow’s cases and the lab work due for them have not been reviewed'),
     block('WASTE', 'Close the bio-medical waste',
       RoleCode.HOUSEKEEPING, Objective.PATIENT_SAFE,
       ClinicEvent.WASTE_CLOSED, null, true,
@@ -299,7 +333,8 @@ function planFor(operatories: readonly Operatory[]): Array<Omit<ClosingBlock, 'd
     block('ENVIRONMENT', 'Close the clinic down and fumigate',
       RoleCode.HOUSEKEEPING, Objective.PATIENT_SAFE,
       ClinicEvent.ENVIRONMENT_CLOSED, null, true,
-      'The waiting area, pantry, washroom and fumigation are not done'),
+      'The waiting area, pantry and washroom, the water pump, and fumigation '
+      + 'are not done'),
     block('SECURITY', 'Secure the premises and hand over the key',
       RoleCode.RECEPTION, Objective.CLINIC_EFFICIENT,
       ClinicEvent.PREMISES_SECURED, null, false,

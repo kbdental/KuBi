@@ -4,22 +4,42 @@ Built the same way as `opening-readiness.md`: your controls restructured so
 they can be counted, sequenced and checked.
 
 **Status: built and running**, against the owner's *Clinic closing drill*
-supplied 2026‑08‑08. Seven sections, nine blocks, enforced server‑side.
+supplied 2026‑08‑08, plus the four matrix controls the drill had no home for,
+added on the owner's instruction. Seven sections, eleven blocks, enforced
+server‑side.
 
 Sources: the owner's closing drill (the seven protocols), the activity matrix
 sheet 15 (`CLOSE-001`–`CLOSE-016`), and the closing items in the
 infection‑control document.
 
-## The nine blocks, from the seven protocols
+## The eleven blocks
+
+Seven come from the seven protocols. Two more — `RESTOCK` and `TOMORROW` —
+were added on the owner's instruction to cover the matrix controls the drill
+was silent about. They are listed grouped by owner rather than interleaved:
+two people working at once is what makes thirty minutes possible, and a list
+that alternates between them reads like a queue when it is not one.
 
 | Block | Protocol | Owner | Critical |
 |---|---|---|---|
 | `OPERATORY_CLOSED` × 4 | Operatory Closing (a–g) | Dental Assistant | ✔ |
+| `RESTOCK` | *added* — consumables replenished for tomorrow (`CLOSE-009`) | Dental Assistant | |
 | `PAYMENTS` | End‑of‑Day Payment Reconciliation (a–f) | Reception | |
 | `REPORT` | Daily Report Submission (a–b) | Reception | |
+| `TOMORROW` | *added* — lab cases due and tomorrow's list (`CLOSE-013`, `CLOSE-014`) | Reception | |
 | `WASTE` | BMW Closing (a–e) | Housekeeping | ✔ |
-| `ENVIRONMENT` | Clinic Environment Closing (a–g), incl. fumigation | Housekeeping | ✔ |
+| `ENVIRONMENT` | Clinic Environment Closing (a–g), incl. fumigation and the water pump (`CLOSE-012`) | Housekeeping | ✔ |
 | `SECURITY` | Security & Lockdown (a–h) | Reception | |
+
+None of the added work is `critical`. The matrix scores priorities PS / C / I,
+and only **PS** is patient safety; `CLOSE-009`, `012` and `013` are I and
+`CLOSE-014` is C. Not critical is not optional — every block holds the lockup —
+but calling this work a 🔴 CLOSING WITH CRITICAL EXCEPTION would empty the
+phrase of meaning.
+
+`CLOSING_MINUTES` stays **30**. The rooms were already being restocked and
+tomorrow already being looked at on the way out of the door; what changed is
+that the system can now see it.
 
 `STAFF_LEFT` counts people out through the End‑of‑Day Staff Protocol —
 reported, not enforced, the same limit as staff entry.
@@ -245,9 +265,9 @@ CLOSE-016  Day closed  ───────────────────
 
    patient      instruments        premises        shutdown      tomorrow
    ─────────    ───────────        ────────        ────────      ────────
-   001 002 003  004 005 006        007 008×N       009 010       013 014 015
-   Reception    Assistant          Housekeeping    Snr Asst      Reception
-   Doctor       Sterilization      + Assistant                   Manager
+   001 002 003  004 005 006        007 008×N       010 011       009 013 014
+   Reception    Assistant          Housekeeping    012 015       Assistant
+   Doctor       Sterilization      + Assistant     Hskpg/Recn    Reception
 ```
 
 Same three properties as the morning:
@@ -271,23 +291,28 @@ Same three properties as the morning:
 | Daily revenue reconciliation | A closing control, Reception. Built. |
 | Fumigation | Daily at end of day. Not the long pole: the hour the rooms stay shut is spent with nobody in the building. |
 | Is there a closing document? | Yes — supplied, and this is built from it. |
+| The four controls with no home | **Add them to the drill.** Two blocks and one fold; no extra minutes. |
+
+## The four that had no home, and how they were added
+
+Four matrix controls had no place in the drill, and three of the four were
+"get ready for tomorrow" work — the drill was thorough about shutting the
+building down and silent about handing the day on. The owner's instruction was
+to add them. They became **two blocks and one fold**, not four blocks:
+
+| Control | | Where it went |
+|---|---|---|
+| `CLOSE-009` | Consumables replenished — ready for next day | `RESTOCK`, Dental Assistant — the same hands that just cleared the trays, in the same rooms |
+| `CLOSE-013` | Lab cases reviewed — pending / due identified | `TOMORROW`, Reception |
+| `CLOSE-014` | Tomorrow's cases reviewed — special requirements identified | `TOMORROW`, Reception — one sit‑down, not two: you cannot review tomorrow's list without noticing which case is at the lab |
+| `CLOSE-012` | Water pump — OFF / status verified | folded into `ENVIRONMENT` — same protocol section, same hands as the fans and ACs, and one switch does not earn its own block in a thirty‑minute drill |
+
+The fold is named in the block's own refusal sentence — *"…the water pump…"* —
+so it reaches the person doing the round rather than being covered on paper and
+dropped in the building. `UNCOVERED_CLOSING_CONTROLS` is now empty, and a test
+asserts that rather than the prose claiming it.
 
 ## Still open
-
-**Four matrix controls have no home in the closing drill.** Three of the four
-are "get ready for tomorrow" work, which suggests the drill is thorough about
-shutting the building down and silent about handing the day on:
-
-| Control | |
-|---|---|
-| `CLOSE-009` | Consumables replenished — ready for next day |
-| `CLOSE-012` | Water pump — OFF / status verified |
-| `CLOSE-013` | Lab cases reviewed — pending / due identified |
-| `CLOSE-014` | Tomorrow's cases reviewed — special requirements identified |
-
-Each is either a section missing from the drill, or a matrix row that has
-stopped being true. Nothing has been invented either way, and
-`UNCOVERED_CLOSING_CONTROLS` names them so they cannot be quietly dropped.
 
 **Two matrix corrections queued**, since the matrix is frozen: `CLOSE-005`
 ("Sterilization complete — same day") no longer states the standard, and
@@ -313,12 +338,12 @@ test rather than believed: `CLOSING_CONTROLS` in `closing.ts`.
 | `CLOSE-006` Sterile instruments stored | *the morning* | storage follows the morning release |
 | `CLOSE-007` Biomedical waste | `WASTE` · **Housekeeping** | BMW Closing Protocol |
 | `CLOSE-008` Chairs cleaned, all rooms | `OPERATORY_CLOSED` | Operatory Closing (b), per room |
-| `CLOSE-009` Consumables replenished | — | **not in the drill** |
+| `CLOSE-009` Consumables replenished | `RESTOCK` · **Dental Assistant** | *added* — not in the drill |
 | `CLOSE-010` Equipment shutdown | `OPERATORY_CLOSED` · **Dental Assistant** | Operatory Closing (d, e) |
 | `CLOSE-011` AC / lights / fans | `ENVIRONMENT` · **Housekeeping** | Clinic Environment Closing (d) |
-| `CLOSE-012` Water pump | — | **not in the drill** |
-| `CLOSE-013` Lab cases reviewed | — | **not in the drill** |
-| `CLOSE-014` Tomorrow's cases | — | **not in the drill** |
+| `CLOSE-012` Water pump | `ENVIRONMENT` · **Housekeeping** | *added* — folded into the same round |
+| `CLOSE-013` Lab cases reviewed | `TOMORROW` · **Reception** | *added* — not in the drill |
+| `CLOSE-014` Tomorrow's cases | `TOMORROW` · **Reception** | *added* — not in the drill |
 | `CLOSE-015` Clinic secured | `SECURITY` · **Reception** | Security & Lockdown Protocol |
 | `CLOSE-016` Day closed | governance | `CLINIC_LOCKED` is the day closing |
 

@@ -85,6 +85,9 @@ export const ClinicEvent = {
    *
    *   OPERATORY_CLOSED    trays cleared, chair wiped, film binned, power
    *                       off, floor mopped (Operatory Closing Protocol)
+   *   CONSUMABLES_RESTOCKED  the rooms stocked for tomorrow (CLOSE-009)
+   *   TOMORROW_REVIEWED   lab cases due and tomorrow's special requirements
+   *                       (CLOSE-013, CLOSE-014)
    *   PAYMENTS_RECONCILED cash, card, TPA tallied against the software,
    *                       discrepancies logged, petty cash balanced, cash
    *                       in the safe (End-of-Day Payment Reconciliation)
@@ -99,6 +102,8 @@ export const ClinicEvent = {
    *   STAFF_LEFT          one person out through the exit protocol
    * ------------------------------------------------------------------ */
   OPERATORY_CLOSED: 'OPERATORY_CLOSED',
+  CONSUMABLES_RESTOCKED: 'CONSUMABLES_RESTOCKED',
+  TOMORROW_REVIEWED: 'TOMORROW_REVIEWED',
   PAYMENTS_RECONCILED: 'PAYMENTS_RECONCILED',
   DAY_REPORTED: 'DAY_REPORTED',
   WASTE_CLOSED: 'WASTE_CLOSED',

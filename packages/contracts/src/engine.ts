@@ -244,11 +244,17 @@ const RULES: Partial<Record<ClinicEvent, readonly Requirement[]>> = {
   [ClinicEvent.OPERATORY_CLOSED]: [
     mineAtClose('Closing down an operatory', RoleCode.DENTAL_ASSISTANT, RoleCode.SENIOR_ASSISTANT),
   ],
+  [ClinicEvent.CONSUMABLES_RESTOCKED]: [
+    mineAtClose('Restocking the rooms', RoleCode.DENTAL_ASSISTANT, RoleCode.SENIOR_ASSISTANT),
+  ],
   [ClinicEvent.PAYMENTS_RECONCILED]: [
     mineAtClose('Reconciling the day’s takings', RoleCode.RECEPTION),
   ],
   [ClinicEvent.DAY_REPORTED]: [
     mineAtClose('The daily collection report', RoleCode.RECEPTION),
+  ],
+  [ClinicEvent.TOMORROW_REVIEWED]: [
+    mineAtClose('Reviewing tomorrow’s list', RoleCode.RECEPTION),
   ],
   [ClinicEvent.WASTE_CLOSED]: [
     mineAtClose('Closing the bio-medical waste', RoleCode.HOUSEKEEPING),
