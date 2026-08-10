@@ -120,6 +120,56 @@ export function lastCollection(shutAt: number | null): {
 }
 
 /* -------------------------------------------------------------------------
+ * Traceability: the matrix's sixteen controls, and what covers each one
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Where each of `CLOSE-001`…`CLOSE-016` ended up.
+ *
+ * Seven of the matrix's owners read "Assigned Staff", which is not an owner.
+ * Rather than infer them, each is traced to the section of the owner's closing
+ * drill that contains the work — the drill assigns owners per protocol, so the
+ * owner falls out of which protocol the control belongs to. That is a
+ * derivation, not a guess, and it is written here so it can be checked instead
+ * of believed.
+ *
+ * `covers` is the closing block that carries it, `GOVERNANCE` for the ones
+ * `CLINIC_LOCKED` refuses on directly, `MORNING` for work the owner moved to
+ * the next day, or **null** where the drill genuinely has no home for it.
+ *
+ * The nulls are the point. Four controls have no place in the closing drill,
+ * and three of those four are "get ready for tomorrow" work — which suggests
+ * the drill is complete about shutting the building down and silent about
+ * handing the day on. That is the owner's to settle; nothing here invents it.
+ */
+export const CLOSING_CONTROLS: Readonly<Record<string, {
+  covers: string | null;
+  why: string;
+}>> = {
+  'CLOSE-001': { covers: 'GOVERNANCE', why: 'CLINIC_LOCKED refuses on an unfinished visit' },
+  'CLOSE-002': { covers: 'GOVERNANCE', why: 'CLINIC_LOCKED refuses on an unwritten clinical note' },
+  'CLOSE-003': { covers: 'GOVERNANCE', why: 'the day-after call is a consequence of finishing treatment' },
+  'CLOSE-004': { covers: 'OPERATORY_CLOSED', why: 'Operatory Closing (a) — trays cleared to the sterilisation room' },
+  'CLOSE-005': { covers: 'MORNING', why: 'same-day sterilisation superseded: the morning run catches yesterday' },
+  'CLOSE-006': { covers: 'MORNING', why: 'storage happens after the morning run is released' },
+  'CLOSE-007': { covers: 'WASTE', why: 'BMW Closing Protocol — housekeeping' },
+  'CLOSE-008': { covers: 'OPERATORY_CLOSED', why: 'Operatory Closing (b) — chair surfaces re-wiped, per room' },
+  'CLOSE-009': { covers: null, why: 'replenishing consumables is nowhere in the closing drill' },
+  'CLOSE-010': { covers: 'OPERATORY_CLOSED', why: 'Operatory Closing (d, e) — light, compressor and suction off; the board is Security (c) and the chairs are Environment (a)' },
+  'CLOSE-011': { covers: 'ENVIRONMENT', why: 'Clinic Environment Closing (d) — windows, fans and ACs' },
+  'CLOSE-012': { covers: null, why: 'the water pump appears in the matrix and in no section of the drill' },
+  'CLOSE-013': { covers: null, why: 'reviewing lab cases is nowhere in the closing drill' },
+  'CLOSE-014': { covers: null, why: 'reviewing tomorrow’s list is nowhere in the closing drill' },
+  'CLOSE-015': { covers: 'SECURITY', why: 'Security & Lockdown Protocol — reception, ending in the key handover' },
+  'CLOSE-016': { covers: 'GOVERNANCE', why: 'CLINIC_LOCKED is the day closing; there is no separate tick' },
+};
+
+/** The matrix controls the closing drill has no home for. */
+export const UNCOVERED_CLOSING_CONTROLS = Object.entries(CLOSING_CONTROLS)
+  .filter(([, v]) => v.covers === null)
+  .map(([id]) => id);
+
+/* -------------------------------------------------------------------------
  * The blocks
  * ---------------------------------------------------------------------- */
 

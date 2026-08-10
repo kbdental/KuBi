@@ -274,11 +274,71 @@ Same three properties as the morning:
 
 ## Still open
 
-1. **The seven `INFERRED` owners** in the matrix rows above — waste, utilities,
-   water pump, security, equipment shutdown, floors, fumigation. The drill's
-   own sections settled who does each *protocol*; these are the matrix's
-   older, finer-grained rows and they have not been reconciled one by one.
+**Four matrix controls have no home in the closing drill.** Three of the four
+are "get ready for tomorrow" work, which suggests the drill is thorough about
+shutting the building down and silent about handing the day on:
 
-2. **Two matrix corrections queued**, since the matrix is frozen:
-   `CLOSE‑005` ("Sterilization complete — same day") no longer states the
-   standard, and `CLOSE‑016` is not an acknowledgement gate.
+| Control | |
+|---|---|
+| `CLOSE-009` | Consumables replenished — ready for next day |
+| `CLOSE-012` | Water pump — OFF / status verified |
+| `CLOSE-013` | Lab cases reviewed — pending / due identified |
+| `CLOSE-014` | Tomorrow's cases reviewed — special requirements identified |
+
+Each is either a section missing from the drill, or a matrix row that has
+stopped being true. Nothing has been invented either way, and
+`UNCOVERED_CLOSING_CONTROLS` names them so they cannot be quietly dropped.
+
+**Two matrix corrections queued**, since the matrix is frozen: `CLOSE-005`
+("Sterilization complete — same day") no longer states the standard, and
+`CLOSE-016` is not an acknowledgement gate.
+
+---
+
+## The sixteen controls, traced
+
+Seven of the matrix's owners read *"Assigned Staff"*, which is not an owner.
+Each is now traced to the section of the closing drill that contains the work —
+the drill assigns owners per protocol, so the owner falls out of which protocol
+the control belongs to. **A derivation, not an inference**, and checked by a
+test rather than believed: `CLOSING_CONTROLS` in `closing.ts`.
+
+| Control | Covered by | From |
+|---|---|---|
+| `CLOSE-001` Remaining patients | governance | `CLINIC_LOCKED` refuses on an unfinished visit |
+| `CLOSE-002` Clinical notes | governance | refuses on an unwritten note |
+| `CLOSE-003` Follow-ups | governance | the day-after call is a consequence of finishing treatment |
+| `CLOSE-004` Instruments collected | `OPERATORY_CLOSED` | Operatory Closing (a) |
+| `CLOSE-005` Sterilization same day | *the morning* | superseded by the morning-run ruling |
+| `CLOSE-006` Sterile instruments stored | *the morning* | storage follows the morning release |
+| `CLOSE-007` Biomedical waste | `WASTE` · **Housekeeping** | BMW Closing Protocol |
+| `CLOSE-008` Chairs cleaned, all rooms | `OPERATORY_CLOSED` | Operatory Closing (b), per room |
+| `CLOSE-009` Consumables replenished | — | **not in the drill** |
+| `CLOSE-010` Equipment shutdown | `OPERATORY_CLOSED` · **Dental Assistant** | Operatory Closing (d, e) |
+| `CLOSE-011` AC / lights / fans | `ENVIRONMENT` · **Housekeeping** | Clinic Environment Closing (d) |
+| `CLOSE-012` Water pump | — | **not in the drill** |
+| `CLOSE-013` Lab cases reviewed | — | **not in the drill** |
+| `CLOSE-014` Tomorrow's cases | — | **not in the drill** |
+| `CLOSE-015` Clinic secured | `SECURITY` · **Reception** | Security & Lockdown Protocol |
+| `CLOSE-016` Day closed | governance | `CLINIC_LOCKED` is the day closing |
+
+### CLOSE-010 was one row and is three jobs
+
+The matrix had a single "Equipment shutdown". The drill splits it across three
+protocols with three different owners:
+
+- **the dental light, compressor and suction** — Operatory Closing (d, e),
+  Dental Assistant, once per room
+- **the chairs raised and electricity off** — Clinic Environment (a),
+  Housekeeping
+- **the board, non-critical points off** — Security & Lockdown (c), Reception
+
+All three are covered. The matrix row was simply coarser than the clinic.
+
+### Floors, which turned out to have two owners
+
+The morning's 3-bucket floors are Housekeeping. At closing the **operatory**
+floor is mopped inside the Operatory Closing Protocol (g) — so it belongs to
+whoever closes the room down, not to housekeeping. The general floors stay with
+housekeeping under Clinic Environment. Two owners, and the drill says which is
+which.

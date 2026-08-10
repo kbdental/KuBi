@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ClinicEvent, RoleCode, Verdict, decisionsFor, emptyWorld, record, closing, whyNotClosed,
   SAME_DAY_STERILISATION_NOTE, CLOSING_MINUTES, lastCollection,
-  readiness,
+  CLOSING_CONTROLS, UNCOVERED_CLOSING_CONTROLS, readiness,
   type Operatory, type World,
 } from '@kubi/contracts';
 
@@ -384,6 +384,76 @@ describe('same-day sterilisation does not fit, and the arithmetic says so', () =
     expect(morning.ready).toBe(false);
     expect(morning.outstanding.map((b) => b.id)).toContain('STERILE');
     expect(sterile.ifOutstanding).toBe('There are no sterile packs in the cabinets for today');
+  });
+});
+
+describe('every one of the matrix’s sixteen controls is accounted for', () => {
+  /**
+   * Seven of the matrix's owners read "Assigned Staff", which is not an owner.
+   * Each is traced to the section of the owner's closing drill that contains
+   * the work — the drill assigns owners per protocol, so the owner falls out
+   * of which protocol the control belongs to. Derivation, not inference, and
+   * checked here rather than believed.
+   */
+  const ids = Object.keys(CLOSING_CONTROLS);
+
+  it('covers CLOSE-001 through CLOSE-016 and invents no others', () => {
+    expect(ids).toEqual(Array.from({ length: 16 },
+      (_, i) => `CLOSE-${String(i + 1).padStart(3, '0')}`));
+  });
+
+  it('points every covered control at a block that actually exists', () => {
+    const blocks = new Set(shut(evening()).blocks.map((b) =>
+      b.id.startsWith('OPERATORY_CLOSED:') ? 'OPERATORY_CLOSED' : b.id));
+    for (const [id, { covers }] of Object.entries(CLOSING_CONTROLS)) {
+      if (covers === null || covers === 'GOVERNANCE' || covers === 'MORNING') continue;
+      expect(blocks, `${id} points at "${covers}", which is not a closing block`)
+        .toContain(covers);
+    }
+  });
+
+  it('gives every control a reason, so none is covered by assertion alone', () => {
+    for (const [id, { why }] of Object.entries(CLOSING_CONTROLS)) {
+      expect(why.length, `${id} has no reason`).toBeGreaterThan(20);
+    }
+  });
+
+  it('names the four the drill has no home for, rather than quietly dropping them', () => {
+    // Three of the four are "get ready for tomorrow" work. The drill is
+    // thorough about shutting the building down and silent about handing the
+    // day on, and that is worth seeing rather than papering over.
+    expect(UNCOVERED_CLOSING_CONTROLS)
+      .toEqual(['CLOSE-009', 'CLOSE-012', 'CLOSE-013', 'CLOSE-014']);
+  });
+
+  it('resolves the seven that used to read "Assigned Staff"', () => {
+    // Six now derive from a section of the drill; the water pump does not
+    // appear in the drill at all and stays open.
+    const wasAssignedStaff = ['CLOSE-007', 'CLOSE-010', 'CLOSE-011', 'CLOSE-012', 'CLOSE-015'];
+    const resolved = wasAssignedStaff.filter((id) => CLOSING_CONTROLS[id]!.covers !== null);
+    expect(resolved).toEqual(['CLOSE-007', 'CLOSE-010', 'CLOSE-011', 'CLOSE-015']);
+    expect(CLOSING_CONTROLS['CLOSE-012']!.covers).toBeNull();
+  });
+
+  it('puts the waste on housekeeping and the lockdown on reception', () => {
+    const owner = (id: string) => {
+      const covers = CLOSING_CONTROLS[id]!.covers!;
+      return shut(evening()).blocks.find((b) => b.id === covers)!.owner;
+    };
+    expect(owner('CLOSE-007')).toBe(RoleCode.HOUSEKEEPING);
+    expect(owner('CLOSE-011')).toBe(RoleCode.HOUSEKEEPING);
+    expect(owner('CLOSE-015')).toBe(RoleCode.RECEPTION);
+  });
+
+  it('puts the operatory shutdown on the assistant, per room', () => {
+    // CLOSE-010 was one matrix row and is three things in the drill: the
+    // light, compressor and suction are the assistant's, in each room; the
+    // board is reception's; the chairs are housekeeping's.
+    const rooms = shut(evening()).blocks.filter((b) => b.id.startsWith('OPERATORY_CLOSED:'));
+    expect(rooms).toHaveLength(4);
+    for (const r of rooms) expect(r.owner).toBe(RoleCode.DENTAL_ASSISTANT);
+    expect(CLOSING_CONTROLS['CLOSE-010']!.why).toContain('Security');
+    expect(CLOSING_CONTROLS['CLOSE-010']!.why).toContain('Environment');
   });
 });
 
