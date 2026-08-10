@@ -943,6 +943,10 @@ export async function buildServer(): Promise<FastifyInstance> {
         // "nothing is outstanding" from "nobody has opened the clinic yet",
         // and those are opposite states that look identical in an empty list.
         unlocked: world.events.some((e) => e.type === ClinicEvent.CLINIC_UNLOCKED),
+        // Who is asking. A courtesy for the screen — the server still refuses
+        // anybody else — but offering a button that is going to be refused is
+        // a dead end, and this clinic has had enough of those.
+        role: (s.roleCodes[0] ?? 'RECEPTION') as Role,
         readiness: readiness(world.events, world.operatories, world.firstPatientAt, now),
         // The evening, on the same terms: which sections of the drill are
         // outstanding, and which of those are patient-safety critical.

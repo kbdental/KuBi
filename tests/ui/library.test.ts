@@ -98,7 +98,9 @@ const CONVERTED = [
   'exceptions.tsx',
   'gate.tsx',
   'notifications.tsx',
+  'closing.tsx',
   'dashboard.tsx',
+  'day-blocks.tsx',
   'patient-360.tsx',
   // Built on the vocabulary from the first line rather than converted onto it
   // afterwards, which is the point of having one.

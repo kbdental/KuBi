@@ -111,13 +111,25 @@ for (const s of SIZES) {
   await page.click('.who-option:has-text("Rahul")');
   await page.waitForTimeout(900);
 
-  const tabs = await page.$$eval('.tab', (els) => els.map((e) => e.textContent?.trim() ?? ''));
+  // The rail replaced the tab row. The three named places are always there;
+  // everything role-specific — including the manager's command centre — is
+  // reached through More, so that is where the clinic-wide check now looks.
+  const rail = await page.$$eval('.rail-item', (els) => els.map((e) => e.textContent?.trim() ?? ''));
+  for (const want of ['Dashboard', 'Clinic readiness', 'Clinic closing']) {
+    if (!rail.some((t) => t.includes(want))) {
+      problems.push(`${s.name}: the rail has no "${want}" (rail: ${rail.join(', ')})`);
+    }
+  }
+
+  await page.click('.rail-item:has-text("More")');
+  await page.waitForTimeout(400);
+  const more = await page.$$eval('.dash-row-title', (els) => els.map((e) => e.textContent?.trim() ?? ''));
   // The manager's clinic-wide view is the command centre now, not "Overview".
   // What is being checked has not changed: an assistant must not get it.
-  if (!tabs.some((t) => t.includes('Command'))) {
-    problems.push(`${s.name}: the manager has no clinic-wide view (tabs: ${tabs.join(', ')})`);
+  if (!more.some((t) => t.includes('Command'))) {
+    problems.push(`${s.name}: the manager has no clinic-wide view (More: ${more.join(', ')})`);
   } else {
-    await page.click('.tab:has-text("Command")');
+    await page.click('.more-row:has(.dash-row-title:text-is("Command"))');
     await page.waitForTimeout(400);
     await sideways('the command centre');
     await shot(page, `${s.name}-03-command`);
@@ -144,12 +156,21 @@ for (const s of SIZES) {
     if (lights < 6) problems.push(`${s.name}: expected at least 6 status lights, found ${lights}`);
   }
 
-  for (const [tab, name] of [['Clinic', '04-clinic'], ['Attention', '05-attention']]) {
-    await page.click(`.tab:has-text("${tab}")`);
-    await page.waitForTimeout(400);
-    await sideways(tab);
+  // The two named places on the rail, plus one screen still under More.
+  for (const [item, name] of [
+    ['Clinic readiness', '04-readiness'], ['Clinic closing', '05-closing'],
+  ]) {
+    await page.click(`.rail-item:has-text("${item}")`);
+    await page.waitForTimeout(500);
+    await sideways(item);
     await shot(page, `${s.name}-${name}`);
   }
+  await page.click('.rail-item:has-text("More")');
+  await page.waitForTimeout(300);
+  await page.click('.more-row:has(.dash-row-title:text-is("Attention"))');
+  await page.waitForTimeout(400);
+  await sideways('Attention');
+  await shot(page, `${s.name}-06-attention`);
 
   // The end of the day: the handover only exists once the clinic is closing,
   // so reaching it is the only way to prove the screen renders at all.
@@ -158,16 +179,27 @@ for (const s of SIZES) {
   // The personal task list is labelled "Today" for staff and "My tasks" for
   // roles that have their own command centre. Matched on either, so renaming
   // a tab for one role does not silently stop verifying the handover.
-  await page.click('.tab:has-text("Today"), .tab:has-text("My tasks")');
+  await page.click('.rail-item:has-text("More")');
+  await page.waitForTimeout(300);
+  // Matched on the row's TITLE, not on its text: every row also carries the
+  // screen's question, and "Is the clinic ready today?" made a loose
+  // :has-text("Today") open the command centre instead.
+  await page.click(
+    '.more-row:has(.dash-row-title:text-is("Today")), '
+    + '.more-row:has(.dash-row-title:text-is("My tasks"))',
+  );
   await page.waitForTimeout(500);
-  const cue = await page.$('.handover-cue');
+  // Matched by its title, not by a class. The cue was `.handover-cue` before
+  // today.tsx moved onto the shared library and became a `<Row>`; this check
+  // had been looking for a class that no longer existed.
+  const cue = await page.$('.row:has(.row-title:text-is("Read the handover"))');
   if (!cue) {
     problems.push(`${s.name}: no handover appears on Today once the clinic is closing`);
   } else {
     await cue.click();
     await page.waitForTimeout(700);
     await sideways('Handover');
-    await shot(page, `${s.name}-06-handover`);
+    await shot(page, `${s.name}-07-handover`);
     const sections = await page.$$eval('.hand-section', (e) => e.length);
     // The demo's day deliberately ends untidy — a handover with nothing on it
     // would mean the screen was never actually exercised.

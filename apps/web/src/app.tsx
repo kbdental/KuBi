@@ -23,6 +23,7 @@ import { IconToday, IconClinic, IconOverview } from './icons.js';
 import { Shell, type RailItem } from './app/shell.js';
 import { Dashboard } from './screens/dashboard.js';
 import { ClinicReadiness } from './screens/readiness.js';
+import { ClinicClosing } from './screens/closing.js';
 
 /**
  * The shell.
@@ -228,6 +229,7 @@ export function App() {
   const rail: RailItem[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: <IconOverview filled={here === 'DASHBOARD'} /> },
     { id: 'READINESS', label: 'Clinic readiness', icon: <IconClinic filled={here === 'READINESS'} /> },
+    { id: 'CLOSING', label: 'Clinic closing', icon: <IconToday filled={here === 'CLOSING'} /> },
     {
       id: 'MORE', label: 'More', icon: <IconToday filled={here === 'MORE'} />,
       count: data.attention.length, urgent: data.attention.length > 0,
@@ -237,11 +239,12 @@ export function App() {
   const TITLES: Record<string, string> = {
     DASHBOARD: 'Dashboard',
     READINESS: 'Clinic readiness',
+    CLOSING: 'Clinic closing',
     MORE: 'More',
   };
 
   // Everything under More is the previous shell's set, reached by its own id.
-  const inMore = !['DASHBOARD', 'READINESS'].includes(here);
+  const inMore = !['DASHBOARD', 'READINESS', 'CLOSING'].includes(here);
 
   return (
     <>
@@ -258,6 +261,7 @@ export function App() {
     >
       {here === 'DASHBOARD' && <Dashboard go={setChosen} />}
       {here === 'READINESS' && <ClinicReadiness />}
+      {here === 'CLOSING' && <ClinicClosing />}
       {here === 'MORE' && (
         <MoreMenu
           items={[

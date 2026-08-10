@@ -33,6 +33,10 @@ import {
   DAILY_STANDARD, provenanceOf, minutesFromOpening, standardById,
   type WorkProvenance,
   retentionOrder, DORMANT_AFTER_DAYS, CLOSING_OUTCOMES, headlineFor,
+  ClinicEvent, emptyWorld, record as recordEvent,
+  readiness, closing, decisions, decisionsFor, escalatedTo, mostImportant,
+  sweep, board, FLOWS,
+  type World, type Operatory, type RoleCode,
 } from '@kubi/contracts';
 
 type Role =
@@ -1031,6 +1035,20 @@ function freshState() {
     ],
     signedIn: null as Person | null,
     /**
+     * The engine's world, held in the browser.
+     *
+     * Not a mock. `readiness()`, `closing()`, `decisions()` and `record()` are
+     * the product's own functions, imported unchanged — they are pure
+     * `(world, now) => X`, which is exactly what makes this possible. So the
+     * two engine screens in this file are running the real rules, and a
+     * refusal here is the same sentence the server would give.
+     *
+     * What is still a stand-in is *enforcement*: a browser can be lied to, and
+     * the server is where that matters. This is for clicking through a
+     * morning, not for security.
+     */
+    world: startedMorning(),
+    /**
      * Set by the demo's "Jump to the end of the day" control. A real clinic
      * gets here by working through eleven hours; a person reviewing the app in
      * five minutes should not have to. Nothing else in this file reads the
@@ -1057,6 +1075,66 @@ const HISTORY: Array<{ readiness: number | null; independentOf: number; independ
   { readiness: 71, independentOf: 5, independent: 3 },
   { readiness: 100, independentOf: 7, independent: 7 },
 ];
+
+/** Four operatories, as the clinic has. */
+const DEMO_OPERATORIES: Operatory[] = [1, 2, 3, 4].map((n) => ({
+  id: `op-${n}`, label: `Operatory ${n}`, position: n,
+}));
+
+/**
+ * The demo's clinic clock: quarter past nine.
+ *
+ * Deliberately fixed rather than read from the viewer's watch. A file opened
+ * at three in the afternoon would otherwise show a morning that was five hours
+ * overdue before anybody touched it, and a file opened at six in the morning
+ * would show one with four hours in hand — the same file telling two people
+ * different things about the same clinic.
+ *
+ * 09:15 is chosen because it is mid-morning: the clinic is open, the first
+ * patient is at ten, and there is enough time left that the list reads as work
+ * rather than as an emergency.
+ */
+const DEMO_MINUTE = 9 * 60 + 15;
+function demoMinute(): number { return DEMO_MINUTE; }
+
+/**
+ * A morning already under way.
+ *
+ * The clinic is unlocked, two rooms are prepared and the run has been
+ * released — so the file opens on a clinic that is halfway through its
+ * morning rather than on a cold building. Everything after that is the
+ * viewer's to drive, and "Start again" comes back here.
+ *
+ * Recorded through `record()` like any other event, so the demo's opening
+ * state obeys the same rules as everything the viewer does next. A seed that
+ * wrote the world directly could put it in a state the engine would never
+ * allow, and then the first click would look like a bug.
+ */
+function startedMorning(): World {
+  let w = emptyWorld(8 * 60 + 30, {
+    operatories: DEMO_OPERATORIES,
+    firstPatientAt: 10 * 60,
+    shutAt: 18 * 60 + 30,
+  });
+  const say = (type: ClinicEvent, subjectId: string, by: RoleCode, label?: string) => {
+    const out = recordEvent({ ...w }, {
+      type, subjectId, by, ...(label ? { subjectLabel: label } : {}),
+    });
+    if (out.ok) w = out.world;
+  };
+  say(ClinicEvent.CLINIC_UNLOCKED, 'today', 'RECEPTION' as RoleCode, 'the clinic');
+  w = { ...w, now: 8 * 60 + 50 };
+  say(ClinicEvent.OPERATORY_READY, 'op-1', 'DENTAL_ASSISTANT' as RoleCode, 'Operatory 1');
+  say(ClinicEvent.OPERATORY_READY, 'op-2', 'DENTAL_ASSISTANT' as RoleCode, 'Operatory 2');
+  w = { ...w, now: 9 * 60 };
+  const b = 'batch-am';
+  say(ClinicEvent.BATCH_COLLECTED, b, 'STERILIZATION_TECHNICIAN' as RoleCode, 'STER-AM');
+  say(ClinicEvent.BATCH_ULTRASONIC_DONE, b, 'STERILIZATION_TECHNICIAN' as RoleCode);
+  say(ClinicEvent.BATCH_PACKED, b, 'STERILIZATION_TECHNICIAN' as RoleCode);
+  say(ClinicEvent.BATCH_AUTOCLAVED, b, 'STERILIZATION_TECHNICIAN' as RoleCode);
+  say(ClinicEvent.BATCH_RELEASED, b, 'SENIOR_ASSISTANT' as RoleCode);
+  return { ...w, now: DEMO_MINUTE };
+}
 
 let db = freshState();
 
@@ -1149,6 +1227,16 @@ export function currentPerson(): Person | null {
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+/** The world at this minute. The demo's end-of-day control moves the clock. */
+function engineWorld(): World {
+  return { ...db.world, now: db.endOfDay ? 18 * 60 + 40 : demoMinute() };
+}
+
+/** Whoever is signed in, as a role the engine knows. */
+function engineRole(): RoleCode {
+  return (db.signedIn?.roles[0] ?? 'RECEPTION') as RoleCode;
+}
 
 const startOf = (t: Task) => OPENING_DUE + t.minutesFromOpening * 60_000;
 const visitStart = (v: Visit) => OPENED_AT + v.startsInMinutes * 60_000;
@@ -1815,6 +1903,62 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
   }
 
   // ---- ATTENTION ----
+  /* ═══════════════════════════════════════════════════════════════════
+     THE ENGINE — the real functions, running in the browser
+
+     Nothing below reimplements a rule. `record()` decides whether an event
+     may be recorded, `readiness()` and `closing()` calculate the morning and
+     the evening, and `decisions()` orders the work. All four are imported
+     from the product unchanged, which is only possible because they are pure.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  if (path === '/api/v1/clinic') {
+    const w = engineWorld();
+    const now = w.now;
+    return json({
+      now,
+      first: mostImportant(w, now),
+      decisions: decisions(w, now),
+      unlocked: w.events.some((e) => e.type === ClinicEvent.CLINIC_UNLOCKED),
+      role: engineRole(),
+      readiness: readiness(w.events, w.operatories, w.firstPatientAt, now),
+      closing: closing(w.events, w.operatories, w.shutAt, now),
+      board: board(w, now),
+      late: sweep(w, now).alerts,
+      flows: w.flows.filter((f) => !f.done).map((f) => ({
+        id: f.id, kind: f.kind, subjectLabel: f.subjectLabel,
+        node: FLOWS[f.kind].nodes[f.at]?.id ?? null,
+      })),
+      eventCount: w.events.length,
+    });
+  }
+
+  if (path === '/api/v1/now') {
+    const w = engineWorld();
+    const role = engineRole();
+    return json({
+      now: w.now, role,
+      mine: decisionsFor(w, role, w.now),
+      escalated: escalatedTo(w, role, w.now),
+    });
+  }
+
+  if (path === '/api/v1/events' && method === 'POST') {
+    const b = body as { type: string; subjectId: string; subjectLabel?: string };
+    const w = engineWorld();
+    const out = recordEvent(w, {
+      type: b.type as ClinicEvent,
+      subjectId: b.subjectId,
+      by: engineRole(),
+      ...(b.subjectLabel ? { subjectLabel: b.subjectLabel } : {}),
+    });
+    // A refusal is a state of the clinic, not a failure of the request — and
+    // it writes nothing, here exactly as on the server.
+    if (!out.ok) return json({ ok: false, refusal: out.refusal });
+    db.world = out.world;
+    return json({ ok: true, duplicate: false, consequences: out.consequences });
+  }
+
   if (path === '/api/v1/attention') {
     const order = { PATIENT_SAFETY: 0, CRITICAL: 1, IMPORTANT: 2, ROUTINE: 3 };
     return json(db.attention.filter((a) => a.open)

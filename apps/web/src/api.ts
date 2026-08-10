@@ -861,6 +861,8 @@ export interface ClinicView {
   decisions: EngineDecision[];
   /** False until reception unlocks. An empty list means something different then. */
   unlocked: boolean;
+  /** The signed-in role, so a screen can offer work only to whoever owns it. */
+  role: string;
   readiness: ReadinessView;
   closing: ClosingView;
   board: Array<{

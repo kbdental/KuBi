@@ -846,6 +846,10 @@ label.field-label {
   .demo-bar { flex: 0 0 auto; padding: 0 18px; }
   .demo-app { flex: 1; min-height: 0; display: flex; }
   .demo-app .app { flex: 1; min-height: 0; }
+  /* The shell is the app now, and it has to fill the frame the demo bar
+     leaves it — without this it sat in a 965px box with grey beside it. */
+  .demo-app .shell { flex: 1; min-height: 0; }
+  .demo-app .shell-content { min-height: 0; }
   /* The sidebar's own brand and signed-in name would both repeat the top bar's,
      so they stand down rather than saying the same thing twice on one screen. */
   .demo-app .nav { height: 100%; position: relative; top: auto; }
@@ -2495,13 +2499,17 @@ label.field-label {
 
 .shell {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  /* minmax(0, 1fr), never a bare 1fr: an `auto` minimum lets a track refuse to
+     shrink below its content, which is how a 260px rail pushed every phone
+     screen sideways by exactly 260px. */
+  grid-template-columns: 260px minmax(0, 1fr);
   min-height: 100vh;
   background: var(--bg, #fff);
 }
 
 .rail {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   border-right: 1px solid var(--line, #e6e6e6);
   background: var(--surface, #fff);
@@ -2579,6 +2587,7 @@ label.field-label {
 .rail-signout:hover { background: var(--hover, #f4f4f5); color: var(--ink, #171717); }
 
 .shell-body { display: flex; flex-direction: column; min-width: 0; }
+.shell-content > * { min-width: 0; }
 
 .shell-bar {
   display: flex;
@@ -2744,13 +2753,18 @@ label.field-label {
 }
 
 @media (max-width: 860px) {
-  .shell { grid-template-columns: 1fr; }
+  .shell { grid-template-columns: minmax(0, 1fr); }
   .rail { flex-direction: row; align-items: center; border-right: 0;
-          border-bottom: 1px solid var(--line, #e6e6e6); padding: 10px 12px; }
-  .rail-brand { padding: 0 12px 0 4px; }
+          border-bottom: 1px solid var(--line, #e6e6e6); padding: 10px 12px;
+          gap: 8px; overflow-x: auto; }
+  .rail-brand { padding: 0 4px 0 4px; flex: 0 0 auto; }
   .rail-brand-clinic { display: none; }
-  .rail-nav { flex-direction: row; overflow-x: auto; }
-  .rail-foot { margin-top: 0; padding-top: 0; }
+  /* The rail scrolls sideways on its own; the page does not. */
+  .rail-nav { flex-direction: row; flex: 1 1 auto; min-width: 0; overflow-x: auto; }
+  .rail-item { flex: 0 0 auto; padding: 8px 10px; }
+  .rail-label { white-space: nowrap; }
+  .rail-foot { margin-top: 0; padding-top: 0; flex: 0 0 auto; }
+  .rail-signout { white-space: nowrap; }
   .shell-content { padding: 20px 16px 48px; }
   .dash-headline { font-size: 30px; }
 }

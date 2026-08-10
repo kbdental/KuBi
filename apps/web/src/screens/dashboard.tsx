@@ -96,7 +96,7 @@ export function Dashboard({ go }: { go: (id: string) => void }) {
             : c.expectedCloseAt !== null ? `Out by ${hhmm(c.expectedCloseAt)}` : 'No shut time set'}
           percent={Math.round(c.compliance * 100)}
           tone={c.clear ? 'good' : c.runningLate ? 'bad' : 'warn'}
-          onOpen={() => go('READINESS')}
+          onOpen={() => go('CLOSING')}
         />
       </div>
 
