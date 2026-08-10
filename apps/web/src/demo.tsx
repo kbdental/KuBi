@@ -25,12 +25,23 @@ import './styles.css';
 
 installDemoBackend();
 
-/** One list, so the entry screen and the person menu cannot disagree. */
-const WHO: Record<string, { name: string; role: string }> =
-  Object.fromEntries(PERSONAS.map((p) => [p.key, { name: p.name, role: p.role }]));
+/**
+ * One list, so the entry screen and the role menu cannot disagree.
+ *
+ * Roles, not names. The owner: *"names can change but roles do not change"* —
+ * and every rule in the engine is written against a role, so the menu now
+ * switches between the things the system actually reasons about.
+ */
+const WHO: Record<string, { role: string }> =
+  Object.fromEntries(PERSONAS.map((p) => [p.key, { role: p.role }]));
 
-const initials = (name: string) =>
-  name.replace(/[^A-Za-z ]/g, '').split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2);
+/** "Dental assistant" → "DA". A role's mark, never a person's initials. */
+const roleMark = (role: string) => {
+  const words = role.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  if (words.length === 1) return words[0]!.slice(0, 2).toUpperCase();
+  return (words[0]![0]! + words[words.length - 1]![0]!).toUpperCase();
+};
 
 function Demo() {
   // Null until somebody chooses. Opening straight into a stranger's shift at
@@ -114,12 +125,9 @@ function Demo() {
             aria-haspopup="menu"
             onClick={() => setMenuOpen((o) => !o)}
           >
-            <span className="who-avatar" aria-hidden="true">{initials(current.name)}</span>
-            {/* No <br> between these: on a phone both are hidden and a stray
-                line break would still take up a line inside the button. */}
+            <span className="who-avatar" aria-hidden="true">{roleMark(current.role)}</span>
             <span className="who-who">
-              <span className="who-name">{current.name}</span>
-              <span className="who-role">{current.role}</span>
+              <span className="who-name">{current.role}</span>
             </span>
             <span className="who-caret" aria-hidden="true">▾</span>
           </button>
@@ -137,10 +145,9 @@ function Demo() {
                     className={p.key === who ? 'who-option is-on' : 'who-option'}
                     onClick={() => switchTo(p.key)}
                   >
-                    <span className="who-avatar" aria-hidden="true">{initials(w.name)}</span>
+                    <span className="who-avatar" aria-hidden="true">{roleMark(w.role)}</span>
                     <span className="who-who">
-                      <span className="who-option-name">{w.name}</span>
-                      <span className="who-option-role">{w.role}</span>
+                      <span className="who-option-name">{w.role}</span>
                     </span>
                   </button>
                 );

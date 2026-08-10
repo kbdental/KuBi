@@ -24,7 +24,14 @@ import { clinicPulse } from '../demo-backend.js';
 
 export interface Persona {
   key: string;
-  name: string;
+  /**
+   * The role, which is the whole identity here.
+   *
+   * The owner: *"do not put a name to anything keep it role wise… names can
+   * change but roles do not change"*. Every rule in the engine is written
+   * against a role, so a name on a screen is decoration over the thing the
+   * system actually reasons about.
+   */
   role: string;
   /** What this person's KuBi actually opens onto, in their own words. */
   sees: string;
@@ -36,39 +43,39 @@ export interface Persona {
  */
 export const PERSONAS: Persona[] = [
   {
-    key: 'rahul', name: 'Rahul M.', role: 'Clinic manager',
+    key: 'rahul', role: 'Clinic manager',
     sees: 'The whole clinic — readiness, patients, exceptions, quality.',
   },
   {
-    key: 'deepak', name: 'Deepak V.', role: 'Owner',
+    key: 'deepak', role: 'Owner',
     sees: 'Eight numbers and what needs him. No task list.',
   },
   {
-    key: 'priya', name: 'Priya S.', role: 'Dental assistant',
+    key: 'priya', role: 'Dental assistant',
     sees: 'Her morning, with the current job already open.',
   },
   {
-    key: 'anita', name: 'Anita K.', role: 'Senior assistant',
+    key: 'anita', role: 'Senior assistant',
     sees: 'Her own work, plus what she must check for somebody else.',
   },
   {
-    key: 'kavita', name: 'Kavita R.', role: 'Reception',
+    key: 'kavita', role: 'Reception',
     sees: 'Today’s list, confirmations and follow-up calls.',
   },
   {
-    key: 'mehta', name: 'Dr Mehta', role: 'Doctor',
+    key: 'mehta', role: 'Doctor',
     sees: 'Who is in the chair, who is not ready, and what is waiting on a check.',
   },
   {
-    key: 'suresh', name: 'Suresh B.', role: 'Lab coordinator',
+    key: 'suresh', role: 'Lab coordinator',
     sees: 'What is late, what arrived, and what may be booked.',
   },
   {
-    key: 'ramesh', name: 'Ramesh P.', role: 'Housekeeping',
+    key: 'ramesh', role: 'Housekeeping',
     sees: 'His rounds, and the rooms waiting to be turned around.',
   },
   {
-    key: 'lakshmi', name: 'Lakshmi N.', role: 'Sterilisation',
+    key: 'lakshmi', role: 'Sterilisation',
     sees: 'The instrument loop, and what nobody may release yet.',
   },
 ];
@@ -92,7 +99,7 @@ export function Entry({ onEnter }: { onEnter: (key: string) => void }) {
         <header className="gate-head">
           <div className="gate-clinic">{p.clinicName.replace('SYNTHETIC ', '')}</div>
           <div className="gate-greet">
-            {greeting(now.getHours())}, {DEFAULT_PERSONA.name.replace(/ \w\.$/, '')}
+            {greeting(now.getHours())}
           </div>
           <div className="gate-when">{day} · {time}</div>
         </header>
@@ -138,7 +145,7 @@ export function Entry({ onEnter }: { onEnter: (key: string) => void }) {
         </button>
 
         <p className="gate-foot">
-          Signing in as {DEFAULT_PERSONA.name} · {DEFAULT_PERSONA.role}.
+          Signing in as {DEFAULT_PERSONA.role}.
           Change person from the menu at the top right.
         </p>
 

@@ -254,7 +254,6 @@ export function App() {
       items={rail}
       here={inMore ? 'MORE' : here}
       go={setChosen}
-      who={data.me.displayLabel}
       whoRole={roleWord(data.me.roleCodes[0] ?? '')}
       title={TITLES[here] ?? label(here, myDashboards)}
       onSignOut={() => { void api.logout().finally(() => { setData(null); setChosen(null); }); }}
@@ -376,8 +375,13 @@ function MeScreen({ me, onSignedOut }: { me: Me; onSignedOut: () => void }) {
 
   return (
     <div className="screen">
-      <h1 className="screen-title">{me.displayLabel}</h1>
+      {/* The role, not the person. Names change; roles do not, and every rule
+          in the engine is written against one. */}
+      <h1 className="screen-title">{roleWord(me.roleCodes[0] ?? '')}</h1>
       <p className="screen-sub">
+        {me.roleCodes.length > 1
+          ? `Also ${me.roleCodes.slice(1).map(roleWord).join(', ').toLowerCase()}. `
+          : ''}
         {me.crossClinic
           ? 'You can see every clinic.'
           : `You're working at ${me.clinicIds.length === 1 ? 'one clinic' : `${me.clinicIds.length} clinics`}.`}

@@ -53,21 +53,21 @@ interface Person {
 }
 
 export const PEOPLE: Person[] = [
-  { key: 'priya', email: 'priya@synthetic.test', employeeId: 'e-priya', displayLabel: 'SYNTHETIC Priya S.', roles: ['DENTAL_ASSISTANT'] },
-  { key: 'rahul', email: 'rahul@synthetic.test', employeeId: 'e-rahul', displayLabel: 'SYNTHETIC Rahul M.', roles: ['CLINIC_MANAGER'] },
-  { key: 'anita', email: 'anita@synthetic.test', employeeId: 'e-anita', displayLabel: 'SYNTHETIC Anita K.', roles: ['SENIOR_ASSISTANT'] },
-  { key: 'kavita', email: 'kavita@synthetic.test', employeeId: 'e-kavita', displayLabel: 'SYNTHETIC Kavita R.', roles: ['RECEPTION'] },
+  { key: 'priya', email: 'priya@synthetic.test', employeeId: 'e-priya', displayLabel: 'Dental assistant', roles: ['DENTAL_ASSISTANT'] },
+  { key: 'rahul', email: 'rahul@synthetic.test', employeeId: 'e-rahul', displayLabel: 'Clinic manager', roles: ['CLINIC_MANAGER'] },
+  { key: 'anita', email: 'anita@synthetic.test', employeeId: 'e-anita', displayLabel: 'Senior assistant', roles: ['SENIOR_ASSISTANT'] },
+  { key: 'kavita', email: 'kavita@synthetic.test', employeeId: 'e-kavita', displayLabel: 'Reception', roles: ['RECEPTION'] },
   // The owner was missing entirely, which meant the one view the requirement
   // describes in most detail -- "you should not see 150 tasks" -- could not be
   // reached by anybody.
-  { key: 'deepak', email: 'deepak@synthetic.test', employeeId: 'e-deepak', displayLabel: 'SYNTHETIC Deepak V.', roles: ['OWNER_DIRECTOR'] },
+  { key: 'deepak', email: 'deepak@synthetic.test', employeeId: 'e-deepak', displayLabel: 'Owner', roles: ['OWNER_DIRECTOR'] },
   // Phase 1 builds the clinical workflow: doctor, assistant, lab, reception,
   // sterilisation. Three of those five had no person to sign in as, so the
   // screens could not be reached at all.
-  { key: 'mehta', email: 'mehta@synthetic.test', employeeId: 'e-mehta', displayLabel: 'SYNTHETIC Dr Mehta', roles: ['TREATING_DOCTOR'] },
-  { key: 'suresh', email: 'suresh@synthetic.test', employeeId: 'e-suresh', displayLabel: 'SYNTHETIC Suresh B.', roles: ['LAB_COORDINATOR'] },
-  { key: 'ramesh', email: 'ramesh@synthetic.test', employeeId: 'e-ramesh', displayLabel: 'SYNTHETIC Ramesh P.', roles: ['HOUSEKEEPING'] },
-  { key: 'lakshmi', email: 'lakshmi@synthetic.test', employeeId: 'e-lakshmi', displayLabel: 'SYNTHETIC Lakshmi N.', roles: ['STERILIZATION_TECHNICIAN'] },
+  { key: 'mehta', email: 'mehta@synthetic.test', employeeId: 'e-mehta', displayLabel: 'Doctor', roles: ['TREATING_DOCTOR'] },
+  { key: 'suresh', email: 'suresh@synthetic.test', employeeId: 'e-suresh', displayLabel: 'Lab coordinator', roles: ['LAB_COORDINATOR'] },
+  { key: 'ramesh', email: 'ramesh@synthetic.test', employeeId: 'e-ramesh', displayLabel: 'Housekeeping', roles: ['HOUSEKEEPING'] },
+  { key: 'lakshmi', email: 'lakshmi@synthetic.test', employeeId: 'e-lakshmi', displayLabel: 'Sterilisation', roles: ['STERILIZATION_TECHNICIAN'] },
 ];
 
 export const DEMO_PASSWORD = 'SyntheticDemo123!';
@@ -781,7 +781,7 @@ function freshState() {
           id: 'act-1', type: 'CORRECTIVE', status: 'EFFECTIVE',
           description: 'Call the three patients and confirm',
           responsible: 'e-kavita', responsibleName: 'Kavita', dueInDays: -2,
-          verifiedBy: 'Rahul', verificationNote: null, ineffectiveCount: 0,
+          verifiedBy: 'Clinic manager', verificationNote: null, ineffectiveCount: 0,
         },
         {
           // Deliberately on its second attempt: the first fix was a reminder
@@ -962,10 +962,10 @@ function freshState() {
   ];
 
   const batches: DemoBatch[] = [
-    { id: 'b1', batchRef: 'STER-0912', stage: 'RELEASED', packCount: 12, operator: 'Priya', cycleResult: 'PASS' },
-    { id: 'b2', batchRef: 'STER-0913', stage: 'AUTOCLAVED', packCount: 9, operator: 'Priya', cycleResult: 'PASS' },
-    { id: 'b3', batchRef: 'STER-0914', stage: 'ULTRASONIC', packCount: 7, operator: 'Anita', cycleResult: null },
-    { id: 'b4', batchRef: 'STER-0911', stage: 'QUARANTINED', packCount: 6, operator: 'Priya', cycleResult: 'INCONCLUSIVE' },
+    { id: 'b1', batchRef: 'STER-0912', stage: 'RELEASED', packCount: 12, operator: 'Sterilisation', cycleResult: 'PASS' },
+    { id: 'b2', batchRef: 'STER-0913', stage: 'AUTOCLAVED', packCount: 9, operator: 'Sterilisation', cycleResult: 'PASS' },
+    { id: 'b3', batchRef: 'STER-0914', stage: 'ULTRASONIC', packCount: 7, operator: 'Senior assistant', cycleResult: null },
+    { id: 'b4', batchRef: 'STER-0911', stage: 'QUARANTINED', packCount: 6, operator: 'Sterilisation', cycleResult: 'INCONCLUSIVE' },
   ];
 
   /**

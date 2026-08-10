@@ -83,7 +83,9 @@ for (const s of SIZES) {
   // Then become the assistant, which is where every check below starts.
   await page.click('.who-button');
   await page.waitForTimeout(250);
-  await page.click('.who-option:has-text("Priya")');
+  // Roles, not names — the menu switches between roles now, because names
+  // change and roles do not.
+  await page.click('.who-option:has-text("Dental assistant")');
   await page.waitForSelector('.demo-bar');
   await page.waitForTimeout(700);
 
@@ -108,7 +110,7 @@ for (const s of SIZES) {
   await page.click('.who-button');
   await page.waitForTimeout(250);
   await shot(page, `${s.name}-02-people`);
-  await page.click('.who-option:has-text("Rahul")');
+  await page.click('.who-option:has-text("Clinic manager")');
   await page.waitForTimeout(900);
 
   // The rail replaced the tab row. The three named places are always there;

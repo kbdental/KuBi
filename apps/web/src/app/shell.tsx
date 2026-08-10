@@ -25,13 +25,22 @@ export interface RailItem {
 }
 
 export function Shell({
-  clinicName, items, here, go, who, whoRole, title, onSignOut, children,
+  clinicName, items, here, go, whoRole, title, onSignOut, children,
 }: {
   clinicName: string;
   items: readonly RailItem[];
   here: string;
   go: (id: string) => void;
-  who: string;
+  /**
+   * The signed-in **role**, and deliberately not the person.
+   *
+   * The owner: *"please do not put a name to anything keep it role wise this
+   * makes things simpler as names can change but roles do not change"*. He is
+   * right about more than tidiness — every rule in the engine is written
+   * against a role, so a screen that says "Priya" is showing something the
+   * system does not actually reason about. The log still records which
+   * employee did what; that is provenance, not the interface.
+   */
   whoRole: string;
   /** The page's own name, in the bar above the content. */
   title: string;
@@ -78,7 +87,7 @@ export function Shell({
           <h1 className="shell-title">{title}</h1>
           <div className="shell-who">
             <span className="shell-who-role">{whoRole}</span>
-            <span className="shell-avatar" aria-hidden="true">{initials(who)}</span>
+            <span className="shell-avatar" aria-hidden="true">{roleMark(whoRole)}</span>
           </div>
         </header>
         <div className="shell-content">{children}</div>
@@ -87,10 +96,15 @@ export function Shell({
   );
 }
 
-/** "SYNTHETIC Kavita R." → "KR". Two letters, because three is a monogram. */
-function initials(name: string): string {
-  const words = name.replace(/^SYNTHETIC\s+/i, '').split(/\s+/).filter(Boolean);
-  const first = words[0]?.[0] ?? '';
-  const last = words.length > 1 ? words[words.length - 1]![0] ?? '' : '';
-  return (first + last).toUpperCase();
+/**
+ * "Dental assistant" → "DA". The role's initials, never a person's.
+ *
+ * A single word gives its first two letters, so Reception is "RE" rather than
+ * a lone R that could be anything.
+ */
+function roleMark(role: string): string {
+  const words = role.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  if (words.length === 1) return words[0]!.slice(0, 2).toUpperCase();
+  return (words[0]![0]! + words[words.length - 1]![0]!).toUpperCase();
 }
