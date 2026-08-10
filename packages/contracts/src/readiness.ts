@@ -137,6 +137,60 @@ export const READINESS_MINUTES = 50;
 export const STERILIZATION_MINUTES = 75;
 
 /* -------------------------------------------------------------------------
+ * Traceability: the matrix's twelve opening controls, and what covers each
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Where each of `OPEN-001`…`OPEN-012` ended up.
+ *
+ * The evening had this table from the day it was built and the morning never
+ * did, which is why the morning's gaps were a paragraph in a document rather
+ * than a number a test could fail on. This is the mirror, written to the same
+ * rule: `covers` is the readiness block that carries it, or **null** where
+ * nothing does.
+ *
+ * The nulls are the finding, and there are seven of them. Six are one thing
+ * wearing six matrix rows — **opening the building**: unlocking it, the
+ * lights and fans, the ACs, the air diffuser, the water supply and the water
+ * pump. Neither source document has that section. The owner's closing drill
+ * has its mirror image (Clinic Environment Closing switches all of it off),
+ * and the opening procedure begins with people already inside a working
+ * building. So the clinic certainly does it; KuBi simply has no block for it,
+ * and nobody has said whose job it is.
+ *
+ * The seventh is `OPEN-012`, morning emergency readiness, and it is not part
+ * of that cluster. It is patient safety — the emergency kit, the drugs and
+ * their expiry, the oxygen — and it is absent from both documents and from
+ * every block. That one is worth its own line rather than being counted in
+ * with the light switches.
+ *
+ * Nothing here invents an owner for any of the seven. Naming them is the
+ * point; `UNCOVERED_OPENING_CONTROLS` is what stops them being forgotten.
+ */
+export const OPENING_CONTROLS: Readonly<Record<string, {
+  covers: string | null;
+  why: string;
+}>> = {
+  'OPEN-001': { covers: null, why: 'opening the premises itself — no block unlocks the building or switches it on' },
+  'OPEN-002': { covers: 'RECEPTION', why: 'the waiting and billing area, reception — 15 items in the owner’s §4' },
+  'OPEN-003': { covers: 'OPERATORY', why: 'one block per room from the master — 24 disinfection actions each' },
+  'OPEN-004': { covers: 'OPERATORY', why: 'the dental chair, one of the four per-room checks the owner named' },
+  'OPEN-005': { covers: 'OPERATORY', why: 'suction, checked in each room even though the plant is centralised' },
+  'OPEN-006': { covers: 'EQUIPMENT', why: 'the compressor is central kit, so it is the senior assistant’s one round — including its 5-minute warm-up' },
+  'OPEN-007': { covers: null, why: 'the ACs at 24 °C — part of opening the building, which no block covers' },
+  'OPEN-008': { covers: null, why: 'the air diffuser — part of opening the building, which no block covers' },
+  'OPEN-009': { covers: null, why: 'water availability — part of opening the building, which no block covers' },
+  'OPEN-010': { covers: null, why: 'the water pump — the owner ruled this belongs to opening rather than closing, and the morning has no block for it yet' },
+  'OPEN-011': { covers: null, why: 'lights and fans — part of opening the building, which no block covers' },
+  'OPEN-012': { covers: null, why: 'morning emergency readiness — the kit, the drugs and their expiry. Patient safety, in neither document and in no block' },
+};
+
+/** The matrix opening controls nothing covers yet. */
+export const UNCOVERED_OPENING_CONTROLS = Object.entries(OPENING_CONTROLS)
+  .filter(([, v]) => v.covers === null)
+  .map(([id]) => id);
+
+/* -------------------------------------------------------------------------
  * The blocks
  * ---------------------------------------------------------------------- */
 

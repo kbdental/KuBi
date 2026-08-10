@@ -1,0 +1,726 @@
+<title>KuBi — the clinic day directory</title>
+<style>
+  /* ── Palette ────────────────────────────────────────────────────────────
+     Grounded in KuBi's own interface: the wordmark green, a paper neutral
+     biased a few degrees toward it, and a desaturated clinical red kept for
+     one job only — the gaps. Nothing else in the page is allowed to be red. */
+  :root {
+    --ground:      #f7f8f6;
+    --surface:     #ffffff;
+    --surface-2:   #f0f3f0;
+    --ink:         #11201c;
+    --ink-2:       #46564f;
+    --ink-3:       #74837c;
+    --rule:        #dde3df;
+    --rule-2:      #eaefec;
+    --accent:      #0c5f4e;
+    --accent-soft: #e2efea;
+    --flag:        #9d2f26;
+    --flag-soft:   #fbeceb;
+    --hold:        #0c5f4e;
+    --advisory:    #7d5610;
+    --shadow:      0 1px 2px rgba(17, 32, 28, .05), 0 8px 24px -12px rgba(17, 32, 28, .12);
+
+    --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0c1411;
+      --surface:     #121c19;
+      --surface-2:   #18241f;
+      --ink:         #e7ece9;
+      --ink-2:       #a7b5af;
+      --ink-3:       #7d8c86;
+      --rule:        #253530;
+      --rule-2:      #1c2924;
+      --accent:      #55b79f;
+      --accent-soft: #16302a;
+      --flag:        #e2857c;
+      --flag-soft:   #2b1917;
+      --hold:        #55b79f;
+      --advisory:    #c9a45e;
+      --shadow:      0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px -12px rgba(0, 0, 0, .5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0c1411;
+    --surface:     #121c19;
+    --surface-2:   #18241f;
+    --ink:         #e7ece9;
+    --ink-2:       #a7b5af;
+    --ink-3:       #7d8c86;
+    --rule:        #253530;
+    --rule-2:      #1c2924;
+    --accent:      #55b79f;
+    --accent-soft: #16302a;
+    --flag:        #e2857c;
+    --flag-soft:   #2b1917;
+    --hold:        #55b79f;
+    --advisory:    #c9a45e;
+    --shadow:      0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px -12px rgba(0, 0, 0, .5);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: clamp(2rem, 5vw, 4.5rem) clamp(1rem, 4vw, 3rem) 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(2.5rem, 5vw, 4rem);
+  }
+
+  /* ── Masthead ─────────────────────────────────────────────────────────── */
+  .mast { display: flex; flex-direction: column; gap: 1.25rem; }
+  .mast-brand {
+    display: flex; align-items: baseline; gap: .6rem;
+    font-family: var(--mono);
+    font-size: .75rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent);
+  }
+  .mast-brand span { color: var(--ink-3); letter-spacing: .1em; }
+  .mast h1 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: clamp(2.1rem, 5.5vw, 3.1rem);
+    line-height: 1.1;
+    letter-spacing: -.015em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .mast .lede {
+    margin: 0; max-width: 46ch;
+    font-size: 1.0625rem; color: var(--ink-2);
+  }
+  .mast .provenance {
+    margin: 0; max-width: 60ch;
+    font-size: .875rem; color: var(--ink-3);
+    padding-top: 1rem; border-top: 1px solid var(--rule);
+  }
+
+  /* ── Count strip ──────────────────────────────────────────────────────── */
+  .counts {
+    display: grid; gap: 1px;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .count { background: var(--surface); padding: 1.1rem 1.25rem; }
+  .count.is-flag { background: var(--flag-soft); }
+  .count-n {
+    font-family: var(--serif);
+    font-size: 2rem; line-height: 1; font-variant-numeric: tabular-nums;
+    color: var(--accent);
+  }
+  .count.is-flag .count-n { color: var(--flag); }
+  .count-l {
+    margin-top: .45rem;
+    font-size: .75rem; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .count.is-flag .count-l { color: var(--flag); opacity: .85; }
+
+  /* ── Sections ─────────────────────────────────────────────────────────── */
+  section { display: flex; flex-direction: column; gap: 1.25rem; }
+  .sec-head { display: flex; flex-direction: column; gap: .5rem; }
+  .sec-num {
+    font-family: var(--mono);
+    font-size: .75rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  section h2 {
+    font-family: var(--serif); font-weight: 500;
+    font-size: clamp(1.5rem, 3.5vw, 1.9rem); line-height: 1.2;
+    letter-spacing: -.01em; margin: 0; text-wrap: balance;
+  }
+  section h3 {
+    font-family: var(--sans); font-weight: 650;
+    font-size: 1rem; letter-spacing: -.005em; margin: 0;
+  }
+  p { margin: 0; max-width: 68ch; }
+  p + p { margin-top: .85rem; }
+  .note { color: var(--ink-2); font-size: .9375rem; }
+  em { font-style: italic; color: var(--ink-2); }
+  strong { font-weight: 650; }
+  code, .code {
+    font-family: var(--mono); font-size: .8125em;
+    background: var(--surface-2); border-radius: 2px;
+    padding: .1em .35em; color: var(--ink-2);
+  }
+
+  /* ── Tables ───────────────────────────────────────────────────────────── */
+  .scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 3px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: .9375rem; }
+  th, td { text-align: left; padding: .7rem .9rem; border-bottom: 1px solid var(--rule-2); vertical-align: top; }
+  thead th {
+    font-size: .6875rem; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 600;
+    border-bottom: 1px solid var(--rule); white-space: nowrap;
+    background: var(--surface);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-3); width: 1%; }
+  td.id { font-family: var(--mono); font-size: .8125rem; white-space: nowrap; }
+  td.mins { white-space: nowrap; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .mark { color: var(--hold); font-weight: 700; }
+  .mark-off { color: var(--advisory); font-size: .8125rem; }
+
+  /* ── Owner chips ──────────────────────────────────────────────────────── */
+  .owner { display: inline-flex; align-items: center; gap: .45rem; white-space: nowrap; }
+  .owner-mark {
+    display: inline-grid; place-items: center;
+    width: 1.4rem; height: 1.4rem; flex: none;
+    border-radius: 50%;
+    font-family: var(--mono); font-size: .625rem; font-weight: 700; letter-spacing: .02em;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .owner-only { color: var(--flag); font-weight: 650; }
+
+  /* ── Callouts ─────────────────────────────────────────────────────────── */
+  .rule-card {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 3px; padding: 1.1rem 1.25rem;
+    display: flex; flex-direction: column; gap: .5rem;
+  }
+  .rule-card h3 { font-size: .9375rem; }
+  .rule-card p { font-size: .9375rem; color: var(--ink-2); }
+
+  .gap-panel {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-top: 3px solid var(--flag);
+    border-radius: 3px; padding: clamp(1.25rem, 3vw, 1.75rem);
+    display: flex; flex-direction: column; gap: 1.1rem;
+    box-shadow: var(--shadow);
+  }
+  .gap-panel.is-single { border-top-color: var(--flag); }
+  .gap-eyebrow {
+    font-family: var(--mono); font-size: .6875rem;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--flag);
+  }
+  .gap-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .gap-list li {
+    display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: .9rem;
+    padding: .6rem 0; border-bottom: 1px solid var(--rule-2);
+    font-size: .9375rem;
+  }
+  .gap-list li:last-child { border-bottom: none; }
+  .gap-list .code-cell { font-family: var(--mono); font-size: .8125rem; color: var(--flag); padding-top: .1rem; }
+
+  .ask {
+    background: var(--accent-soft);
+    border-radius: 3px; padding: 1rem 1.15rem;
+    font-size: .9375rem; color: var(--ink);
+  }
+  .ask strong { color: var(--accent); }
+
+  /* ── Q&A lists ────────────────────────────────────────────────────────── */
+  .qa { display: flex; flex-direction: column; }
+  .qa-row {
+    display: grid; grid-template-columns: minmax(0, 14rem) minmax(0, 1fr); gap: 1.25rem;
+    padding: .8rem 0; border-bottom: 1px solid var(--rule-2);
+    font-size: .9375rem;
+  }
+  .qa-row:last-child { border-bottom: none; }
+  .qa-q { color: var(--ink-2); }
+  .qa-a { color: var(--ink); }
+
+  .events { display: flex; flex-wrap: wrap; gap: .35rem; }
+  .ev {
+    font-family: var(--mono); font-size: .75rem;
+    background: var(--surface); border: 1px solid var(--rule);
+    border-radius: 2px; padding: .25rem .5rem; color: var(--ink-2);
+  }
+  .ev.is-gov { border-color: var(--accent); color: var(--accent); }
+
+  footer {
+    border-top: 1px solid var(--rule); padding-top: 1.5rem;
+    font-size: .8125rem; color: var(--ink-3);
+    display: flex; flex-direction: column; gap: .4rem;
+  }
+
+  @media (max-width: 34rem) {
+    .qa-row, .gap-list li { grid-template-columns: minmax(0, 1fr); gap: .3rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="mast">
+    <div class="mast-brand">KuBi <span>· Clinic Operating System</span></div>
+    <h1>The clinic day — directory</h1>
+    <p class="lede">
+      Everything the system holds about opening and closing, with the role
+      against each item, so the gaps can be seen rather than remembered.
+    </p>
+    <p class="provenance">
+      Read out of the built system on 10 August 2026 — not written from intent.
+      Every block, owner and event below comes from <code>readiness.ts</code>
+      and <code>closing.ts</code>. If the code changes and this page does not,
+      the tests that assert these lists fail.
+    </p>
+  </header>
+
+  <div class="counts">
+    <div class="count">
+      <div class="count-n">9</div>
+      <div class="count-l">Morning blocks</div>
+    </div>
+    <div class="count">
+      <div class="count-n">11</div>
+      <div class="count-l">Evening blocks</div>
+    </div>
+    <div class="count">
+      <div class="count-n">28</div>
+      <div class="count-l">Matrix controls traced</div>
+    </div>
+    <div class="count is-flag">
+      <div class="count-n">7</div>
+      <div class="count-l">Uncovered — §5</div>
+    </div>
+  </div>
+
+  <!-- ── 1 ────────────────────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">Section 1</div>
+      <h2>Stakeholders</h2>
+    </div>
+    <p class="note">
+      Seven roles touch the day. Roles, never names — <em>names can change but
+      roles do not change</em>. The log still records which employee did what;
+      that is provenance, not the interface.
+    </p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Role</th><th>Morning</th><th>Evening</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="owner"><span class="owner-mark">DA</span>Dental Assistant</span></td>
+            <td>4 operatories, 15 min each · stock, as required</td>
+            <td>4 operatories · restock for tomorrow</td>
+          </tr>
+          <tr>
+            <td><span class="owner"><span class="owner-mark">SA</span>Senior Assistant</span></td>
+            <td>the equipment round — <span class="owner-only">only they may report it</span></td>
+            <td>may stand in on the rooms</td>
+          </tr>
+          <tr>
+            <td><span class="owner"><span class="owner-mark">ST</span>Sterilization Technician</span></td>
+            <td>the morning run — 75 min to cooling</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td><span class="owner"><span class="owner-mark">HK</span>Housekeeping</span></td>
+            <td>floors, pantry, washroom — 45 min</td>
+            <td>bio-medical waste · environment and fumigation</td>
+          </tr>
+          <tr>
+            <td><span class="owner"><span class="owner-mark">RE</span>Reception</span></td>
+            <td>the waiting and billing area</td>
+            <td>takings · daily report · tomorrow's list · lockdown and key</td>
+          </tr>
+          <tr>
+            <td><span class="owner"><span class="owner-mark">CM</span>Clinic Manager</span></td>
+            <td>—</td>
+            <td>locks the day — refused until the drill is done</td>
+          </tr>
+          <tr>
+            <td><span class="owner"><span class="owner-mark">TD</span>Treating Doctor</span></td>
+            <td>—</td>
+            <td>clinical notes, via the gate on lockup</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rule-card">
+      <h3>Enforced, not advisory</h3>
+      <p>
+        A role that does not own a block cannot report it. The server refuses,
+        in the person's own words: <em>"Cleaning the floors and shared areas is
+        not your part of the morning."</em> This was found by driving a real
+        morning — an assistant recorded housekeeping's floors and the clinic
+        accepted it, which turned the whole readiness calculation into a
+        formality.
+      </p>
+      <p>
+        Senior Assistant counts as an assistant for rooms and stock and
+        <strong>nowhere else</strong>. The equipment round is theirs alone, and
+        releasing a sterilisation batch stays a separation-of-duties gate so
+        that nobody releases their own work.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 2 ────────────────────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">Section 2 · Clinic readiness</div>
+      <h2>The morning</h2>
+    </div>
+    <p class="note">
+      <strong>50 minutes</strong> for everything but the autoclave; the
+      sterilisation cycle is <strong>75 minutes to cooling</strong> and runs
+      alongside. The clinic is ready when the longer path finishes — so the
+      start time is the first appointment minus the long pole, never the sum of
+      the blocks.
+    </p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th></th><th>Block</th><th>What it is</th><th>Owner</th>
+            <th>Completed by</th><th>Minutes</th><th>Holds the door</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="n">1</td><td class="id">OPERATORY:op-1</td><td>Prepare Operatory 1</td><td><span class="owner"><span class="owner-mark">DA</span>Dental Assistant</span></td><td class="id">OPERATORY_READY</td><td class="mins">15</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">2</td><td class="id">OPERATORY:op-2</td><td>Prepare Operatory 2</td><td><span class="owner"><span class="owner-mark">DA</span>Dental Assistant</span></td><td class="id">OPERATORY_READY</td><td class="mins">15</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">3</td><td class="id">OPERATORY:op-3</td><td>Prepare Operatory 3</td><td><span class="owner"><span class="owner-mark">DA</span>Dental Assistant</span></td><td class="id">OPERATORY_READY</td><td class="mins">15</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">4</td><td class="id">OPERATORY:op-4</td><td>Prepare Operatory 4</td><td><span class="owner"><span class="owner-mark">DA</span>Dental Assistant</span></td><td class="id">OPERATORY_READY</td><td class="mins">15</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">5</td><td class="id">STERILE</td><td>Release the morning sterilisation run</td><td><span class="owner"><span class="owner-mark">ST</span>Sterilization Technician</span></td><td class="id">BATCH_RELEASED</td><td class="mins">75</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">6</td><td class="id">EQUIPMENT</td><td>Check the equipment</td><td><span class="owner"><span class="owner-mark">SA</span><span class="owner-only">Senior Assistant only</span></span></td><td class="id">EQUIPMENT_VERIFIED</td><td class="mins">in the 50</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">7</td><td class="id">COMMON_AREAS</td><td>Clean the floors, pantry and washroom</td><td><span class="owner"><span class="owner-mark">HK</span>Housekeeping</span></td><td class="id">COMMON_AREAS_READY</td><td class="mins">45</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">8</td><td class="id">RECEPTION</td><td>Ready the waiting and billing area</td><td><span class="owner"><span class="owner-mark">RE</span>Reception</span></td><td class="id">RECEPTION_READY</td><td class="mins">in the 50</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">9</td><td class="id">STOCK</td><td>Check stock, as required</td><td><span class="owner"><span class="owner-mark">DA</span>Dental Assistant</span></td><td class="id">STOCK_VERIFIED</td><td class="mins">as required</td><td><span class="mark-off">advisory</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rule-card">
+      <h3>Four rooms come from the master, not from the code</h3>
+      <p>
+        A fifth operatory is a row in a table, not a release. And what is
+        checked <em>in</em> a room is fixed at four things — dental chair,
+        x-ray, hand instruments, suction — because the special kit travels on a
+        trolley and is the equipment round instead. Buying a second scanner
+        does not change the shape of anybody's morning.
+      </p>
+    </div>
+
+    <div class="rule-card">
+      <h3>Ready is calculated, never ticked</h3>
+      <p>
+        <code>ROOMS_READY</code> is refused until every block underneath it has
+        actually been reported. Nobody can assert a ready clinic; they can only
+        do the work that makes it one.
+      </p>
+    </div>
+
+    <div class="rule-card">
+      <h3>Staff entry is counted, not gated — and that is deliberate</h3>
+      <p>
+        The hygiene protocol gates each <strong>person</strong>, and an event
+        here carries the role that recorded it rather than the individual.
+        Counting is honest; refusing would not be, because the model cannot yet
+        tell two assistants apart. Recorded as a known limit rather than
+        quietly enforced on a role.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 3 ────────────────────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">Section 3 · Clinic closing</div>
+      <h2>The evening</h2>
+    </div>
+    <p class="note">
+      <strong>30 minutes</strong> from the moment the clinic shuts. Shut time is
+      <strong>18:30</strong>, with exception days at <strong>19:00</strong> —
+      both are data, because a clinic that only knew 18:30 would call every one
+      of those evenings an overrun by the team that stayed late.
+    </p>
+    <p class="note">
+      Ordered by owner rather than interleaved: two people working at once is
+      what makes thirty minutes possible, and a list that alternates between
+      them reads like a queue when it is not one.
+    </p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th></th><th>Block</th><th>What it is</th><th>Owner</th>
+            <th>Completed by</th><th>Patient safety</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="n">1</td><td class="id">OPERATORY_CLOSED:op-1</td><td>Close down Operatory 1</td><td><span class="owner"><span class="owner-mark">DA</span>Dental Assistant</span></td><td class="id">OPERATORY_CLOSED</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">2</td><td class="id">OPERATORY_CLOSED:op-2</td><td>Close down Operatory 2</td><td><span class="owner"><span class="owner-mark">DA</span>Dental Assistant</span></td><td class="id">OPERATORY_CLOSED</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">3</td><td class="id">OPERATORY_CLOSED:op-3</td><td>Close down Operatory 3</td><td><span class="owner"><span class="owner-mark">DA</span>Dental Assistant</span></td><td class="id">OPERATORY_CLOSED</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">4</td><td class="id">OPERATORY_CLOSED:op-4</td><td>Close down Operatory 4</td><td><span class="owner"><span class="owner-mark">DA</span>Dental Assistant</span></td><td class="id">OPERATORY_CLOSED</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">5</td><td class="id">RESTOCK</td><td>Restock the rooms for tomorrow</td><td><span class="owner"><span class="owner-mark">DA</span>Dental Assistant</span></td><td class="id">CONSUMABLES_RESTOCKED</td><td></td></tr>
+          <tr><td class="n">6</td><td class="id">PAYMENTS</td><td>Reconcile the day's takings</td><td><span class="owner"><span class="owner-mark">RE</span>Reception</span></td><td class="id">PAYMENTS_RECONCILED</td><td></td></tr>
+          <tr><td class="n">7</td><td class="id">REPORT</td><td>Send the daily collection report</td><td><span class="owner"><span class="owner-mark">RE</span>Reception</span></td><td class="id">DAY_REPORTED</td><td></td></tr>
+          <tr><td class="n">8</td><td class="id">TOMORROW</td><td>Review tomorrow's list and the lab cases due</td><td><span class="owner"><span class="owner-mark">RE</span>Reception</span></td><td class="id">TOMORROW_REVIEWED</td><td></td></tr>
+          <tr><td class="n">9</td><td class="id">WASTE</td><td>Close the bio-medical waste</td><td><span class="owner"><span class="owner-mark">HK</span>Housekeeping</span></td><td class="id">WASTE_CLOSED</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">10</td><td class="id">ENVIRONMENT</td><td>Close the clinic down and fumigate</td><td><span class="owner"><span class="owner-mark">HK</span>Housekeeping</span></td><td class="id">ENVIRONMENT_CLOSED</td><td><span class="mark">✔</span></td></tr>
+          <tr><td class="n">11</td><td class="id">SECURITY</td><td>Secure the premises and hand over the key</td><td><span class="owner"><span class="owner-mark">RE</span>Reception</span></td><td class="id">PREMISES_SECURED</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rule-card">
+      <h3>All eleven hold the lockup</h3>
+      <p>
+        Patient safety decides which one the manager is told about
+        <strong>first</strong> — not whether it can be skipped. There is no
+        override path and no acknowledgement, on your ruling.
+      </p>
+    </div>
+
+    <div class="rule-card">
+      <h3>The refusal is ordered by what matters</h3>
+      <p>
+        Locking the day is refused on four things in sequence: an unfinished
+        visit → an unwritten clinical note → an autoclave cycle that ran and was
+        never released → the closing drill. A manager who left a cycle
+        unreleased is told about the cycle, not about the bins.
+      </p>
+    </div>
+
+    <div class="rule-card">
+      <h3>Same-day sterilisation is not reachable, and the arithmetic says so</h3>
+      <p>
+        Cycle 75 minutes; the team leaves 30 minutes after the door shuts. The
+        last instrument that could be stored today would have to be collected
+        at <strong>17:45</strong> — forty-five minutes <em>before</em> the
+        clinic shuts. Your ruling: the morning run catches yesterday's
+        instruments, and the safety net sits at opening, where the clinic
+        cannot be called ready until a run is released. A batch waiting
+        overnight is the normal end of a day.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 4 ────────────────────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">Section 4</div>
+      <h2>The events</h2>
+    </div>
+    <p class="note">
+      The day writes 19 of the 47 event types. Past tense throughout, enforced
+      by a test — an event records what happened, never what should. The two in
+      green are governed: nobody writes them directly.
+    </p>
+
+    <h3>Morning</h3>
+    <div class="events">
+      <span class="ev">STAFF_READY</span>
+      <span class="ev">OPERATORY_READY</span>
+      <span class="ev">EQUIPMENT_VERIFIED</span>
+      <span class="ev">STOCK_VERIFIED</span>
+      <span class="ev">RECEPTION_READY</span>
+      <span class="ev">COMMON_AREAS_READY</span>
+      <span class="ev">BATCH_RELEASED</span>
+      <span class="ev is-gov">ROOMS_READY</span>
+      <span class="ev">CLINIC_UNLOCKED</span>
+    </div>
+
+    <h3>Evening</h3>
+    <div class="events">
+      <span class="ev">OPERATORY_CLOSED</span>
+      <span class="ev">CONSUMABLES_RESTOCKED</span>
+      <span class="ev">PAYMENTS_RECONCILED</span>
+      <span class="ev">DAY_REPORTED</span>
+      <span class="ev">TOMORROW_REVIEWED</span>
+      <span class="ev">WASTE_CLOSED</span>
+      <span class="ev">ENVIRONMENT_CLOSED</span>
+      <span class="ev">PREMISES_SECURED</span>
+      <span class="ev">STAFF_LEFT</span>
+      <span class="ev is-gov">CLINIC_LOCKED</span>
+    </div>
+
+    <div class="rule-card">
+      <h3>The log cannot be edited, by grant rather than by convention</h3>
+      <p>
+        <code>UPDATE</code>, <code>DELETE</code> and <code>TRUNCATE</code> are
+        revoked from the application's own database role. A corrected mistake is
+        a new event, never an edited one. Proven against a live restart and a
+        hard kill.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 5 ────────────────────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">Section 5 · What is missing</div>
+      <h2>The gaps</h2>
+    </div>
+
+    <div class="gap-panel">
+      <div class="gap-eyebrow">5a · Opening — six controls, one missing block</div>
+      <p class="note">
+        Six of the seven uncovered controls are <strong>one thing wearing six
+        matrix rows: opening the building.</strong> Neither document has that
+        section. Your closing drill has its exact mirror image — Clinic
+        Environment Closing switches all of it off in the evening — and the
+        opening procedure begins with people already inside a working building.
+        The clinic plainly does this every morning. KuBi has no block for it,
+        and nobody has said whose job it is.
+      </p>
+      <ul class="gap-list">
+        <li><span class="code-cell">OPEN-001</span><span>Open the second-floor clinic</span></li>
+        <li><span class="code-cell">OPEN-007</span><span>ACs at 24 °C</span></li>
+        <li><span class="code-cell">OPEN-008</span><span>Air diffuser</span></li>
+        <li><span class="code-cell">OPEN-009</span><span>Water availability</span></li>
+        <li><span class="code-cell">OPEN-010</span><span><strong>Water pump</strong> — <em>"starting the water pump is a task of opening"</em></span></li>
+        <li><span class="code-cell">OPEN-011</span><span>Lights and fans</span></li>
+      </ul>
+      <div class="ask">
+        <strong>The one answer that closes all six:</strong> who opens the
+        building? Housekeeping arrive first for the forty-five minutes of
+        mopping, which makes them the obvious candidate — but that is a guess,
+        and a guessed owner is a block that gets reported by whoever happens to
+        be standing there. Name the role and this becomes a single
+        <code>PREMISES_OPENED</code> block at the head of the morning.
+      </div>
+    </div>
+
+    <div class="gap-panel is-single">
+      <div class="gap-eyebrow">5b · The most serious gap on this page</div>
+      <h3>OPEN-012 — morning emergency readiness</h3>
+      <p class="note">
+        The emergency kit, the drugs and their expiry dates, the oxygen. This is
+        patient safety, and it is absent from the activity matrix's detail, from
+        the opening procedure, and from every block KuBi holds. It sits in the
+        same uncovered list as the fans and the ACs and it is not the same kind
+        of thing — a gap that reads like a light switch will be filled like one,
+        which is why it is on its own here.
+      </p>
+      <div class="ask">
+        <strong>Two answers needed:</strong> who checks it, and what does the
+        check consist of — is it a daily look at the kit, or a dated expiry
+        register? The second answer decides whether this is a block or a
+        register with its own review cycle.
+      </div>
+    </div>
+
+    <div class="gap-panel">
+      <div class="gap-eyebrow">5c · Documents still owed</div>
+      <p class="note">
+        The <em>K. B. Dental Hand Hygiene Protocol</em> — <em>"will provide
+        later"</em>. The staff-entry gate has no standard behind it: the
+        twenty-second handwash is currently a step with nothing to check it
+        against. The Five Step Sterilization Protocol is closed; the sixteen
+        steps stand as written.
+      </p>
+    </div>
+
+    <div class="gap-panel">
+      <div class="gap-eyebrow">5d · Two statements that disagree</div>
+      <p class="note">
+        Neither can be resolved by reading harder — both statements are in the
+        opening document.
+      </p>
+      <ul class="gap-list">
+        <li><span class="code-cell">1</span><span><strong>Reception floor agent.</strong> The 3-bucket technique says Virulex; the reception paragraph says 1 % sodium hypochlorite.</span></li>
+        <li><span class="code-cell">2</span><span><strong>Eye shield.</strong> PPE says disinfect and reuse; BMW says red bin as contaminated plastic. Both can be true only if these are two different items.</span></li>
+        <li><span class="code-cell">3</span><span><strong>Needles.</strong> The formalin chamber lists needles; BMW puts them in the white sharps box, never recapped. Sterilising and discarding the same item cannot both be the rule.</span></li>
+        <li><span class="code-cell">4</span><span><strong>Fumigation cadence.</strong> <em>"Once every day"</em> and <em>"on a holiday or end of the day"</em> are not the same schedule.</span></li>
+      </ul>
+    </div>
+
+    <div class="gap-panel">
+      <div class="gap-eyebrow">5e · Ordering the documents do not state</div>
+      <ul class="gap-list">
+        <li><span class="code-cell">5</span><span>Floors before surfaces, or after?</span></li>
+        <li><span class="code-cell">6</span><span>Equipment check before the sterilisation run, or after? The autoclave is checked in §3 and used in §7.</span></li>
+        <li><span class="code-cell">7</span><span>Where does the chemical route run? The sixteen steps end in an autoclave; the chemical-route instruments presumably go to the formalin chamber, but no sequence is given.</span></li>
+      </ul>
+    </div>
+
+    <div class="gap-panel">
+      <div class="gap-eyebrow">5f · One model limit, raised rather than worked around</div>
+      <p class="note">
+        <strong>Per-patient sterilisation has one owner and you have named
+        two.</strong> The flow gives each step a single owning role, so the
+        turnover run displays as the technician's even when a dental assistant
+        does it. Nothing is refused — role ownership is enforced only on the
+        readiness and closing blocks — but the displayed owner is narrower than
+        the clinic. Widening it means letting a node have two owners, which
+        changes the frozen model, so it is raised rather than done.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 6 ────────────────────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">Section 6</div>
+      <h2>Matrix corrections queued</h2>
+    </div>
+    <p class="note">
+      The activity matrix is frozen at v2.0, so these queue for v3.0 rather
+      than being edited in place.
+    </p>
+    <div class="qa">
+      <div class="qa-row">
+        <div class="qa-q"><code>CLOSE-005</code></div>
+        <div class="qa-a">"Sterilization complete — same day" is not reachable at these hours and no longer states the standard.</div>
+      </div>
+      <div class="qa-row">
+        <div class="qa-q"><code>CLOSE-012</code></div>
+        <div class="qa-a">Water pump is filed under closing. <strong>Starting</strong> it is an opening task — the matrix had it on the wrong side of the day.</div>
+      </div>
+      <div class="qa-row">
+        <div class="qa-q"><code>CLOSE-016</code></div>
+        <div class="qa-a">Drafted as a manager acknowledgement gate. It is not one — the day closes when the drill is done.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 7 ────────────────────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">Section 7</div>
+      <h2>Settled — so it is not reopened by accident</h2>
+    </div>
+    <div class="qa">
+      <div class="qa-row"><div class="qa-q">How many operatories?</div><div class="qa-a">Four, from a master. A fifth is a row, not a release.</div></div>
+      <div class="qa-row"><div class="qa-q">Technician or assistant on sterilisation?</div><div class="qa-a">The technician owns the morning run; either does the per-patient runs.</div></div>
+      <div class="qa-row"><div class="qa-q">Who owns each block?</div><div class="qa-a">Rooms and stock → Assistant or Senior · equipment round → Senior only · waiting and billing → Reception · floors → Housekeeping · morning run → Technician.</div></div>
+      <div class="qa-row"><div class="qa-q">The two unknown durations</div><div class="qa-a">The equipment round and the waiting area happen inside the fifty minutes. They carry no clock of their own, which is different from unknown.</div></div>
+      <div class="qa-row"><div class="qa-q">Is the first appointment the target?</div><div class="qa-a">Yes. A day with nothing booked reports no target rather than an invented one.</div></div>
+      <div class="qa-row"><div class="qa-q">Total readiness minutes</div><div class="qa-a">50, excluding the sterilisation cycle.</div></div>
+      <div class="qa-row"><div class="qa-q">Total closing minutes</div><div class="qa-a">30, from the moment the clinic shuts.</div></div>
+      <div class="qa-row"><div class="qa-q">Clinic shut time</div><div class="qa-a">18:30, exception days 19:00 — both held as data.</div></div>
+      <div class="qa-row"><div class="qa-q">Refuse, or acknowledge, at lockup?</div><div class="qa-a">Keep refusing. No override path.</div></div>
+      <div class="qa-row"><div class="qa-q">Same-day sterilisation?</div><div class="qa-a">No. The morning run catches yesterday's instruments.</div></div>
+      <div class="qa-row"><div class="qa-q">Fumigation</div><div class="qa-a">Daily at end of day. Not the long pole — the hour the rooms stay shut is spent with nobody in the building.</div></div>
+      <div class="qa-row"><div class="qa-q">Names in the interface?</div><div class="qa-a">Roles only.</div></div>
+    </div>
+  </section>
+
+  <footer>
+    <div>KuBi · Clinic Operating System · SYNTHETIC KB Dental Andheri</div>
+    <div>Synthetic data throughout. No patient or production data appears on this page.</div>
+  </footer>
+
+</div>

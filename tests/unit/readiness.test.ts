@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ClinicEvent, RoleCode, Verdict, decisionsFor, emptyWorld, record, readiness, whyNotReady,
   OPERATORY_MINUTES, HOUSEKEEPING_MINUTES, STERILIZATION_MINUTES, READINESS_MINUTES,
+  OPENING_CONTROLS, UNCOVERED_OPENING_CONTROLS,
   type Operatory, type World,
 } from '@kubi/contracts';
 
@@ -479,5 +480,65 @@ describe('staff entry is reported, and honestly labelled', () => {
     const w = fullMorning();
     expect(read(w).staffEntered).toBe(0);
     expect(read(w).ready).toBe(true);
+  });
+});
+
+describe('every one of the matrix’s twelve opening controls is accounted for', () => {
+  /**
+   * The evening has had this table since it was built; the morning never did,
+   * so the morning's gaps were a paragraph in a document rather than something
+   * a test could fail on. This is the mirror.
+   */
+  const ids = Object.keys(OPENING_CONTROLS);
+
+  it('covers OPEN-001 through OPEN-012 and invents no others', () => {
+    expect(ids).toEqual(Array.from({ length: 12 },
+      (_, i) => `OPEN-${String(i + 1).padStart(3, '0')}`));
+  });
+
+  it('points every covered control at a block that actually exists', () => {
+    const blocks = new Set(read(world()).blocks.map((b) =>
+      b.id.startsWith('OPERATORY:') ? 'OPERATORY' : b.id));
+    for (const [id, { covers }] of Object.entries(OPENING_CONTROLS)) {
+      if (covers === null) continue;
+      expect(blocks, `${id} points at "${covers}", which is not a readiness block`)
+        .toContain(covers);
+    }
+  });
+
+  it('gives every control a reason, so none is covered by assertion alone', () => {
+    for (const [id, { why }] of Object.entries(OPENING_CONTROLS)) {
+      expect(why.length, `${id} has no reason`).toBeGreaterThan(20);
+    }
+  });
+
+  it('names the seven nothing covers, rather than quietly dropping them', () => {
+    // Six of the seven are one thing wearing six matrix rows: opening the
+    // building. Neither source document has that section — the closing drill
+    // switches all of it off in the evening, and the opening procedure begins
+    // with people already inside a working building. The clinic plainly does
+    // it; KuBi has no block for it and nobody has said whose job it is.
+    expect(UNCOVERED_OPENING_CONTROLS).toEqual([
+      'OPEN-001', 'OPEN-007', 'OPEN-008', 'OPEN-009', 'OPEN-010', 'OPEN-011',
+      'OPEN-012',
+    ]);
+  });
+
+  it('holds the water pump on the owner’s ruling, and admits no block has it', () => {
+    // *"starting the water pump is a task of opening"*. The matrix put it in
+    // the evening. It is the morning's now — and the morning does not yet
+    // cover it, which is the honest state rather than a block invented to
+    // make the row look closed.
+    expect(OPENING_CONTROLS['OPEN-010']!.covers).toBeNull();
+    expect(OPENING_CONTROLS['OPEN-010']!.why).toContain('water pump');
+    expect(UNCOVERED_OPENING_CONTROLS).toContain('OPEN-010');
+  });
+
+  it('keeps emergency readiness apart from the light switches', () => {
+    // OPEN-012 is the emergency kit, the drugs and their expiry. It is in the
+    // same uncovered list as the ACs and the fans and it is not the same kind
+    // of thing, so its reason has to say so — a gap that reads like a fan
+    // switch will be filled like one.
+    expect(OPENING_CONTROLS['OPEN-012']!.why).toContain('Patient safety');
   });
 });

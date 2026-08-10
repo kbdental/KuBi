@@ -141,7 +141,7 @@ export function lastCollection(shutAt: number | null): {
  * CLOSE-009, 012, 013 and 014 — and the reading held up: three of the four
  * were "hand the day on" work, so the drill was complete about shutting the
  * building down and silent about tomorrow. The owner's instruction was to add
- * them, and they became **two blocks and one fold**, not four blocks:
+ * them, and three of them became **two blocks**:
  *
  *   - `RESTOCK` — consumables replenished for tomorrow (CLOSE-009), the
  *     assistant, since it is the same hands that just cleared the trays.
@@ -149,12 +149,18 @@ export function lastCollection(shutAt: number | null): {
  *     (CLOSE-013, CLOSE-014), reception, one sit-down rather than two. They
  *     are the same act: you cannot review tomorrow's list without noticing
  *     which case is at the lab.
- *   - The water pump (CLOSE-012) folded into `ENVIRONMENT` rather than
- *     standing alone — same protocol section, same hands, and one switch does
- *     not earn its own block in a thirty-minute drill.
  *
- * None of them is `critical`. The matrix's priorities are PS / C / I, and only
- * **PS** is patient safety; CLOSE-009, 012 and 013 are I and CLOSE-014 is C.
+ * The fourth turned out not to be a closing control at all. The water pump
+ * (CLOSE-012) was briefly folded into `ENVIRONMENT`, and the owner corrected
+ * it: *"the water pump… is not a task of closing, instead starting the water
+ * pump is a task of opening"*. So it points at `MORNING` — the matrix put it
+ * on the wrong side of the day, and this is the record of that rather than a
+ * quiet deletion. Whether the morning has a block for it is the morning's
+ * question; see `UNCOVERED_OPENING_CONTROLS` in `readiness.ts`, where it is
+ * currently one of seven that nothing yet covers.
+ *
+ * Neither new block is `critical`. The matrix's priorities are PS / C / I, and
+ * only **PS** is patient safety; CLOSE-009 and 013 are I and CLOSE-014 is C.
  * A block that is merely important still holds the door — every block does —
  * but it is not a 🔴 CLOSING WITH CRITICAL EXCEPTION, and calling it one would
  * make that flag mean nothing.
@@ -177,7 +183,7 @@ export const CLOSING_CONTROLS: Readonly<Record<string, {
   'CLOSE-009': { covers: 'RESTOCK', why: 'added to the drill: the rooms are stocked for tomorrow before the assistant leaves' },
   'CLOSE-010': { covers: 'OPERATORY_CLOSED', why: 'Operatory Closing (d, e) — light, compressor and suction off; the board is Security (c) and the chairs are Environment (a)' },
   'CLOSE-011': { covers: 'ENVIRONMENT', why: 'Clinic Environment Closing (d) — windows, fans and ACs' },
-  'CLOSE-012': { covers: 'ENVIRONMENT', why: 'added to the drill: the water pump is one switch in the same protocol and the same hands as the fans and ACs' },
+  'CLOSE-012': { covers: 'MORNING', why: 'not a closing task — the owner ruled that starting the water pump belongs to opening (OPEN-010)' },
   'CLOSE-013': { covers: 'TOMORROW', why: 'added to the drill: lab cases due are reviewed with tomorrow’s list' },
   'CLOSE-014': { covers: 'TOMORROW', why: 'added to the drill: reception reviews tomorrow’s list and its special requirements' },
   'CLOSE-015': { covers: 'SECURITY', why: 'Security & Lockdown Protocol — reception, ending in the key handover' },
@@ -333,8 +339,7 @@ function planFor(operatories: readonly Operatory[]): Array<Omit<ClosingBlock, 'd
     block('ENVIRONMENT', 'Close the clinic down and fumigate',
       RoleCode.HOUSEKEEPING, Objective.PATIENT_SAFE,
       ClinicEvent.ENVIRONMENT_CLOSED, null, true,
-      'The waiting area, pantry and washroom, the water pump, and fumigation '
-      + 'are not done'),
+      'The waiting area, pantry, washroom and fumigation are not done'),
     block('SECURITY', 'Secure the premises and hand over the key',
       RoleCode.RECEPTION, Objective.CLINIC_EFFICIENT,
       ClinicEvent.PREMISES_SECURED, null, false,

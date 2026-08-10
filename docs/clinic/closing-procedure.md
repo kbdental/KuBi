@@ -28,12 +28,12 @@ that alternates between them reads like a queue when it is not one.
 | `REPORT` | Daily Report Submission (a–b) | Reception | |
 | `TOMORROW` | *added* — lab cases due and tomorrow's list (`CLOSE-013`, `CLOSE-014`) | Reception | |
 | `WASTE` | BMW Closing (a–e) | Housekeeping | ✔ |
-| `ENVIRONMENT` | Clinic Environment Closing (a–g), incl. fumigation and the water pump (`CLOSE-012`) | Housekeeping | ✔ |
+| `ENVIRONMENT` | Clinic Environment Closing (a–g), incl. fumigation | Housekeeping | ✔ |
 | `SECURITY` | Security & Lockdown (a–h) | Reception | |
 
 None of the added work is `critical`. The matrix scores priorities PS / C / I,
-and only **PS** is patient safety; `CLOSE-009`, `012` and `013` are I and
-`CLOSE-014` is C. Not critical is not optional — every block holds the lockup —
+and only **PS** is patient safety; `CLOSE-009` and `013` are I and `CLOSE-014`
+is C. Not critical is not optional — every block holds the lockup —
 but calling this work a 🔴 CLOSING WITH CRITICAL EXCEPTION would empty the
 phrase of meaning.
 
@@ -265,9 +265,9 @@ CLOSE-016  Day closed  ───────────────────
 
    patient      instruments        premises        shutdown      tomorrow
    ─────────    ───────────        ────────        ────────      ────────
-   001 002 003  004 005 006        007 008×N       010 011       009 013 014
-   Reception    Assistant          Housekeeping    012 015       Assistant
-   Doctor       Sterilization      + Assistant     Hskpg/Recn    Reception
+   001 002 003  004 005 006        007 008×N       010 011 015   009 013 014
+   Reception    Assistant          Housekeeping    Hskpg/Recn    Assistant
+   Doctor       Sterilization      + Assistant                   Reception
 ```
 
 Same three properties as the morning:
@@ -291,7 +291,8 @@ Same three properties as the morning:
 | Daily revenue reconciliation | A closing control, Reception. Built. |
 | Fumigation | Daily at end of day. Not the long pole: the hour the rooms stay shut is spent with nobody in the building. |
 | Is there a closing document? | Yes — supplied, and this is built from it. |
-| The four controls with no home | **Add them to the drill.** Two blocks and one fold; no extra minutes. |
+| The four controls with no home | **Add them to the drill.** Two blocks; no extra minutes. |
+| The water pump | **Not a closing task.** Starting it is an opening task; the matrix had it on the wrong side of the day. |
 
 ## The four that had no home, and how they were added
 
@@ -305,12 +306,12 @@ to add them. They became **two blocks and one fold**, not four blocks:
 | `CLOSE-009` | Consumables replenished — ready for next day | `RESTOCK`, Dental Assistant — the same hands that just cleared the trays, in the same rooms |
 | `CLOSE-013` | Lab cases reviewed — pending / due identified | `TOMORROW`, Reception |
 | `CLOSE-014` | Tomorrow's cases reviewed — special requirements identified | `TOMORROW`, Reception — one sit‑down, not two: you cannot review tomorrow's list without noticing which case is at the lab |
-| `CLOSE-012` | Water pump — OFF / status verified | folded into `ENVIRONMENT` — same protocol section, same hands as the fans and ACs, and one switch does not earn its own block in a thirty‑minute drill |
+| `CLOSE-012` | Water pump — OFF / status verified | **the morning.** It was briefly folded into `ENVIRONMENT`, and the owner corrected it: *"the water pump… is not a task of closing, instead starting the water pump is a task of opening"*. The matrix had it on the wrong side of the day |
 
-The fold is named in the block's own refusal sentence — *"…the water pump…"* —
-so it reaches the person doing the round rather than being covered on paper and
-dropped in the building. `UNCOVERED_CLOSING_CONTROLS` is now empty, and a test
-asserts that rather than the prose claiming it.
+`UNCOVERED_CLOSING_CONTROLS` is now empty, and a test asserts that rather than
+the prose claiming it. The pump is recorded as the morning's — see
+`UNCOVERED_OPENING_CONTROLS`, where it is one of seven the morning does not yet
+cover.
 
 ## Still open
 
@@ -341,7 +342,7 @@ test rather than believed: `CLOSING_CONTROLS` in `closing.ts`.
 | `CLOSE-009` Consumables replenished | `RESTOCK` · **Dental Assistant** | *added* — not in the drill |
 | `CLOSE-010` Equipment shutdown | `OPERATORY_CLOSED` · **Dental Assistant** | Operatory Closing (d, e) |
 | `CLOSE-011` AC / lights / fans | `ENVIRONMENT` · **Housekeeping** | Clinic Environment Closing (d) |
-| `CLOSE-012` Water pump | `ENVIRONMENT` · **Housekeeping** | *added* — folded into the same round |
+| `CLOSE-012` Water pump | *the morning* | owner's ruling — starting the pump is an opening task |
 | `CLOSE-013` Lab cases reviewed | `TOMORROW` · **Reception** | *added* — not in the drill |
 | `CLOSE-014` Tomorrow's cases | `TOMORROW` · **Reception** | *added* — not in the drill |
 | `CLOSE-015` Clinic secured | `SECURITY` · **Reception** | Security & Lockdown Protocol |

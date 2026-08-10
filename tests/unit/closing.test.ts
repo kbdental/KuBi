@@ -474,28 +474,34 @@ describe('every one of the matrix’s sixteen controls is accounted for', () => 
 
   it('resolves the seven that used to read "Assigned Staff"', () => {
     // Six derived from a section of the drill. The water pump derived from
-    // nothing — it appeared in the matrix and in no section — so it was added,
-    // folded into Environment: same protocol, same hands, one switch.
+    // nothing — it appeared in the matrix and in no section — and the owner
+    // explained why: it is not a closing task at all.
     const wasAssignedStaff = ['CLOSE-007', 'CLOSE-010', 'CLOSE-011', 'CLOSE-012', 'CLOSE-015'];
     expect(wasAssignedStaff.filter((id) => CLOSING_CONTROLS[id]!.covers !== null))
       .toEqual(wasAssignedStaff);
-    expect(CLOSING_CONTROLS['CLOSE-012']!.covers).toBe('ENVIRONMENT');
   });
 
-  it('adds four controls as two blocks and a fold, not as four blocks', () => {
+  it('adds three controls as two blocks, and sends the fourth to the morning', () => {
     // The judgement worth being able to check: CLOSE-013 and CLOSE-014 are one
     // sit-down at reception — you cannot review tomorrow's list without
-    // noticing which case is at the lab — and the water pump is one switch in
-    // housekeeping's existing round. Four rows, two new blocks.
+    // noticing which case is at the lab.
     expect(CLOSING_CONTROLS['CLOSE-009']!.covers).toBe('RESTOCK');
     expect(CLOSING_CONTROLS['CLOSE-013']!.covers).toBe('TOMORROW');
     expect(CLOSING_CONTROLS['CLOSE-014']!.covers).toBe('TOMORROW');
-    expect(CLOSING_CONTROLS['CLOSE-012']!.covers).toBe('ENVIRONMENT');
+  });
 
-    // And the fold has to be visible to whoever is doing the round, or it is a
-    // control covered on paper and dropped in the building.
+  it('keeps the water pump out of the evening, on the owner’s ruling', () => {
+    // *"the water pump… is not a task of closing, instead starting the water
+    // pump is a task of opening"*. The matrix had it on the wrong side of the
+    // day. It is recorded as the morning's rather than deleted, and the
+    // evening must not mention it — a closing block that names a switch
+    // nobody flips at closing teaches people to ignore the sentence.
+    expect(CLOSING_CONTROLS['CLOSE-012']!.covers).toBe('MORNING');
     const env = shut(evening()).blocks.find((b) => b.id === 'ENVIRONMENT')!;
-    expect(env.ifOutstanding).toContain('water pump');
+    expect(env.ifOutstanding).not.toContain('pump');
+    for (const b of shut(evening()).blocks) {
+      expect(b.label.toLowerCase(), `${b.id} still mentions the pump`).not.toContain('pump');
+    }
   });
 
   it('costs the day no extra time, because the work was already being done', () => {
