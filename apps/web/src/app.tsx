@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   api, ApiError,
   type Me, type MyDay, type TaskSheet, type AttentionRow, type CheckRow, type Schedule,
@@ -19,10 +19,10 @@ import { Gate } from './screens/gate.js';
 import { Clinic } from './screens/clinic.js';
 import { Patient360 } from './screens/patient-360.js';
 import { CommandPalette, useCommandKey } from './screens/command-palette.js';
-import {
-  IconToday, IconClinic, IconAttention, IconChecks,
-  IconQuality, IconPatients, IconOperations, IconMe, IconOverview,
-} from './icons.js';
+import { IconToday, IconClinic, IconOverview } from './icons.js';
+import { Shell, type RailItem } from './app/shell.js';
+import { Dashboard } from './screens/dashboard.js';
+import { ClinicReadiness } from './screens/readiness.js';
 
 /**
  * The shell.
@@ -118,7 +118,10 @@ export function App() {
     return (
       <SignIn
         onSignedIn={() => {
-          setChosen('TODAY');
+          // Null, not a place: the default is resolved at render, so signing
+          // in lands wherever the shell's home is rather than pinning the old
+          // task list into state before the rail has been drawn.
+          setChosen(null);
           reload();
         }}
       />
@@ -208,73 +211,76 @@ export function App() {
   // has and nobody admits to. Someone with no dashboard yet — housekeeping,
   // until the Assistant screen ships — lands on their task list rather than
   // on somebody else's screen.
-  const home: Place = myHome ? myHome.id : 'TODAY';
+  // The dashboard is where everybody lands. The old role-homes are still
+  // reachable — they are on the More list, not deleted — but "where is the
+  // clinic" comes before "what do I owe", which is the design principle.
+  const home: Place = 'DASHBOARD';
   const here: Place = chosen ?? home;
+  void myHome;
+
+  /**
+   * The rail.
+   *
+   * Two places are named so far — the dashboard and clinic readiness — and
+   * everything that already existed sits under More rather than being deleted:
+   * a screen somebody uses is not made obsolete by a new frame around it.
+   */
+  const rail: RailItem[] = [
+    { id: 'DASHBOARD', label: 'Dashboard', icon: <IconOverview filled={here === 'DASHBOARD'} /> },
+    { id: 'READINESS', label: 'Clinic readiness', icon: <IconClinic filled={here === 'READINESS'} /> },
+    {
+      id: 'MORE', label: 'More', icon: <IconToday filled={here === 'MORE'} />,
+      count: data.attention.length, urgent: data.attention.length > 0,
+    },
+  ];
+
+  const TITLES: Record<string, string> = {
+    DASHBOARD: 'Dashboard',
+    READINESS: 'Clinic readiness',
+    MORE: 'More',
+  };
+
+  // Everything under More is the previous shell's set, reached by its own id.
+  const inMore = !['DASHBOARD', 'READINESS'].includes(here);
 
   return (
-    <div className="app">
-      {paletteEl}
-      <nav className="nav">
-        <div className="nav-brand">
-          <span className="nav-mark">KuBi</span>
-          {data.day.clinic && <span className="nav-clinic">{data.day.clinic.name}</span>}
-        </div>
-        <div className="nav-items">
-          {/* An owner is not a manager with more permissions. "You should not
-              see 150 tasks" is a different screen, not a filtered one — so the
-              owner gets their own dashboard and none of the operational tabs.
-              Which dashboards appear is the registry's business, not this
-              file's. */}
-          {myDashboards.map((d) => (
-            <Tab key={d.id} id={d.id} label={d.label} now={here} go={setChosen} />
-          ))}
-          {!isOwner && (
-            <Tab
-              id="TODAY"
-              label={myDashboards.length > 0 ? 'My tasks' : 'Today'}
-              now={here}
-              go={setChosen}
-            />
-          )}
-          {!isOwner && data.schedule.rows.length > 0 && (
-            <Tab id="CLINIC" label="Clinic" now={here} go={setChosen} />
-          )}
-          {/* Readiness before the chair, follow-up after it. Clinical work, so
-              it follows the same permission as the clinic-wide views. */}
-          {!isOwner && data.overview && <Tab id="PATIENTS" label="Patients" now={here} go={setChosen} />}
-          {!isOwner && (
-            <Tab
-              id="ATTENTION"
-              label="Attention"
-              now={here}
-              go={setChosen}
-              count={data.attention.length}
-            />
-          )}
-          {/* The IMPROVE stage. Clinic-wide, like Overview: an assistant has a
-              day, a manager has a clinic — and learning is a clinic's job. */}
-          {data.overview && <Tab id="QUALITY" label="Quality" now={here} go={setChosen} />}
-          {/* The published standard — primary, not buried in settings. It is
-              the thing no competitor has, and burying it hides it. */}
-          {data.me.roleCodes.includes('RECEPTION')
-            && <Tab id="CONFIRMATIONS" label="Confirmations" now={here} go={setChosen} />}
-          {/* Engine D. Whoever is at the chair needs the verdict, not a list. */}
-          {['TREATING_DOCTOR','DENTAL_ASSISTANT','SENIOR_ASSISTANT','CLINICAL_DIRECTOR']
-            .some((r) => data.me.roleCodes.includes(r))
-            && <Tab id="GATE" label="Gate" now={here} go={setChosen} />}
-          {data.overview && <Tab id="STANDARDS" label="Standards" now={here} go={setChosen} />}
-          <Tab id="ME" label="Me" now={here} go={setChosen} />
-        </div>
-        <button className="nav-search" type="button" onClick={() => setPalette(true)}>
-          <span>Search</span>
-          <kbd>⌘K</kbd>
-        </button>
-        <div className="nav-who">
-          <span className="nav-who-name">{data.me.displayLabel}</span>
-        </div>
-      </nav>
+    <>
+    {paletteEl}
+    <Shell
+      clinicName={data.day.clinic?.name ?? 'KB Dental'}
+      items={rail}
+      here={inMore ? 'MORE' : here}
+      go={setChosen}
+      who={data.me.displayLabel}
+      whoRole={roleWord(data.me.roleCodes[0] ?? '')}
+      title={TITLES[here] ?? label(here, myDashboards)}
+      onSignOut={() => { void api.logout().finally(() => { setData(null); setChosen(null); }); }}
+    >
+      {here === 'DASHBOARD' && <Dashboard go={setChosen} />}
+      {here === 'READINESS' && <ClinicReadiness />}
+      {here === 'MORE' && (
+        <MoreMenu
+          items={[
+            ...myDashboards.map((d) => ({ id: d.id, label: d.label, question: d.question })),
+            ...(!isOwner ? [{ id: 'TODAY', label: 'My tasks', question: 'What do I owe today?' }] : []),
+            ...(!isOwner && data.schedule.rows.length > 0
+              ? [{ id: 'CLINIC', label: 'Clinic', question: 'Who is here and who is next?' }] : []),
+            ...(!isOwner && data.overview
+              ? [{ id: 'PATIENTS', label: 'Patients', question: 'Who has stopped coming?' }] : []),
+            ...(!isOwner ? [{ id: 'ATTENTION', label: 'Attention', question: 'What has gone wrong?' }] : []),
+            ...(data.overview ? [{ id: 'QUALITY', label: 'Quality', question: 'What are we learning?' }] : []),
+            ...(data.me.roleCodes.includes('RECEPTION')
+              ? [{ id: 'CONFIRMATIONS', label: 'Confirmations', question: 'Who has not confirmed?' }] : []),
+            ...(['TREATING_DOCTOR','DENTAL_ASSISTANT','SENIOR_ASSISTANT','CLINICAL_DIRECTOR']
+              .some((r) => data.me.roleCodes.includes(r))
+              ? [{ id: 'GATE', label: 'Gate', question: 'May this procedure start?' }] : []),
+            ...(data.overview ? [{ id: 'STANDARDS', label: 'Standards', question: 'What is the standard?' }] : []),
+            { id: 'ME', label: 'Me', question: 'My account.' },
+          ]}
+          go={setChosen}
+        />
+      )}
 
-      <main className="main">
       {here === 'TODAY' && (
         <Today
           day={data.day}
@@ -314,65 +320,51 @@ export function App() {
       {here === 'CONFIRMATIONS' && <ConfirmationsBoard />}
       {here === 'GATE' && <Gate />}
       {here === 'ME' && (
-        <MeScreen me={data.me} onSignedOut={() => { setData(null); setChosen('TODAY'); }} />
+        <MeScreen me={data.me} onSignedOut={() => { setData(null); setChosen(null); }} />
       )}
-      </main>
+    </Shell>
+    </>
+  );
+}
+
+/** A dashboard's own label, for the bar above the content. */
+function label(id: string, dashboards: ReadonlyArray<{ id: string; label: string }>): string {
+  return dashboards.find((d) => d.id === id)?.label ?? id.replace(/_/g, ' ');
+}
+
+const roleWord = (role: string) =>
+  role.replace(/_/g, ' ').toLowerCase().replace(/^./, (ch) => ch.toUpperCase());
+
+/**
+ * More — the places that are not yet on the rail.
+ *
+ * A list with each screen's own question rather than a grid of names: "Gate"
+ * means nothing to somebody who has not used it, and "May this procedure
+ * start?" means everything.
+ */
+function MoreMenu({
+  items, go,
+}: {
+  items: ReadonlyArray<{ id: string; label: string; question: string }>;
+  go: (id: string) => void;
+}) {
+  return (
+    <div className="screen">
+      <div className="dash-list">
+        {items.map((it) => (
+          <button key={it.id} className="dash-row more-row" type="button" onClick={() => go(it.id)}>
+            <div className="dash-row-body">
+              <div className="dash-row-title">{it.label}</div>
+              <div className="dash-row-meta">{it.question}</div>
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
-const TAB_ICON: Record<string, (p: { filled: boolean }) => ReactElement> = {
-  TODAY: ({ filled }) => <IconToday filled={filled} />,
-  CLINIC: ({ filled }) => <IconClinic filled={filled} />,
-  ATTENTION: ({ filled }) => <IconAttention filled={filled} />,
-  OWNER: ({ filled }) => <IconOverview filled={filled} />,
-  COMMAND: ({ filled }) => <IconOverview filled={filled} />,
-  DESK: ({ filled }) => <IconClinic filled={filled} />,
-  DOCTOR: ({ filled }) => <IconPatients filled={filled} />,
-  ASSISTANT: ({ filled }) => <IconToday filled={filled} />,
-  LAB: ({ filled }) => <IconOperations filled={filled} />,
-  INVENTORY: ({ filled }) => <IconOperations filled={filled} />,
-  PATIENTS: ({ filled }) => <IconPatients filled={filled} />,
-  QUALITY: ({ filled }) => <IconQuality filled={filled} />,
-  STANDARDS: ({ filled }) => <IconChecks filled={filled} />,
-  CONFIRMATIONS: ({ filled }) => <IconClinic filled={filled} />,
-  GATE: ({ filled }) => <IconChecks filled={filled} />,
-  ME: ({ filled }) => <IconMe filled={filled} />,
-};
 
-function Tab({
-  id, label, now, go, count,
-}: {
-  id: Place;
-  label: string;
-  now: Place;
-  go: (p: Place) => void;
-  count?: number;
-}) {
-  const on = now === id;
-  // A dashboard registered without an icon still gets a tab. Falling back
-  // beats crashing the shell, and beats hiding the tab — which would make a
-  // missing icon look like a missing permission.
-  const Icon = TAB_ICON[id] ?? IconOverview;
-  return (
-    <button
-      className="tab"
-      type="button"
-      onClick={() => go(id)}
-      // Without this the badge is read before the label — "2Attention".
-      aria-label={count ? `${label}, ${count} waiting` : label}
-      {...(on ? { 'aria-current': 'page' as const } : {})}
-    >
-      <span className="tab-icon">
-        <Icon filled={on} />
-        {count !== undefined && count > 0 && (
-          <span className="tab-count" aria-hidden="true">{count > 9 ? '9+' : count}</span>
-        )}
-      </span>
-      <span className="tab-label" aria-hidden="true">{label}</span>
-    </button>
-  );
-}
 
 /** Who you are, where you are, and the way out. Nothing else belongs here yet. */
 function MeScreen({ me, onSignedOut }: { me: Me; onSignedOut: () => void }) {

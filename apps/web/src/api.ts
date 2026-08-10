@@ -805,10 +805,64 @@ export interface NowView {
   }>;
 }
 
+/** One piece of the morning or the evening, as the engine calculates it. */
+export interface DayBlock {
+  id: string;
+  label: string;
+  owner: string;
+  objective: string;
+  completedBy: string;
+  subjectId: string | null;
+  expectMinutes?: number | null;
+  mandatory?: boolean;
+  critical?: boolean;
+  done: boolean;
+  doneAt: number | null;
+  ifOutstanding: string;
+}
+
+export interface ReadinessView {
+  blocks: DayBlock[];
+  outstanding: DayBlock[];
+  advisory: DayBlock[];
+  ready: boolean;
+  readyAt: number | null;
+  targetAt: number | null;
+  varianceMinutes: number | null;
+  compliance: number;
+  unconfigured: string[];
+  overdue: boolean;
+  minutesToTarget: number | null;
+  startBy: number | null;
+  startDrivenBy: string | null;
+  staffEntered: number;
+}
+
+export interface ClosingView {
+  blocks: DayBlock[];
+  outstanding: DayBlock[];
+  criticalException: DayBlock[];
+  clear: boolean;
+  closedAt: number | null;
+  shutAt: number | null;
+  expectedCloseAt: number | null;
+  overrunMinutes: number | null;
+  varianceMinutes: number | null;
+  closingNow: boolean;
+  runningLate: boolean;
+  compliance: number;
+  unconfigured: string[];
+  staffLeft: number;
+}
+
 export interface ClinicView {
   now: number;
   first: EngineDecision | null;
   decisions: EngineDecision[];
+  /** False until reception unlocks. An empty list means something different then. */
+  unlocked: boolean;
+  readiness: ReadinessView;
+  closing: ClosingView;
   board: Array<{
     node: string; label: string; owner: string;
     patients: Array<{ subjectLabel: string; minutesHeld: number; minutesLate: number }>;

@@ -64,6 +64,25 @@ const LIBRARY = new Set([
   'jr-done', 'jr-now', 'jr-blocked', 'jr-waiting', 'jr-absent',
   // forms
   'field', 'field-label',
+
+  /* ── the shell, and the two screens on it ──────────────────────────────
+     New shapes rather than second ways of saying old ones: a rail, a state
+     card, a block list, a meter. Registered here so the discipline still
+     bites — any screen inventing a *seventh* way to draw a row still fails.  */
+  // dashboard
+  'dash-kicker', 'dash-headline', 'dash-sub', 'dash-cards', 'dash-section',
+  'dash-list', 'dash-row', 'dash-row-body', 'dash-row-title', 'dash-row-meta',
+  'more-row',
+  'state-card', 'state-card-title', 'state-card-state', 'state-card-detail',
+  'state-card-bar',
+  // clinic readiness
+  'ready-panel', 'ready-head', 'ready-kicker', 'ready-verdict', 'ready-sub',
+  'ready-note', 'ready-advisory', 'ready-advisory-head',
+  'block-list', 'block', 'block-mark', 'block-body', 'block-label',
+  'block-meta', 'block-do',
+  'meter', 'meter-value',
+  // shared state modifiers
+  'is-good', 'is-warn', 'is-bad', 'is-done', 'is-here', 'is-urgent',
 ]);
 
 /**
@@ -79,10 +98,12 @@ const CONVERTED = [
   'exceptions.tsx',
   'gate.tsx',
   'notifications.tsx',
+  'dashboard.tsx',
   'patient-360.tsx',
   // Built on the vocabulary from the first line rather than converted onto it
   // afterwards, which is the point of having one.
   'now.tsx',
+  'readiness.tsx',
   'retention.tsx',
   'rules.tsx',
   'today.tsx',

@@ -2483,3 +2483,282 @@ label.field-label {
    gap in the standard is visible at the moment somebody is working to it. */
 .trace-line.is-gap { color: var(--warn); }
 .trace-line.is-gap b { color: var(--warn); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   THE SHELL — a left rail, and one thing at a time on the right
+
+   The owner's structure, from KuBi-V3. A rail rather than a tab row: it has
+   room for the clinic's name, for a count against an item, and for as many
+   places as the product eventually has. Tab rows run out at about seven and
+   start hiding things behind a chevron.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+  background: var(--bg, #fff);
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line, #e6e6e6);
+  background: var(--surface, #fff);
+  padding: 22px 12px 12px;
+}
+
+.rail-brand { padding: 0 12px 22px; }
+.rail-brand-name {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink, #171717);
+}
+.rail-brand-clinic {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-soft, #6b6b6b);
+}
+
+.rail-nav { display: flex; flex-direction: column; gap: 2px; }
+
+.rail-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink, #171717);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.rail-item:hover { background: var(--hover, #f4f4f5); }
+/* The current place, said with weight and colour rather than only a tint —
+   a background alone disappears at a glance on a bright screen. */
+.rail-item.is-here {
+  background: var(--accent-wash, #eef4ff);
+  color: var(--accent, #1d4ed8);
+  font-weight: 600;
+}
+.rail-icon { display: inline-flex; width: 20px; height: 20px; flex: 0 0 20px; }
+.rail-icon svg { width: 20px; height: 20px; }
+.rail-label { flex: 1 1 auto; text-align: left; }
+
+.rail-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--hover, #f0f0f1);
+  color: var(--ink-soft, #6b6b6b);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+/* Red is for patient safety, never for volume. */
+.rail-count.is-urgent { background: #fdecec; color: #b3261e; }
+
+.rail-foot { margin-top: auto; padding-top: 16px; }
+.rail-signout {
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-soft, #6b6b6b);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.rail-signout:hover { background: var(--hover, #f4f4f5); color: var(--ink, #171717); }
+
+.shell-body { display: flex; flex-direction: column; min-width: 0; }
+
+.shell-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--line, #e6e6e6);
+}
+.shell-title { margin: 0; font-size: 19px; font-weight: 600; }
+.shell-who { display: flex; align-items: center; gap: 10px; }
+.shell-who-role { font-size: 14px; color: var(--ink-soft, #6b6b6b); }
+.shell-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: 999px;
+  background: var(--accent, #1d4ed8);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.shell-content { flex: 1 1 auto; overflow-y: auto; padding: 28px 32px 64px; }
+
+/* ── Dashboard ─────────────────────────────────────────────────────── */
+
+.dash-kicker, .ready-kicker {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft, #8a8a8a);
+}
+.dash-headline {
+  margin: 10px 0 4px;
+  font-size: 40px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.dash-headline.is-good { color: #14803c; }
+.dash-headline.is-warn { color: #8a5300; }
+.dash-headline.is-bad  { color: #b3261e; }
+.dash-sub { margin: 0 0 26px; color: var(--ink-soft, #6b6b6b); }
+
+.dash-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  max-width: 720px;
+}
+.state-card {
+  display: block;
+  padding: 16px 18px;
+  border: 1px solid var(--line, #e6e6e6);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.state-card:hover { border-color: var(--ink-soft, #b9b9b9); }
+.state-card-title { font-size: 13px; color: var(--ink-soft, #6b6b6b); }
+.state-card-state { margin-top: 4px; font-size: 22px; font-weight: 700; }
+.state-card-detail { margin-top: 2px; font-size: 13px; color: var(--ink-soft, #6b6b6b); }
+.state-card-bar {
+  margin-top: 12px; height: 5px; border-radius: 999px;
+  background: var(--hover, #f0f0f1); overflow: hidden;
+}
+.state-card-bar > span { display: block; height: 100%; background: #9aa0a6; }
+.state-card.is-good .state-card-bar > span { background: #14803c; }
+.state-card.is-warn .state-card-bar > span { background: #cf8a00; }
+.state-card.is-bad  .state-card-bar > span { background: #b3261e; }
+
+.dash-section { margin: 32px 0 12px; font-size: 15px; font-weight: 600; }
+.dash-list {
+  border: 1px solid var(--line, #e6e6e6);
+  border-radius: 14px;
+  overflow: hidden;
+  max-width: 900px;
+}
+.dash-row {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line, #f0f0f0);
+}
+.dash-row:last-child { border-bottom: 0; }
+.dash-row-body { min-width: 0; }
+.dash-row-title { font-size: 15px; font-weight: 500; }
+.dash-row-meta { margin-top: 2px; font-size: 13px; color: var(--ink-soft, #6b6b6b); }
+
+/* ── Clinic readiness ──────────────────────────────────────────────── */
+
+.ready-panel {
+  margin-bottom: 34px;
+  max-width: 900px;
+  border: 1px solid var(--line, #e6e6e6);
+  border-radius: 16px;
+  padding: 20px 22px;
+}
+.ready-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;
+}
+.ready-verdict {
+  margin: 8px 0 4px; font-size: 27px; font-weight: 700; letter-spacing: -0.01em;
+}
+.ready-verdict.is-good { color: #14803c; }
+.ready-verdict.is-bad  { color: #b3261e; }
+.ready-sub { margin: 0; color: var(--ink-soft, #6b6b6b); }
+.ready-note { margin: 14px 0 0; font-size: 14px; color: var(--ink-soft, #6b6b6b); }
+.ready-note.is-bad { color: #b3261e; }
+
+.meter {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 68px; height: 68px; flex: 0 0 68px;
+  border: 3px solid var(--line, #e6e6e6);
+  border-radius: 999px;
+}
+.meter.is-good { border-color: #14803c; }
+.meter-value { font-size: 15px; font-weight: 700; }
+
+.block-list { margin-top: 18px; }
+.block {
+  display: flex; align-items: center; gap: 14px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line, #f0f0f0);
+}
+.block:first-child { border-top: 0; }
+/* Done work stays on the list, greyed. "Did anybody do the floors?" is a real
+   question at 09:50 and a list that hides its own history cannot answer it. */
+.block.is-done .block-label { color: var(--ink-soft, #8a8a8a); }
+.block-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex: 0 0 22px;
+  border: 2px solid var(--line, #dcdcdc);
+  border-radius: 999px;
+  font-size: 13px;
+}
+.block-mark.is-done { border-color: #14803c; color: #14803c; }
+.block-body { flex: 1 1 auto; min-width: 0; }
+.block-label { font-size: 15px; }
+.block-meta { margin-top: 1px; font-size: 13px; color: var(--ink-soft, #8a8a8a); }
+/* The shared .btn is a full-width slab — right for a task sheet on a phone,
+   wrong for a row where the label is the point. Narrow it here rather than
+   weakening .btn, which every touch screen still depends on. */
+.block-do {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 0;
+  padding: 7px 16px;
+  font-size: 14px;
+  box-shadow: none;
+}
+
+.ready-advisory {
+  margin-top: 22px; padding-top: 16px;
+  border-top: 1px dashed var(--line, #e0e0e0);
+}
+.ready-advisory-head {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--ink-soft, #8a8a8a);
+}
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .rail { flex-direction: row; align-items: center; border-right: 0;
+          border-bottom: 1px solid var(--line, #e6e6e6); padding: 10px 12px; }
+  .rail-brand { padding: 0 12px 0 4px; }
+  .rail-brand-clinic { display: none; }
+  .rail-nav { flex-direction: row; overflow-x: auto; }
+  .rail-foot { margin-top: 0; padding-top: 0; }
+  .shell-content { padding: 20px 16px 48px; }
+  .dash-headline { font-size: 30px; }
+}
+
+/* A More row is a button, so it needs the reset a div did not. */
+.more-row {
+  display: flex; width: 100%; border: 0; border-bottom: 1px solid var(--line, #f0f0f0);
+  background: transparent; font: inherit; text-align: left; cursor: pointer;
+}
+.more-row:last-child { border-bottom: 0; }
+.more-row:hover { background: var(--hover, #f7f7f8); }

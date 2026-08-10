@@ -939,6 +939,10 @@ export async function buildServer(): Promise<FastifyInstance> {
         // The morning: which blocks are outstanding, whether the clinic is
         // ready, and readiness against the first appointment. Calculated
         // here and rendered there — the screen computes nothing.
+        // Whether the day has started at all. Without it a screen cannot tell
+        // "nothing is outstanding" from "nobody has opened the clinic yet",
+        // and those are opposite states that look identical in an empty list.
+        unlocked: world.events.some((e) => e.type === ClinicEvent.CLINIC_UNLOCKED),
         readiness: readiness(world.events, world.operatories, world.firstPatientAt, now),
         // The evening, on the same terms: which sections of the drill are
         // outstanding, and which of those are patient-safety critical.
