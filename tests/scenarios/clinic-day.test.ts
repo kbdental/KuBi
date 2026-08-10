@@ -567,17 +567,42 @@ describe('Scenario 8b · ranking orders work; it never makes a record optional',
    ═══════════════════════════════════════════════════════════════════════════ */
 
 describe('Scenario 10 · closing with sterilisation unresolved', () => {
-  it('refuses to lock up, and says which loop is still open', () => {
+  it('lets the day end with a batch waiting for the morning run', () => {
+    // The owner's ruling: "morning run catches yesterday's instruments". A
+    // batch collected at closing is not a failure — it is tomorrow's first
+    // job, and the clinic cannot open until it is released, because the
+    // morning's STERILE block requires it. Refusing here instead would have
+    // ended every single evening in a refusal nobody on shift could clear:
+    // the cycle is 75 minutes and the team leaves 30 minutes after the door.
     let w = openTheClinic();
     w = must(w, ClinicEvent.BATCH_COLLECTED, 'b3', RoleCode.STERILIZATION_TECHNICIAN, 'STER-0915');
     w = at(w, T(19, 30));
+    w = closeTheClinic(w);
+
+    expect(record(w, {
+      type: ClinicEvent.CLINIC_LOCKED, subjectId: 'today', by: RoleCode.CLINIC_MANAGER,
+    }).ok).toBe(true);
+  });
+
+  it('refuses to lock up on a cycle that ran and was never released', () => {
+    // The one state that is genuinely a today problem, and the owner's own
+    // words for it: "Autoclave cycle result never recorded". Nobody has
+    // attested that it passed, the operator has gone home, and tomorrow those
+    // packs are indistinguishable from sterile ones on the shelf.
+    let w = openTheClinic();
+    w = must(w, ClinicEvent.BATCH_COLLECTED, 'b3', RoleCode.STERILIZATION_TECHNICIAN, 'STER-0915');
+    w = must(w, ClinicEvent.BATCH_ULTRASONIC_DONE, 'b3', RoleCode.STERILIZATION_TECHNICIAN);
+    w = must(w, ClinicEvent.BATCH_PACKED, 'b3', RoleCode.STERILIZATION_TECHNICIAN);
+    w = must(w, ClinicEvent.BATCH_AUTOCLAVED, 'b3', RoleCode.STERILIZATION_TECHNICIAN);
+    w = at(w, T(19, 30));
+    w = closeTheClinic(w);
 
     const r = record(w, {
       type: ClinicEvent.CLINIC_LOCKED, subjectId: 'today', by: RoleCode.CLINIC_MANAGER,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
-    expect(r.refusal.because).toBe('Instruments are still in the loop');
+    expect(r.refusal.because).toBe('An autoclave cycle has not been released');
   });
 
   it('locks up once the loop is clear and the drill is done', () => {

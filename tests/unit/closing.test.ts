@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ClinicEvent, RoleCode, Verdict, decisionsFor, emptyWorld, record, closing, whyNotClosed,
   SAME_DAY_STERILISATION_NOTE, CLOSING_MINUTES, lastCollection,
+  readiness,
   type Operatory, type World,
 } from '@kubi/contracts';
 
@@ -162,18 +163,21 @@ describe('the day cannot be locked up on somebody’s word', () => {
 
   it('puts the patient, the note and the instruments ahead of the building', () => {
     // The closing-drill rule is deliberately the last of the four on
-    // CLINIC_LOCKED. A manager who has left a patient mid-visit should be told
-    // about the patient, not about the bins.
+    // CLINIC_LOCKED. A manager who has left an unreleased autoclave cycle
+    // should be told about the cycle, not about the bins.
     let w = evening();
     w = must(w, ClinicEvent.CLINIC_UNLOCKED, 'today', RoleCode.RECEPTION, 'the clinic');
     w = must(w, ClinicEvent.BATCH_COLLECTED, 'b9', RoleCode.STERILIZATION_TECHNICIAN, 'STER-9');
+    w = must(w, ClinicEvent.BATCH_ULTRASONIC_DONE, 'b9', RoleCode.STERILIZATION_TECHNICIAN);
+    w = must(w, ClinicEvent.BATCH_PACKED, 'b9', RoleCode.STERILIZATION_TECHNICIAN);
+    w = must(w, ClinicEvent.BATCH_AUTOCLAVED, 'b9', RoleCode.STERILIZATION_TECHNICIAN);
 
     const r = record(w, {
       type: ClinicEvent.CLINIC_LOCKED, subjectId: 'today', by: RoleCode.CLINIC_MANAGER,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
-    expect(r.refusal.because).toBe('Instruments are still in the loop');
+    expect(r.refusal.because).toBe('An autoclave cycle has not been released');
   });
 });
 
@@ -218,12 +222,13 @@ describe('the critical exception is named, and not acted on', () => {
     }
   });
 
-  it('says why same-day sterilisation will bite, without pretending to solve it', () => {
-    // Instruments go to the sterilisation room at closing, the cycle is 75
-    // minutes to cooling, and the matrix wants same-day at 100%. Recorded
-    // rather than resolved.
+  it('says how the same-day question was settled, and by what', () => {
+    // Not "recorded rather than resolved" any more — the owner ruled. The note
+    // carries the arithmetic that forced the choice and the choice itself, so
+    // whoever proposes same-day again finds both in one place.
     expect(SAME_DAY_STERILISATION_NOTE).toContain('75');
-    expect(SAME_DAY_STERILISATION_NOTE).toContain('cut-off');
+    expect(SAME_DAY_STERILISATION_NOTE).toContain('morning run');
+    expect(lastCollection(T(18, 30)).reachable).toBe(false);
   });
 });
 
@@ -344,15 +349,41 @@ describe('same-day sterilisation does not fit, and the arithmetic says so', () =
     expect(lastCollection(null)).toEqual({ at: null, reachable: false, shortfallMinutes: null });
   });
 
-  it('still refuses to close with instruments in the loop', () => {
-    // The arithmetic is a finding, not a licence. Until the owner rules on it,
-    // the clinic behaves exactly as before.
-    expect(SAME_DAY_STERILISATION_NOTE).toContain('cut-off');
-    let w = evening();
-    w = must(w, ClinicEvent.BATCH_COLLECTED, 'b1', RoleCode.STERILIZATION_TECHNICIAN, 'STER-1');
-    expect(record(w, {
+  it('lets a batch wait for the morning, and refuses an unreleased cycle', () => {
+    // The owner's ruling, both halves. A batch at collection is tomorrow's
+    // first job; a cycle that ran and was never released is a today problem.
+    expect(SAME_DAY_STERILISATION_NOTE).toContain('morning run');
+
+    let waiting = wholeDrill();
+    waiting = must(waiting, ClinicEvent.BATCH_COLLECTED, 'b1',
+      RoleCode.STERILIZATION_TECHNICIAN, 'STER-1');
+    expect(record(waiting, {
+      type: ClinicEvent.CLINIC_LOCKED, subjectId: 'today', by: RoleCode.CLINIC_MANAGER,
+    }).ok).toBe(true);
+
+    let unreleased = waiting;
+    unreleased = must(unreleased, ClinicEvent.BATCH_ULTRASONIC_DONE, 'b1', RoleCode.STERILIZATION_TECHNICIAN);
+    unreleased = must(unreleased, ClinicEvent.BATCH_PACKED, 'b1', RoleCode.STERILIZATION_TECHNICIAN);
+    unreleased = must(unreleased, ClinicEvent.BATCH_AUTOCLAVED, 'b1', RoleCode.STERILIZATION_TECHNICIAN);
+    expect(record(unreleased, {
       type: ClinicEvent.CLINIC_LOCKED, subjectId: 'today', by: RoleCode.CLINIC_MANAGER,
     }).ok).toBe(false);
+  });
+
+  it('hands the overnight batch to the morning, which cannot open without it', () => {
+    // The other half of the ruling, and the reason the evening can let a batch
+    // go: the safety net moved to opening. Yesterday's instruments are the
+    // morning's STERILE block, and the clinic cannot be called ready until
+    // somebody releases a run.
+    const tomorrow = emptyWorld(T(8, 30), { operatories: FOUR, firstPatientAt: T(10, 0) });
+    const morning = readiness(tomorrow.events, tomorrow.operatories,
+      tomorrow.firstPatientAt, T(8, 30));
+    const sterile = morning.blocks.find((b) => b.id === 'STERILE')!;
+    expect(sterile.mandatory).toBe(true);
+    expect(sterile.done).toBe(false);
+    expect(morning.ready).toBe(false);
+    expect(morning.outstanding.map((b) => b.id)).toContain('STERILE');
+    expect(sterile.ifOutstanding).toBe('There are no sterile packs in the cabinets for today');
   });
 });
 

@@ -15,13 +15,15 @@
  * remains unresolved, the system should display 🔴 CLOSING WITH CRITICAL
  * EXCEPTION and require manager acknowledgement."*
  *
- * That is an override path, and this file does not build one. Constitution
- * rule 2: a BLOCK_HARD gate has no override, enforced by the absence of a
- * permission rather than by a runtime check. Inventing an acknowledgement
- * that lets a patient-safety failure through would be exactly the thing that
- * rule exists to prevent, so `criticalException` below *names* the state and
- * `CLINIC_LOCKED` still refuses. Whether the owner wants an acknowledged
- * close is an open decision, and an open decision is never silently resolved.
+ * That is an override path, and this file does not build one — and that is now
+ * the owner's ruling rather than a pending question: **keep refusing at
+ * lockup.** It agrees with constitution rule 2, which says a BLOCK_HARD gate
+ * has no override, enforced by the absence of a permission rather than by a
+ * runtime check.
+ *
+ * `criticalException` below still *names* the state, because a manager is
+ * entitled to see which patient-safety item is holding the door even though
+ * nothing lets them through it.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * Why fumigation is not the long pole
@@ -33,8 +35,9 @@
  * adds nothing to how long closing takes, and the guess that it would has
  * been dropped rather than carried forward.
  *
- * The real long pole is the instrument loop, and it is a genuine problem the
- * owner has to settle — see `SAME_DAY_STERILISATION_NOTE`.
+ * The instrument loop looked like the real long pole, and it turned out not to
+ * be one either — the owner ruled that the morning run catches yesterday's
+ * instruments. See `SAME_DAY_STERILISATION_NOTE`.
  */
 import { RoleCode } from './enums.js';
 import { Objective } from './objectives.js';
@@ -42,23 +45,30 @@ import { ClinicEvent } from './operating-model.js';
 import type { Operatory, ReadinessEvent } from './readiness.js';
 
 /**
- * The timing problem, recorded where somebody will find it.
+ * The timing problem, and how the owner settled it.
  *
  * The closing drill sends used instruments to the sterilisation room at
- * closing: *"All instrument trays cleared; used instruments placed in the
- * sterilization room"*. The matrix demands *"Sterilization complete — same
- * day"* at 100%. The cycle takes seventy-five minutes to cooling.
+ * closing. The cycle takes seventy-five minutes to cooling. The team leaves
+ * thirty minutes after the door shuts. Working back, the last instrument that
+ * could be stored the same day would have to be collected forty-five minutes
+ * *before* the clinic shuts — so same-day sterilisation was never reachable,
+ * and the matrix's *"Same-Day Sterilization = 100%"* was measuring something
+ * this clinic is not built to do.
  *
- * Those three cannot all hold. A tray cleared at 19:00 is not stored before
- * 20:15, so either somebody stays, or there is a collection cut-off, or
- * same-day is not really the rule and the morning run is what catches
- * yesterday's instruments — which would explain why the opening procedure has
- * one. KuBi does not choose; it refuses to close with instruments in the loop,
- * which is the existing behaviour, and this note says why that will bite.
+ * The owner's ruling: **the morning run catches yesterday's instruments.**
+ * That is why the opening procedure has a morning run at all. So a batch
+ * waiting overnight is the normal end of a day, not a failure, and the safety
+ * net sits at opening — the clinic cannot open until a run is released, which
+ * `readiness()` enforces as the `STERILE` block.
+ *
+ * What closing still refuses is the one thing that is genuinely a today
+ * problem: a cycle that ran and was never released. See the `CLINIC_LOCKED`
+ * rule in `engine.ts`.
  */
 export const SAME_DAY_STERILISATION_NOTE =
-  'Instruments go to the sterilisation room at closing and the cycle takes 75 '
-  + 'minutes to cooling, so same-day completion needs a collection cut-off.';
+  'Same-day sterilisation is not reachable: the cycle is 75 minutes and the '
+  + 'team leaves 30 minutes after the clinic shuts. The morning run catches '
+  + 'yesterday’s instruments, and the clinic cannot open until it is released.';
 
 /**
  * How long the closing drill takes.
@@ -80,17 +90,20 @@ const STERILISATION_MINUTES = 75;
  * The latest an instrument can be collected and still be stored before the
  * team leaves — and whether that time is reachable at all.
  *
- * This is the same-day sterilisation problem, done as arithmetic instead of
- * worried about in prose. The drill takes thirty minutes from the moment the
- * clinic shuts, so the team leaves at `shutAt + 30`. A cycle takes
- * seventy-five minutes to cooling. Working back:
+ * This is the arithmetic that settled the same-day question. The drill takes
+ * thirty minutes from the moment the clinic shuts, so the team leaves at
+ * `shutAt + 30`. A cycle takes seventy-five minutes to cooling. Working back:
  *
  *     18:30 shut  →  19:00 leave  →  17:45 last possible collection
  *
- * which is **forty-five minutes before the clinic shuts**. Instruments used in
- * the last treatment of the day cannot be stored the same day, by arithmetic
- * and not by anybody's carelessness. `reachable` is false whenever the cut-off
- * lands before the clinic shuts, which on these numbers is always.
+ * which is **forty-five minutes before the clinic shuts**. `reachable` is
+ * false whenever the cut-off lands before the clinic shuts, which on these
+ * numbers is always — and that is why the owner ruled for the morning run
+ * rather than a cut-off.
+ *
+ * Kept rather than deleted: the day somebody proposes same-day sterilisation
+ * again, this says in one call why it cannot work at these hours, and it moves
+ * on its own if the shut time or the drill ever changes.
  */
 export function lastCollection(shutAt: number | null): {
   at: number | null;

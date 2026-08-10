@@ -333,8 +333,31 @@ const RULES: Partial<Record<ClinicEvent, readonly Requirement[]>> = {
     req((w) => !w.flows.some((f) => f.kind === FlowKind.CLINICAL && !f.done
       && !f.history.some((h) => h.node === 'NOTES')),
       'A clinical note has not been completed', 'Open the clinical record', 'Clinical'),
-    req((w) => !w.flows.some((f) => f.kind === FlowKind.STERILIZATION && !f.done),
-      'Instruments are still in the loop', 'Open sterilisation', 'Operations'),
+    /**
+     * The autoclave result, and only that.
+     *
+     * This used to refuse whenever any batch was mid-loop, which the owner's
+     * own numbers made impossible to satisfy: the drill sends instruments to
+     * the sterilisation room at closing, the cycle is seventy-five minutes to
+     * cooling, and the team leaves thirty minutes after the door shuts. Every
+     * evening would have ended in a refusal nobody on shift could clear, and
+     * a rule that cannot be satisfied is a rule people learn to route around.
+     *
+     * The owner's ruling: *"morning run catches yesterday's instruments"*. So
+     * a batch waiting at collection, ultrasonic or packing is not a failure —
+     * it is tomorrow's first job, and the morning cannot open without it,
+     * because `STERILE` is one of the readiness blocks.
+     *
+     * What still refuses is the one state that is genuinely a today problem:
+     * **a cycle that ran and was never released.** Nobody has attested that
+     * it passed, the operator who ran it has gone home, and the packs look
+     * identical to sterile ones on the shelf tomorrow. That is the owner's
+     * own *"Autoclave cycle result never recorded"*, and it is a
+     * patient-safety item, not a piece of housekeeping.
+     */
+    req((w) => !w.flows.some((f) => f.kind === FlowKind.STERILIZATION && !f.done
+      && f.history.some((h) => h.node === 'AUTO')),
+      'An autoclave cycle has not been released', 'Open sterilisation', 'Operations'),
     req((w) => !w.flows.some((f) => f.kind === FlowKind.PATIENT && !f.done),
       'A visit has not been finished', 'Open the board', 'Board'),
     /**
