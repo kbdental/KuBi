@@ -483,7 +483,7 @@ describe('staff entry is reported, and honestly labelled', () => {
   });
 });
 
-describe('every one of the matrix’s twelve opening controls is accounted for', () => {
+describe('every one of the matrix’s thirteen opening controls is accounted for', () => {
   /**
    * The evening has had this table since it was built; the morning never did,
    * so the morning's gaps were a paragraph in a document rather than something
@@ -491,8 +491,8 @@ describe('every one of the matrix’s twelve opening controls is accounted for',
    */
   const ids = Object.keys(OPENING_CONTROLS);
 
-  it('covers OPEN-001 through OPEN-012 and invents no others', () => {
-    expect(ids).toEqual(Array.from({ length: 12 },
+  it('covers OPEN-001 through OPEN-013 and invents no others', () => {
+    expect(ids).toEqual(Array.from({ length: 13 },
       (_, i) => `OPEN-${String(i + 1).padStart(3, '0')}`));
   });
 
@@ -500,10 +500,19 @@ describe('every one of the matrix’s twelve opening controls is accounted for',
     const blocks = new Set(read(world()).blocks.map((b) =>
       b.id.startsWith('OPERATORY:') ? 'OPERATORY' : b.id));
     for (const [id, { covers }] of Object.entries(OPENING_CONTROLS)) {
-      if (covers === null) continue;
+      // OPEN-013 is the exception, and deliberately so: the matrix gives its
+      // doer as "System" and its evidence as "Auto". It points at no block
+      // because it *is* the calculation over the blocks.
+      if (covers === null || covers === 'DERIVED') continue;
       expect(blocks, `${id} points at "${covers}", which is not a readiness block`)
         .toContain(covers);
     }
+  });
+
+  it('leaves exactly one control with no doer, and it is the derived one', () => {
+    const derived = Object.entries(OPENING_CONTROLS)
+      .filter(([, v]) => v.covers === 'DERIVED').map(([id]) => id);
+    expect(derived).toEqual(['OPEN-013']);
   });
 
   it('gives every control a reason, so none is covered by assertion alone', () => {

@@ -183,7 +183,27 @@ export const OPENING_CONTROLS: Readonly<Record<string, {
   'OPEN-010': { covers: null, why: 'the water pump — the owner ruled this belongs to opening rather than closing, and the morning has no block for it yet' },
   'OPEN-011': { covers: null, why: 'lights and fans — part of opening the building, which no block covers' },
   'OPEN-012': { covers: null, why: 'morning emergency readiness — the kit, the drugs and their expiry. Patient safety, in neither document and in no block' },
+  // The one control with no doer, and that is the point of it.
+  'OPEN-013': { covers: 'DERIVED', why: 'opening complete — the matrix gives the doer as “System” and the evidence as “Auto”. `readiness().ready` is that control: it is computed from the mandatory blocks every time it is read, and there is no event, field or permission that can set it' },
 };
+
+/**
+ * OPEN-013, enforced rather than described.
+ *
+ * The owner: *"The staff should not manually tick 'Clinic Ready.' KuBi
+ * calculates it: Clinic Ready = all mandatory opening controls passed."*
+ *
+ * The way that is guaranteed here is by **absence** — the same technique the
+ * constitution uses for BLOCK_HARD gates. There is no `CLINIC_READY` event in
+ * the log, so there is no thing to record; `ready` exists only as the return
+ * value of a function over the blocks. A test asserts the event does not
+ * exist, because the way this rule would be lost is somebody adding one in
+ * good faith to make a screen simpler.
+ *
+ * This constant is what that test names, so the rule has somewhere to live
+ * other than a comment.
+ */
+export const READY_IS_DERIVED_ONLY = true;
 
 /** The matrix opening controls nothing covers yet. */
 export const UNCOVERED_OPENING_CONTROLS = Object.entries(OPENING_CONTROLS)

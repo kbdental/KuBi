@@ -49,7 +49,7 @@ import type { AttendanceView } from './attendance.js';
 import type { Readiness } from './readiness.js';
 import type { Closing } from './closing.js';
 import type { Compliance } from './compliance.js';
-import type { EquipmentView } from './equipment.js';
+import type { EquipmentView, RoomLinkage } from './equipment.js';
 import type { InventoryView } from './inventory.js';
 
 /* -------------------------------------------------------------------------
@@ -289,6 +289,8 @@ export interface FailureInputs {
   equipment?: EquipmentView;
   inventory?: InventoryView;
   closing?: Closing;
+  /** Which rooms may take a patient. See `roomAvailability`. */
+  rooms?: RoomLinkage;
   /** The minute now, for due-time wording. */
   now: number;
 }
@@ -535,6 +537,44 @@ export function gatherFailures(
         goes: 'Equipment',
       });
     }
+  }
+
+  /* ── Rooms withdrawn from allocation ──────────────────────────────── */
+  //
+  // *"If OPEN-004 Dental Chair = FAIL, that chair becomes NOT AVAILABLE FOR
+  // PATIENT ALLOCATION."* This is that rule reaching the person holding the
+  // appointment book, which is the only place it does any good — a withdrawn
+  // room that only the equipment screen knows about is a room somebody will
+  // still book at eleven o'clock.
+  for (const room of input.rooms?.unavailable ?? []) {
+    out.push({
+      id: `ROOM:${room.operatoryId}`,
+      area: FailureArea.EQUIPMENT,
+      severity: FailureSeverity.STOPS,
+      what: `${room.label} may not take a patient`,
+      because: room.because,
+      ownerRole: RoleCode.CLINIC_MANAGER,
+      involved: people(RoleCode.CLINIC_MANAGER),
+      dueAt: null,
+      goes: 'Equipment',
+    });
+  }
+  // A chair that protects no room is a broken link, and the only way anybody
+  // finds out is if it is said out loud.
+  for (const orphan of input.rooms?.orphaned ?? []) {
+    out.push({
+      id: `ROOM:ORPHAN:${orphan.asset.tag}`,
+      area: FailureArea.EQUIPMENT,
+      severity: FailureSeverity.HOLDS,
+      what: `${orphan.asset.name} is filed under a room that does not exist`,
+      because: `The register puts ${orphan.asset.tag} in "${orphan.asset.location}", `
+        + 'which is not one of this clinic\'s operatories. Until that is fixed, '
+        + 'a failure of this asset withdraws no room.',
+      ownerRole: RoleCode.CLINIC_MANAGER,
+      involved: people(RoleCode.CLINIC_MANAGER),
+      dueAt: null,
+      goes: 'Equipment',
+    });
   }
 
   /* ── Stock ────────────────────────────────────────────────────────── */

@@ -41,6 +41,7 @@ import {
   type StaffMember, type AttendanceRow, type LeaveRow,
   careFor, careForAll, careOwedBy, TREATMENTS, NOTHING_KNOWN, UNRATIFIED_CATALOGUE,
   ASSETS, equipment as equipmentView, assetWorkFor, UNRATIFIED_REGISTER,
+  roomAvailability,
   complianceFor, readinessHorizon,
   STOCK_ITEMS, inventory as inventoryView,
   gatherFailures, holdersFrom, lensFor, placesFor, bookingWindow,
@@ -1673,6 +1674,9 @@ function failuresNow() {
       equipment: eq,
       inventory: inv,
       closing: closing(w.events, w.operatories, w.shutAt, now),
+      // OPEN-004's consequence: a room whose chair failed must reach whoever
+      // is holding the appointment book, not only the equipment screen.
+      rooms: roomAvailability(w.operatories, eq),
       now,
     }, holders),
   };

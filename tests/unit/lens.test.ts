@@ -412,3 +412,50 @@ describe('a different look, not a smaller one', () => {
     expect(mayOpen([RoleCode.HOUSEKEEPING], Place.READINESS)).toBe(true);
   });
 });
+
+describe('a withdrawn room reaches the appointment book', () => {
+  const holders = new Map<RoleCode, readonly Involved[]>([
+    [RoleCode.CLINIC_MANAGER, [person('e9', 'Deepak')]],
+  ]);
+
+  it('puts NOT AVAILABLE FOR PATIENT ALLOCATION in front of the manager', () => {
+    // A withdrawn room that only the equipment screen knows about is a room
+    // somebody will still book at eleven o'clock.
+    const rooms = {
+      rooms: [], unverified: [], orphaned: [],
+      unavailable: [{
+        operatoryId: 'op-3', label: 'Operatory 3', state: 'WITHDRAWN',
+        available: false, blockedBy: [], unverified: [],
+        because: 'NOT AVAILABLE FOR PATIENT ALLOCATION — Dental chair unit 3 (CHAIR-03).',
+      }],
+    } as never;
+    const [row] = gatherFailures({ rooms, now: NOW }, holders);
+    expect(row!.severity).toBe(FailureSeverity.STOPS);
+    expect(row!.what).toBe('Operatory 3 may not take a patient');
+    expect(row!.because).toContain('NOT AVAILABLE FOR PATIENT ALLOCATION');
+    expect(row!.involved.map((p) => p.label)).toEqual(['Deepak']);
+  });
+
+  it('says out loud when a chair protects no room', () => {
+    // The asset-to-room link is a string match and string matches rot. A
+    // broken one is silent by nature, so it has to be made loud by hand.
+    const rooms = {
+      rooms: [], unavailable: [], unverified: [],
+      orphaned: [{ asset: { tag: 'CHAIR-03', name: 'Dental chair unit 3',
+        location: 'Surgery C' } }],
+    } as never;
+    const [row] = gatherFailures({ rooms, now: NOW }, holders);
+    expect(row!.what).toContain('filed under a room that does not exist');
+    expect(row!.because).toContain('withdraws no room');
+  });
+
+  it('says nothing about a room that is merely unverified', () => {
+    // Open, and not a clean bill of health. That belongs on the equipment
+    // screen, not on the list of things stopping work today.
+    const rooms = {
+      rooms: [], unavailable: [], orphaned: [],
+      unverified: [{ operatoryId: 'op-1', label: 'Operatory 1' }],
+    } as never;
+    expect(gatherFailures({ rooms, now: NOW }, holders)).toEqual([]);
+  });
+});

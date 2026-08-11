@@ -123,6 +123,21 @@ export interface Asset {
   category: AssetCategory;
   /** Where it is. An operatory id, or a named place. */
   location: string;
+  /**
+   * The room this asset's failure takes out of use, if any.
+   *
+   * Not the same question as `location`, and conflating them was a bug. A
+   * curing light *lives* in Operatory 2 and does not *hold* Operatory 2 — if
+   * it dies you carry one in from next door. A dental chair is bolted to the
+   * floor: if it dies, the room dies with it.
+   *
+   * So `location` answers "where will I find it" and this answers "what stops
+   * if it fails". Null for anything portable, and for anything that is not in
+   * a treatment room at all. Set it, and OPEN-004's consequence follows on its
+   * own; leave it null and the asset raises a fault that withdraws nothing —
+   * which for a curing light is exactly right.
+   */
+  holdsRoom: string | null;
   /** The owner's "responsible person", held as a role. */
   responsible: RoleCode;
   criticality: Criticality;
@@ -275,7 +290,10 @@ function chairsideFor(n: number): Asset[] {
   return [
     asset({
       tag: s('CHAIR'), name: `Dental chair unit ${n}`, category: AssetCategory.CHAIRSIDE,
-      location: where, responsible: ASST, criticality: Criticality.STOPS_WORK,
+      // Bolted to the floor. If it fails, the room fails with it — this is
+      // the asset OPEN-004 is about.
+      location: where, holdsRoom: where,
+      responsible: ASST, criticality: Criticality.STOPS_WORK,
       make: 'Confident', model: 'Elite', serial: `CE-2200${n}`,
       commissionedAt: null, warrantyUntil: null,
       amc: { vendor: 'Confident Service', until: days(210), covers: 'Chair, light, spittoon, upholstery. Labour and travel; parts extra.' },
@@ -286,7 +304,9 @@ function chairsideFor(n: number): Asset[] {
     }),
     asset({
       tag: s('XRAY'), name: `Intraoral X-ray ${n}`, category: AssetCategory.IMAGING,
-      location: where, responsible: SNR, criticality: Criticality.STOPS_WORK,
+      // Wall-mounted, and on a licence. A room cannot borrow one.
+      location: where, holdsRoom: where,
+      responsible: SNR, criticality: Criticality.STOPS_WORK,
       make: 'Genoray', model: 'Port-X', serial: `GX-77${n}0`,
       commissionedAt: null, warrantyUntil: days(120),
       amc: null,
@@ -302,7 +322,7 @@ function chairsideFor(n: number): Asset[] {
     }),
     asset({
       tag: s('RVG'), name: `RVG sensor ${n}`, category: AssetCategory.IMAGING,
-      location: where, responsible: ASST, criticality: Criticality.STOPS_WORK,
+      location: where, holdsRoom: null, responsible: ASST, criticality: Criticality.STOPS_WORK,
       make: 'Carestream', model: 'RVG 5200', serial: `CS-52${n}18`,
       commissionedAt: null, warrantyUntil: null, amc: null,
       documents: ['User manual'],
@@ -312,7 +332,7 @@ function chairsideFor(n: number): Asset[] {
     }),
     asset({
       tag: s('SCALER'), name: `Ultrasonic scaler ${n}`, category: AssetCategory.CHAIRSIDE,
-      location: where, responsible: ASST, criticality: Criticality.DEGRADES,
+      location: where, holdsRoom: null, responsible: ASST, criticality: Criticality.DEGRADES,
       make: 'Woodpecker', model: 'UDS-J', serial: `WP-J${n}442`,
       commissionedAt: null, warrantyUntil: null, amc: null,
       documents: [],
@@ -322,7 +342,7 @@ function chairsideFor(n: number): Asset[] {
     }),
     asset({
       tag: s('CURE'), name: `Curing light ${n}`, category: AssetCategory.CHAIRSIDE,
-      location: where, responsible: ASST, criticality: Criticality.STOPS_WORK,
+      location: where, holdsRoom: null, responsible: ASST, criticality: Criticality.STOPS_WORK,
       make: 'Ivoclar', model: 'Bluephase', serial: `IV-BP${n}09`,
       commissionedAt: null, warrantyUntil: null, amc: null,
       documents: ['User manual'],
@@ -339,7 +359,7 @@ export const ASSETS: readonly Asset[] = [
   /* ── The instrument loop ────────────────────────────────────────────── */
   asset({
     tag: 'AUTOCLAVE-01', name: 'Autoclave', category: AssetCategory.STERILIZATION,
-    location: 'Sterilisation room', responsible: STER, criticality: Criticality.STOPS_CLINIC,
+    location: 'Sterilisation room', holdsRoom: null, responsible: STER, criticality: Criticality.STOPS_CLINIC,
     make: 'Runyes', model: 'Class B 23L', serial: 'RY-B23-4471',
     commissionedAt: null, warrantyUntil: null,
     amc: { vendor: 'Runyes India', until: days(96), covers: 'Two preventive visits a year, gasket and filter included, chamber excluded.' },
@@ -357,7 +377,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'ULTRASONIC-01', name: 'Ultrasonic cleaner', category: AssetCategory.STERILIZATION,
-    location: 'Sterilisation room', responsible: STER, criticality: Criticality.STOPS_WORK,
+    location: 'Sterilisation room', holdsRoom: null, responsible: STER, criticality: Criticality.STOPS_WORK,
     make: 'Confident', model: 'CD-4820', serial: 'CD-4820-119',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: ['User manual'],
@@ -372,7 +392,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'SEALER-01', name: 'Pouch sealing machine', category: AssetCategory.STERILIZATION,
-    location: 'Sterilisation room', responsible: STER, criticality: Criticality.STOPS_CLINIC,
+    location: 'Sterilisation room', holdsRoom: null, responsible: STER, criticality: Criticality.STOPS_CLINIC,
     make: 'Hawo', model: 'hm 500 DC-V', serial: 'HW-500-882',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -385,7 +405,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'DISTILLER-01', name: 'Water distiller', category: AssetCategory.STERILIZATION,
-    location: 'Sterilisation room', responsible: STER, criticality: Criticality.STOPS_CLINIC,
+    location: 'Sterilisation room', holdsRoom: null, responsible: STER, criticality: Criticality.STOPS_CLINIC,
     make: 'Megahome', model: 'MH943', serial: 'MH-943-206',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -395,7 +415,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'UV-01', name: 'UV cabinet — sterilisation room', category: AssetCategory.STERILIZATION,
-    location: 'Sterilisation room', responsible: STER, criticality: Criticality.DEGRADES,
+    location: 'Sterilisation room', holdsRoom: null, responsible: STER, criticality: Criticality.DEGRADES,
     make: 'Confident', model: 'UV-90', serial: 'CU-90-337',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -405,7 +425,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'NEEDLE-01', name: 'Needle destroyer', category: AssetCategory.STERILIZATION,
-    location: 'Sterilisation room', responsible: STER, criticality: Criticality.DEGRADES,
+    location: 'Sterilisation room', holdsRoom: null, responsible: STER, criticality: Criticality.DEGRADES,
     make: 'Sharps', model: 'ND-2', serial: 'SH-ND2-054',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -417,7 +437,7 @@ export const ASSETS: readonly Asset[] = [
   /* ── Plant ──────────────────────────────────────────────────────────── */
   asset({
     tag: 'COMPRESSOR-01', name: 'Air compressor', category: AssetCategory.PLANT,
-    location: 'Plant room', responsible: MGR, criticality: Criticality.STOPS_CLINIC,
+    location: 'Plant room', holdsRoom: null, responsible: MGR, criticality: Criticality.STOPS_CLINIC,
     make: 'Josef Kaeser', model: 'Dental 3', serial: 'JK-D3-7714',
     commissionedAt: null, warrantyUntil: null,
     amc: { vendor: 'Airtech Services', until: days(41), covers: 'Two visits a year, filters included, receiver and motor excluded.' },
@@ -435,7 +455,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'SUCTION-01', name: 'Central suction pump', category: AssetCategory.PLANT,
-    location: 'Plant room', responsible: MGR, criticality: Criticality.STOPS_CLINIC,
+    location: 'Plant room', holdsRoom: null, responsible: MGR, criticality: Criticality.STOPS_CLINIC,
     make: 'Cattani', model: 'Turbo Smart', serial: 'CT-TS-3390',
     commissionedAt: null, warrantyUntil: null,
     amc: { vendor: 'Cattani Care', until: null, covers: 'Annual service and amalgam separator servicing.' },
@@ -451,7 +471,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'PUMP-01', name: 'Water pump', category: AssetCategory.FACILITY,
-    location: 'Plant room', responsible: HK, criticality: Criticality.STOPS_CLINIC,
+    location: 'Plant room', holdsRoom: null, responsible: HK, criticality: Criticality.STOPS_CLINIC,
     make: 'Crompton', model: 'Mini Champ', serial: 'CR-MC-2210',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -463,7 +483,7 @@ export const ASSETS: readonly Asset[] = [
   /* ── Imaging, central ───────────────────────────────────────────────── */
   asset({
     tag: 'OPG-01', name: 'OPG and cephalometric unit', category: AssetCategory.IMAGING,
-    location: 'X-ray room', responsible: SNR, criticality: Criticality.STOPS_WORK,
+    location: 'X-ray room', holdsRoom: null, responsible: SNR, criticality: Criticality.STOPS_WORK,
     make: 'Vatech', model: 'PaX-i', serial: 'VT-PXI-5502',
     commissionedAt: null, warrantyUntil: null,
     amc: { vendor: 'Vatech India', until: days(158), covers: 'One preventive visit, software updates, tube excluded.' },
@@ -479,7 +499,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'SCANNER-01', name: 'Intraoral scanner', category: AssetCategory.CHAIRSIDE,
-    location: 'Mobile — trolley', responsible: SNR, criticality: Criticality.DEGRADES,
+    location: 'Mobile — trolley', holdsRoom: null, responsible: SNR, criticality: Criticality.DEGRADES,
     make: 'Medit', model: 'i700', serial: 'MD-i700-441',
     commissionedAt: null, warrantyUntil: days(280), amc: null,
     documents: ['User manual', 'Calibration record'],
@@ -491,7 +511,7 @@ export const ASSETS: readonly Asset[] = [
   /* ── Laboratory ─────────────────────────────────────────────────────── */
   asset({
     tag: 'LAB-MICRO-01', name: 'Laboratory micromotor', category: AssetCategory.LABORATORY,
-    location: 'Laboratory', responsible: SNR, criticality: Criticality.DEGRADES,
+    location: 'Laboratory', holdsRoom: null, responsible: SNR, criticality: Criticality.DEGRADES,
     make: 'Marathon', model: 'N7', serial: 'MR-N7-812',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -500,7 +520,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'TRIMMER-01', name: 'Model trimmer', category: AssetCategory.LABORATORY,
-    location: 'Laboratory', responsible: SNR, criticality: Criticality.DEGRADES,
+    location: 'Laboratory', holdsRoom: null, responsible: SNR, criticality: Criticality.DEGRADES,
     make: 'Confident', model: 'MT-10', serial: 'CM-10-663',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -512,7 +532,7 @@ export const ASSETS: readonly Asset[] = [
   /* ── Facility ───────────────────────────────────────────────────────── */
   asset({
     tag: 'UPS-01', name: 'UPS and inverter', category: AssetCategory.FACILITY,
-    location: 'Plant room', responsible: MGR, criticality: Criticality.STOPS_CLINIC,
+    location: 'Plant room', holdsRoom: null, responsible: MGR, criticality: Criticality.STOPS_CLINIC,
     make: 'Luminous', model: 'Zelio 1100', serial: 'LM-Z1100-914',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -525,7 +545,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'AC-RECEPTION', name: 'Air conditioner — reception', category: AssetCategory.FACILITY,
-    location: 'Reception', responsible: HK, criticality: Criticality.DEGRADES,
+    location: 'Reception', holdsRoom: null, responsible: HK, criticality: Criticality.DEGRADES,
     make: 'Daikin', model: 'FTKF50', serial: 'DK-F50-3301',
     commissionedAt: null, warrantyUntil: null,
     amc: { vendor: 'CoolCare', until: days(63), covers: 'Quarterly cleaning and gas top-up.' },
@@ -536,7 +556,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'PURIFIER-01', name: 'Air purifier and diffuser', category: AssetCategory.FACILITY,
-    location: 'Reception', responsible: HK, criticality: Criticality.DEGRADES,
+    location: 'Reception', holdsRoom: null, responsible: HK, criticality: Criticality.DEGRADES,
     make: 'Philips', model: 'AC2887', serial: 'PH-2887-771',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -546,7 +566,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'RO-01', name: 'RO water purifier', category: AssetCategory.FACILITY,
-    location: 'Pantry', responsible: HK, criticality: Criticality.DEGRADES,
+    location: 'Pantry', holdsRoom: null, responsible: HK, criticality: Criticality.DEGRADES,
     make: 'Kent', model: 'Grand Plus', serial: 'KT-GP-5528',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -556,7 +576,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'FRIDGE-01', name: 'Refrigerator — medicaments', category: AssetCategory.FACILITY,
-    location: 'Sterilisation room', responsible: ASST, criticality: Criticality.STOPS_WORK,
+    location: 'Sterilisation room', holdsRoom: null, responsible: ASST, criticality: Criticality.STOPS_WORK,
     make: 'Godrej', model: 'RD Edge', serial: 'GJ-RD-1180',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -568,7 +588,7 @@ export const ASSETS: readonly Asset[] = [
   /* ── Safety ─────────────────────────────────────────────────────────── */
   asset({
     tag: 'EMERGENCY-01', name: 'Emergency drug kit', category: AssetCategory.SAFETY,
-    location: 'Sterilisation room', responsible: SNR, criticality: Criticality.STOPS_CLINIC,
+    location: 'Sterilisation room', holdsRoom: null, responsible: SNR, criticality: Criticality.STOPS_CLINIC,
     make: '—', model: 'Clinic kit', serial: '—',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: ['Contents list with expiry dates'],
@@ -583,7 +603,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'OXYGEN-01', name: 'Oxygen cylinder and mask', category: AssetCategory.SAFETY,
-    location: 'Sterilisation room', responsible: SNR, criticality: Criticality.STOPS_CLINIC,
+    location: 'Sterilisation room', holdsRoom: null, responsible: SNR, criticality: Criticality.STOPS_CLINIC,
     make: 'INOX', model: 'D-type', serial: 'IN-D-4409',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: ['Cylinder test certificate'],
@@ -597,7 +617,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'FIRE-01', name: 'Fire extinguisher — CO2', category: AssetCategory.SAFETY,
-    location: 'Corridor', responsible: MGR, criticality: Criticality.DEGRADES,
+    location: 'Corridor', holdsRoom: null, responsible: MGR, criticality: Criticality.DEGRADES,
     make: 'Ceasefire', model: 'CO2 4.5kg', serial: 'CF-CO2-2287',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: ['Refill certificate'],
@@ -609,7 +629,7 @@ export const ASSETS: readonly Asset[] = [
   /* ── Front office ───────────────────────────────────────────────────── */
   asset({
     tag: 'DVR-01', name: 'CCTV recorder', category: AssetCategory.FRONT_OFFICE,
-    location: 'Reception', responsible: REC, criticality: Criticality.DEGRADES,
+    location: 'Reception', holdsRoom: null, responsible: REC, criticality: Criticality.DEGRADES,
     make: 'Hikvision', model: 'DS-7108', serial: 'HK-7108-661',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -619,7 +639,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'SERVER-01', name: 'Practice computer and backup', category: AssetCategory.FRONT_OFFICE,
-    location: 'Reception', responsible: MGR, criticality: Criticality.STOPS_CLINIC,
+    location: 'Reception', holdsRoom: null, responsible: MGR, criticality: Criticality.STOPS_CLINIC,
     make: 'Dell', model: 'OptiPlex 7010', serial: 'DL-7010-8823',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -632,7 +652,7 @@ export const ASSETS: readonly Asset[] = [
   }),
   asset({
     tag: 'CARDPOS-01', name: 'Card machine', category: AssetCategory.FRONT_OFFICE,
-    location: 'Reception', responsible: REC, criticality: Criticality.DEGRADES,
+    location: 'Reception', holdsRoom: null, responsible: REC, criticality: Criticality.DEGRADES,
     make: 'Pine Labs', model: 'A910', serial: 'PL-A910-3390',
     commissionedAt: null, warrantyUntil: null, amc: null,
     documents: [],
@@ -878,4 +898,154 @@ export function equipment(
 /** What one role owes across the register, worst first. */
 export function assetWorkFor(v: EquipmentView, role: RoleCode): AssetTask[] {
   return v.tasks.filter((t) => t.owner === role);
+}
+
+/* -------------------------------------------------------------------------
+ * A room is only usable if the kit in it is
+ * ---------------------------------------------------------------------- */
+
+/**
+ * The owner's rule, stated plainly:
+ *
+ *   *"If OPEN-004 Dental Chair = FAIL, that chair becomes
+ *   🔴 NOT AVAILABLE FOR PATIENT ALLOCATION."*
+ *
+ * Before this, KuBi could hold both of these at once without noticing: the
+ * asset register saying `CHAIR-03` is down, and the day's board offering
+ * Operatory 3 to the next patient. Nothing joined them. `asset.location` was
+ * a string that got printed on a screen and read by nobody.
+ *
+ * The consequence is what makes the check worth doing. A failed chair that
+ * produces a maintenance ticket and no change to the booking sheet is a
+ * clinic that will still seat somebody in that room at eleven o'clock.
+ */
+export const RoomState = {
+  /** Allocate patients here. */
+  AVAILABLE: 'AVAILABLE',
+  /** 🔴 NOT AVAILABLE FOR PATIENT ALLOCATION. Something in it failed. */
+  WITHDRAWN: 'WITHDRAWN',
+  /**
+   * Usable today, and something in it has never been verified.
+   *
+   * The third state, and the reason it exists: on the day a clinic starts
+   * using KuBi, every blocking cycle in the register is unrecorded, and a
+   * two-state rule withdraws all four rooms at once. Nobody believes that,
+   * so the flag gets switched off and the day a chair genuinely fails nobody
+   * is watching.
+   *
+   * It is the same distinction inventory already makes between *out of
+   * stock* and *never counted* — one is a fact about today, the other is a
+   * fact about the register. Neither is a pass, and they are not the same
+   * sentence.
+   */
+  UNVERIFIED: 'UNVERIFIED',
+} as const;
+export type RoomState = (typeof RoomState)[keyof typeof RoomState];
+
+export interface RoomAvailability {
+  operatoryId: string;
+  label: string;
+  state: RoomState;
+  /** False means: do not allocate a patient here. */
+  available: boolean;
+  /** The assets that took it out — only ever ones declaring `holdsRoom`. */
+  blockedBy: readonly AssetRecord[];
+  /** Assets in this room carrying a blocking cycle nobody has ever recorded. */
+  unverified: readonly AssetRecord[];
+  /** Said to whoever is holding the appointment book. */
+  because: string;
+}
+
+/**
+ * Assets whose `location` names no room the clinic has.
+ *
+ * The link between an asset and its room is a string match, because that is
+ * what the register actually holds. A string match rots — somebody renames a
+ * room, and every chair in it quietly stops blocking anything.
+ *
+ * So the mismatches are returned rather than dropped. A chair that protects no
+ * room must be visible as a broken link, not as a room that is fine.
+ */
+export interface RoomLinkage {
+  rooms: readonly RoomAvailability[];
+  /** Rooms that may not take a patient. */
+  unavailable: readonly RoomAvailability[];
+  /** Rooms open today with kit that has never been verified. */
+  unverified: readonly RoomAvailability[];
+  /** Assets claiming a room this clinic does not have. */
+  orphaned: readonly AssetRecord[];
+}
+
+/**
+ * Which rooms may take a patient, given the state of the kit inside them.
+ *
+ * A room is **withdrawn** when an asset that *holds* it is down, or has a
+ * blocking cycle whose due date has passed. Holding is declared per asset, not
+ * inferred from where the thing sits: a curing light lives in Operatory 2 and
+ * does not hold it, because you carry one in from next door. Withdrawing a
+ * whole operatory for a curing light would teach the clinic to ignore the flag
+ * within a week, and the flag is only worth having on the day a chair fails.
+ *
+ * A room is **unverified** when the only thing against it is a blocking cycle
+ * with no date at all — nobody has ever recorded that check. That is a
+ * register to be filled in, not a room to be shut, and saying so is what keeps
+ * the withdrawal meaningful on the days it happens.
+ *
+ * Pure, and derived — no event marks a room unavailable, exactly as no event
+ * marks the clinic ready. Restore the chair and the room comes back on its own.
+ */
+export function roomAvailability(
+  operatories: readonly { id: string; label: string }[],
+  v: EquipmentView,
+): RoomLinkage {
+  /** A blocking cycle that had a date and went past it. */
+  const lapsed = (r: AssetRecord) =>
+    r.due.some((t) => t.blocks && t.overdue && t.dueAt !== null);
+  /** A blocking cycle nobody has ever recorded. */
+  const neverDone = (r: AssetRecord) =>
+    r.due.some((t) => t.blocks && t.overdue && t.dueAt === null);
+
+  const byRoom = new Set(operatories.map((o) => o.label));
+  const down = new Set(v.down.map((r) => r.asset.tag));
+  // Only assets that declare they hold a room can withdraw one. That single
+  // field is what separates a chair from a curing light, and it is declared
+  // in the register rather than guessed from a location string.
+  const fixed = v.records.filter((r) => r.asset.holdsRoom !== null);
+
+  const rooms: RoomAvailability[] = operatories.map((o) => {
+    const here = fixed.filter((r) => r.asset.holdsRoom === o.label);
+    const blockedBy = here.filter((r) => down.has(r.asset.tag) || lapsed(r));
+    const unverified = here.filter((r) => !blockedBy.includes(r) && neverDone(r));
+
+    const state = blockedBy.length > 0 ? RoomState.WITHDRAWN
+      : unverified.length > 0 ? RoomState.UNVERIFIED
+        : RoomState.AVAILABLE;
+
+    return {
+      operatoryId: o.id,
+      label: o.label,
+      state,
+      available: state !== RoomState.WITHDRAWN,
+      blockedBy,
+      unverified,
+      because: state === RoomState.WITHDRAWN
+        ? `NOT AVAILABLE FOR PATIENT ALLOCATION — ${blockedBy
+          .map((r) => `${r.asset.name} (${r.asset.tag})`).join(', ')}.`
+        : state === RoomState.UNVERIFIED
+          ? `Open, and ${unverified.length} item${unverified.length === 1 ? '' : 's'} `
+            + 'here carry a check nobody has ever recorded: '
+            + `${unverified.map((r) => r.asset.tag).join(', ')}.`
+          : 'Every asset holding this room is usable.',
+    };
+  });
+
+  return {
+    rooms,
+    unavailable: rooms.filter((r) => r.state === RoomState.WITHDRAWN),
+    unverified: rooms.filter((r) => r.state === RoomState.UNVERIFIED),
+    // An asset that claims a room the clinic does not have. Only assets that
+    // claim one can be orphaned — a trolley scanner declaring no room is
+    // correct, not a broken link, and the old rule reported it as a fault.
+    orphaned: fixed.filter((r) => !byRoom.has(r.asset.holdsRoom!)),
+  };
 }
