@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   api, type PatientEventsView, type CareView, type CareTaskView, type GateResultView,
+  type HorizonAlert,
 } from '../api.js';
 import { hhmm, who, Loading } from './day-blocks.js';
 
@@ -109,6 +110,20 @@ export function PatientEvents() {
         )}
       </section>
 
+      {/* ── Before the patient reaches the chair ─────────────────────────
+          The owner: "This should appear before the patient reaches the chair,
+          not when the doctor asks for the component." So it is above the
+          bookings, not inside one — the point is that somebody sees it while
+          there is still time to ring the supplier. */}
+      {view.horizon.length > 0 && (
+        <section className="ready-panel">
+          <div className="ready-kicker">BEFORE THEY REACH THE CHAIR</div>
+          <div className="horizon">
+            {view.horizon.map((a) => <Alert key={a.bookingId} a={a} />)}
+          </div>
+        </section>
+      )}
+
       {view.care.map((c) => (
         <Booking key={c.bookingId} care={c} busy={busy}
           expanded={open === c.bookingId}
@@ -135,6 +150,37 @@ export function PatientEvents() {
     </div>
   );
 }
+
+function Alert({ a }: { a: HorizonAlert }) {
+  const days = Math.floor(a.minutesOfWarning / 1440);
+  const hours = Math.floor((a.minutesOfWarning % 1440) / 60);
+  const when = a.minutesOfWarning < 0 ? 'now'
+    : days > 0 ? `in ${days} day${days === 1 ? '' : 's'}`
+      : hours > 0 ? `in ${hours} h` : `in ${a.minutesOfWarning} min`;
+
+  return (
+    <div className={`horizon-row ${SEV[a.severity]}`}>
+      <span className={`horizon-sev ${SEV[a.severity]}`}>{a.severity}</span>
+      <div className="horizon-body">
+        <div className="horizon-head">
+          {a.treatmentName} · {a.patientLabel} · {hhmm(a.at)} · {when}
+        </div>
+        <div className="horizon-why">{a.headline}</div>
+        {/* The number worth watching: not "we were not ready", but "we could
+            have known days ago and did not". */}
+        {a.couldHaveKnownEarlier && a.warningLostHours !== null && (
+          <div className="horizon-lost">
+            Knowable {a.warningLostHours} hours ago. That much notice has already gone.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const SEV: Record<string, string> = {
+  CRITICAL: 'is-critical', HIGH: 'is-high', NORMAL: 'is-normal',
+};
 
 /* -------------------------------------------------------------------------
  * One booking
@@ -206,6 +252,24 @@ function Booking({ care, busy, expanded, onToggle, onReport }: {
           {m!.refusals.length} recorded attempt{m!.refusals.length === 1 ? '' : 's'} to
           start this anyway — {m!.refusals.map((r) => hhmm(r.at % 1440)).join(', ')}.
         </p>
+      )}
+
+      {/* ── The spine: five stages, in order, exactly as the owner drew it
+             — history ✓ → X-ray ✓ → consent ✓ → instruments ✓ → docs ✓ */}
+      {m !== null && (
+        <div className="spine">
+          {m.stages.filter((st) => st.gateIds.length > 0).map((st) => (
+            <span key={st.stage}
+              className={`spine-stage ${st.clear ? 'is-clear' : 'is-open'}`}>
+              <span className="spine-mark" aria-hidden="true">{st.clear ? '✓' : '○'}</span>
+              {st.label}
+              {st.outstanding > 0 ? ` (${st.outstanding})` : ''}
+            </span>
+          ))}
+          <span className={`spine-verdict ${ready ? 'is-clear' : 'is-open'}`}>
+            {ready ? 'READY' : 'NOT READY'}
+          </span>
+        </div>
       )}
 
       {/* ── The mandatory list, on the booking, clickable ─────────────── */}

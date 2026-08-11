@@ -15,7 +15,8 @@ import { describe, it, expect } from 'vitest';
 import {
   ClinicEvent, RoleCode, complianceFor, complianceAcross, mustListFor, mayStart,
   GATE_EVIDENCE, GateBasis, GateOutcome, TREATMENTS, CareGate, CareStage,
-  NOTHING_KNOWN, STOCK_BACKED_GATES,
+  NOTHING_KNOWN, STOCK_BACKED_GATES, FailureClass, readinessHorizon,
+  complianceAcrossWithHorizon,
   type Booking, type PatientFacts, type ReadinessEvent, type Compliance,
 } from '@kubi/contracts';
 
@@ -52,7 +53,11 @@ const vouchedFor = (bookingId: string, except: readonly string[] = []) =>
   Object.fromEntries(STOCK_BACKED_GATES
     .map((g) => [`${bookingId}#${g}`, !except.includes(g)]));
 
-const FIT = { unusableAssets: [] as string[], stockVouched: vouchedFor('bk-1') };
+const FIT = {
+  unusableAssets: [] as string[],
+  stockVouched: vouchedFor('bk-1'),
+  emergencyReady: true,
+};
 
 /** Every BEFORE gate met, except the ones named. */
 function metAllBut(code: string, skip: readonly string[], at = APPT - 60): ReadinessEvent[] {
@@ -70,6 +75,7 @@ const without = (code: string, skip: readonly string[], now = APPT): Compliance 
   complianceFor(booking(code), KNOWN, metAllBut(code, skip), now, {
     unusableAssets: [],
     stockVouched: vouchedFor('bk-1', skip.filter((g) => STOCK_BACKED_GATES.includes(g))),
+    emergencyReady: !skip.includes('EMERGENCY_READY'),
   })!;
 
 /* ═══════════════════════════════════════════════════════════════════════ */
@@ -145,11 +151,17 @@ describe('the must-required list', () => {
 
 describe('⚠ PROCEDURE NOT READY', () => {
   it('refuses when a mandatory gate is missing, and names it', () => {
+    // An implant gets the surgical banner. Same verdict, louder words —
+    // see "the owner's implant protocol" below.
     const c = of('IMPLANT', metAllBut('IMPLANT', ['CONSENT']));
     expect(c.ready).toBe(false);
     expect(c.verdict).toBe('NOT_READY');
-    expect(c.headline).toContain('PROCEDURE NOT READY');
+    expect(c.headline).toContain('SURGERY READINESS FAILED');
     expect(c.headline).toContain('Consent taken');
+
+    // A filling gets the ordinary one.
+    const f = of('FILLING', metAllBut('FILLING', ['CONSENT']));
+    expect(f.headline).toContain('PROCEDURE NOT READY');
   });
 
   it('says READY when every mandatory gate is met', () => {
@@ -217,7 +229,8 @@ describe('the four ways a requirement disappears', () => {
     // A compliance engine that passes an implant because it could not read the
     // equipment register has passed it for the worst possible reason.
     const c = complianceFor(booking('IMPLANT'), KNOWN,
-      metAllBut('IMPLANT', []), APPT, { stockVouched: vouchedFor('bk-1') })!;
+      metAllBut('IMPLANT', []), APPT,
+      { stockVouched: vouchedFor('bk-1'), emergencyReady: true })!;
     expect(c.ready).toBe(false);
     expect(c.gates.find((x) => x.id === 'EQUIPMENT_FIT')!.verdict)
       .toBe(GateOutcome.UNKNOWN);
@@ -227,7 +240,8 @@ describe('the four ways a requirement disappears', () => {
     // The owner's "sterilization confirmed" is two facts: a released pack for
     // this patient, and an autoclave that is fit to have released it.
     const c = complianceFor(booking('IMPLANT'), KNOWN, metAllBut('IMPLANT', []),
-      APPT, { unusableAssets: ['AUTOCLAVE-01'], stockVouched: vouchedFor('bk-1') })!;
+      APPT, { unusableAssets: ['AUTOCLAVE-01'], stockVouched: vouchedFor('bk-1'),
+        emergencyReady: true })!;
     expect(c.ready).toBe(false);
     expect(c.missing.map((m) => m.id)).toContain('EQUIPMENT_FIT');
     expect(c.gates.find((x) => x.id === 'EQUIPMENT_FIT')!.because)
@@ -349,11 +363,11 @@ describe('across the clinic', () => {
   const day = (): Compliance[] => [
     complianceFor(booking('IMPLANT', { id: 'b1', patientLabel: 'Anita Rao' }),
       KNOWN, metAllBut('IMPLANT', []).map((e) => ({ ...e, subjectId: e.subjectId.replace('bk-1', 'b1') })),
-      APPT, { unusableAssets: [], stockVouched: vouchedFor('b1') })!,
+      APPT, { unusableAssets: [], stockVouched: vouchedFor('b1'), emergencyReady: true })!,
     complianceFor(booking('EXTRACT', { id: 'b2', patientLabel: 'Sunil Mehta' }),
-      KNOWN, [], APPT, { unusableAssets: [], stockVouched: vouchedFor('b2') })!,
+      KNOWN, [], APPT, { unusableAssets: [], stockVouched: vouchedFor('b2'), emergencyReady: true })!,
     complianceFor(booking('SCALE', { id: 'b3', patientLabel: 'Farah Qureshi' }),
-      KNOWN, [], APPT, { unusableAssets: [], stockVouched: vouchedFor('b3') })!,
+      KNOWN, [], APPT, { unusableAssets: [], stockVouched: vouchedFor('b3'), emergencyReady: true })!,
   ];
 
   it('counts what is not ready right now', () => {
@@ -407,5 +421,172 @@ describe('what the older gate register could not do', () => {
       const present = of('IMPLANT', metAllBut('IMPLANT', []));
       expect(present.gates.find((x) => x.id === id)!.verdict).toBe(GateOutcome.MET);
     }
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   The owner's own protocol, checked line by line
+
+   He asked the right question — "is this the protocol that is being
+   followed?" — so these tests read his two examples back as assertions
+   rather than taking my word for it.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+describe('the owner’s RCT protocol, item for item', () => {
+  const ids = () => mustListFor('RCT_POST')
+    .filter((m) => m.stage === CareStage.BEFORE).map((m) => m.id);
+
+  it('has medical history, X-ray, consent, instruments and pre-op documentation', () => {
+    const got = ids();
+    expect(got, 'medical history').toContain('HISTORY');
+    expect(got, 'relevant X-ray').toContain('IMAGING');
+    expect(got, 'consent').toContain('CONSENT');
+    expect(got, 'required instruments/materials').toContain('STOCK');
+    expect(got, 'pre-op documentation').toContain('PREOP_DOC');
+  });
+
+  it('goes green only when all five are met', () => {
+    const short = without('RCT_POST', ['PREOP_DOC']);
+    expect(short.ready).toBe(false);
+    const full = of('RCT_POST', metAllBut('RCT_POST', []));
+    expect(full.ready).toBe(true);
+    expect(full.headline).toBe('Ready to proceed.');
+  });
+});
+
+describe('the owner’s implant protocol, item for item', () => {
+  const ids = () => mustListFor('IMPLANT')
+    .filter((m) => m.stage === CareStage.BEFORE).map((m) => m.id);
+
+  it('has all eleven things he listed', () => {
+    const got = ids();
+    expect(got, 'medical history').toContain('HISTORY');
+    expect(got, 'investigations').toContain('INVESTIGATIONS');
+    expect(got, 'consent').toContain('CONSENT');
+    expect(got, 'pre-op scan/X-ray').toContain('IMAGING');
+    expect(got, 'medicine instructions').toContain('MED_INSTRUCTIONS');
+    expect(got, 'meal instructions').toContain('MEAL_INSTRUCTIONS');
+    expect(got, 'implant availability').toContain('IMPLANT_STOCK');
+    expect(got, 'surgical kit').toContain('DRILL_KIT');
+    expect(got, 'sterile instruments').toContain('STERILE_PACK');
+    expect(got, 'emergency readiness').toContain('EMERGENCY_READY');
+    expect(got, 'surgical documentation').toContain('PLAN_SIGNED');
+  });
+
+  it('says his sentence when the component is missing', () => {
+    // "🔴 SURGERY READINESS FAILED — IMPLANT COMPONENT UNAVAILABLE"
+    const c = without('IMPLANT', ['IMPLANT_STOCK']);
+    expect(c.failure).toBe(FailureClass.COMPONENT_UNAVAILABLE);
+    expect(c.headline).toContain('SURGERY READINESS FAILED');
+    expect(c.headline).toContain('IMPLANT COMPONENT UNAVAILABLE');
+  });
+
+  it('does not shout SURGERY at a scaling', () => {
+    const c = without('SCALE', ['CONSENT']);
+    expect(c.headline).toContain('PROCEDURE NOT READY');
+    expect(c.headline).not.toContain('SURGERY');
+  });
+});
+
+describe('the spine is the same for every treatment', () => {
+  it('gives all thirty-nine the same five stages, in order', () => {
+    for (const t of TREATMENTS) {
+      const c = complianceFor(booking(t.code), KNOWN, [], APPT, FIT);
+      expect(c, t.code).not.toBeNull();
+      expect(c!.stages.map((s) => s.stage), t.code)
+        .toEqual(['ASSESSED', 'RECORDS', 'CONSENT', 'PREPARED', 'RESOURCES']);
+    }
+  });
+
+  it('puts every treatment’s gates into a stage, none left over', () => {
+    for (const t of TREATMENTS) {
+      const c = complianceFor(booking(t.code), KNOWN, [], APPT, FIT)!;
+      const inStages = c.stages.reduce((n, s) => n + s.gates.length, 0);
+      expect(inStages, t.code).toBe(c.before.length);
+    }
+  });
+
+  it('asks every treatment for the patient preparation, not just the implant', () => {
+    // *"I mean for every treatment."*
+    for (const t of TREATMENTS) {
+      const got = mustListFor(t.code).map((m) => m.id);
+      expect(got, `${t.code} has no pre-op documentation`).toContain('PREOP_DOC');
+      expect(got, `${t.code} has no medicine instructions`).toContain('MED_INSTRUCTIONS');
+      expect(got, `${t.code} has no emergency readiness`).toContain('EMERGENCY_READY');
+    }
+  });
+
+  it('gives an emergency the same requirements at its own pace', () => {
+    // A walk-in cannot have had records completed the day before an
+    // appointment made ten minutes ago. Zero offset, not dropped.
+    const walkIn = mustListFor('EMERG_ABSCESS').find((m) => m.id === 'PREOP_DOC')!;
+    const planned = mustListFor('IMPLANT').find((m) => m.id === 'PREOP_DOC')!;
+    expect(walkIn).toBeDefined();
+    expect(planned).toBeDefined();
+  });
+});
+
+describe('before the patient reaches the chair', () => {
+  /**
+   * *"This should appear before the patient reaches the chair, not when the
+   * doctor asks for the component."*
+   *
+   * The mechanism is that every gate has its own due minute, so the moment a
+   * booking becomes un-ready is knowable — and for a component it is three
+   * days out, not on the morning.
+   */
+  const at = (id: string) => (id === 'bk-1' ? APPT : APPT);
+
+  it('raises the component three days out, not on the day', () => {
+    const threeDaysBefore = APPT - 3 * DAY;
+    const c = without('IMPLANT', ['IMPLANT_STOCK'], threeDaysBefore);
+    const [alert] = readinessHorizon([c], at, threeDaysBefore);
+    expect(alert).toBeDefined();
+    expect(alert!.failure).toBe(FailureClass.COMPONENT_UNAVAILABLE);
+    expect(alert!.severity).toBe('CRITICAL');
+    expect(alert!.minutesOfWarning).toBe(3 * DAY);
+  });
+
+  it('says when the clinic could already have known, and how much notice it lost', () => {
+    const onTheDay = APPT - 30;
+    const c = without('IMPLANT', ['IMPLANT_STOCK'], onTheDay);
+    const [alert] = readinessHorizon([c], at, onTheDay);
+    expect(alert!.couldHaveKnownEarlier).toBe(true);
+    // The stock gate falls due three days before the appointment.
+    expect(alert!.warningLostHours).toBeGreaterThan(60);
+  });
+
+  it('is not a late discovery when it has only just fallen due', () => {
+    const early = APPT - 5 * DAY;
+    const c = without('IMPLANT', ['IMPLANT_STOCK'], early);
+    const [alert] = readinessHorizon([c], at, early);
+    expect(alert!.couldHaveKnownEarlier).toBe(false);
+    expect(alert!.warningLostHours).toBe(0);
+  });
+
+  it('keeps a component critical however far away, and a consent only near the day', () => {
+    // A component has a lead time; waiting does not help. A consent takes five
+    // minutes and only becomes urgent when there are no five minutes left.
+    const week = APPT - 7 * DAY;
+    const component = readinessHorizon([without('IMPLANT', ['IMPLANT_STOCK'], week)], at, week);
+    const consent = readinessHorizon([without('IMPLANT', ['CONSENT'], week)], at, week);
+    expect(component[0]!.severity).toBe('CRITICAL');
+    expect(consent[0]!.severity).toBe('NORMAL');
+
+    const soon = APPT - 60;
+    const consentSoon = readinessHorizon([without('IMPLANT', ['CONSENT'], soon)], at, soon);
+    expect(consentSoon[0]!.severity).toBe('HIGH');
+  });
+
+  it('says nothing about a booking that is ready', () => {
+    const c = of('IMPLANT', metAllBut('IMPLANT', []));
+    expect(readinessHorizon([c], at, APPT - DAY)).toHaveLength(0);
+  });
+
+  it('counts late discoveries across the clinic', () => {
+    const onTheDay = APPT - 30;
+    const c = without('IMPLANT', ['IMPLANT_STOCK'], onTheDay);
+    const alerts = readinessHorizon([c], at, onTheDay);
+    expect(complianceAcrossWithHorizon([c], alerts).lateDiscoveries).toBe(1);
   });
 });

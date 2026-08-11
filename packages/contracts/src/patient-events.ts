@@ -212,6 +212,23 @@ const universal = (): CareItem[] => [
   item('HISTORY', 'Medical history verified', ASST, Objective.PATIENT_SAFE,
     CareStage.BEFORE, days(1), CareGate.BLOCK,
     'Nobody has confirmed this patient’s medical history for today'),
+  // The owner, checking the engine against his own protocol: *"I mean for
+  // every treatment."* These three were on the implant list and nowhere else,
+  // and there is no treatment they do not belong to — a patient who has not
+  // been told what to take, or whether to eat, has not been prepared for a
+  // filling either.
+  item('PREOP_DOC', 'Pre-operative records complete and in the file', DOC,
+    Objective.RECORDS_COMPLETE, CareStage.BEFORE, days(1), CareGate.BLOCK,
+    'The pre-operative records for this procedure are not complete'),
+  item('MED_INSTRUCTIONS', 'Medicine instructions given to the patient', DOC,
+    Objective.PATIENT_SAFE, CareStage.BEFORE, days(1), CareGate.BLOCK,
+    'The patient has not been told what to take, and what to stop, before today'),
+  // Advisory by default and re-declared as blocking for surgery, where an
+  // unfed diabetic or an unfasted sedation case is a real problem rather than
+  // an inconvenience.
+  item('MEAL_INSTRUCTIONS', 'Eating and drinking instructions given', REC,
+    Objective.PATIENT_HAPPY, CareStage.BEFORE, days(1), CareGate.ADVISE,
+    'The patient has not been told whether to eat before this appointment'),
   item('CONSENT', 'Consent taken', DOC, Objective.RECORDS_COMPLETE,
     CareStage.BEFORE, mins(15), CareGate.BLOCK,
     'Consent has not been signed'),
@@ -253,8 +270,41 @@ const bleeding = (): CareItem[] => [
     'diabetic'),
 ];
 
+/**
+ * The same spine, at the pace an emergency actually runs.
+ *
+ * A walk-in cannot have had records completed the day before an appointment
+ * that was made ten minutes ago. The requirements do not disappear — they are
+ * re-declared at zero offset, so they are due now rather than retrospectively
+ * late. Dropping them instead would have made the emergency the one place the
+ * protocol does not apply, which is the place it matters most.
+ */
+const emergencyPrep = (): CareItem[] => [
+  item('PREOP_DOC', 'Records made at the time, not afterwards', DOC,
+    Objective.RECORDS_COMPLETE, CareStage.BEFORE, mins(0), CareGate.BLOCK,
+    'There is no record of the presenting complaint and examination'),
+  item('MED_INSTRUCTIONS', 'Medicine instructions given before the patient leaves', DOC,
+    Objective.PATIENT_SAFE, CareStage.BEFORE, mins(0), CareGate.BLOCK,
+    'The patient has not been told what to take'),
+  item('MEAL_INSTRUCTIONS', 'Eating and drinking instructions given', REC,
+    Objective.PATIENT_HAPPY, CareStage.BEFORE, mins(0), CareGate.ADVISE,
+    'The patient has not been told whether to eat'),
+];
+
+/** Blood work that has to be back, and read, before the day. */
+const investigated = (leadDays: number): CareItem[] => [
+  item('INVESTIGATIONS', 'Blood investigations reported and reviewed', DOC,
+    Objective.PATIENT_SAFE, CareStage.BEFORE, days(leadDays), CareGate.BLOCK,
+    'The investigations this surgery depends on are not back, or are back and unread'),
+];
+
 /** Anything surgical: a flap, a bur on bone, a suture. */
 const surgical = (): CareItem[] => [
+  // Sharpened from the universal advisory version: an unfasted sedation case
+  // or an unfed diabetic is a cancelled list, not an inconvenience.
+  item('MEAL_INSTRUCTIONS', 'Eating and drinking instructions given', REC,
+    Objective.PATIENT_SAFE, CareStage.BEFORE, days(1), CareGate.BLOCK,
+    'The patient has not been told whether to eat or fast before surgery'),
   item('MRONJ', 'Antiresorptive risk assessed and the patient warned', DOC,
     Objective.PATIENT_SAFE, CareStage.BEFORE, days(3), CareGate.BLOCK,
     'The patient is on an antiresorptive and the osteonecrosis risk has not been assessed',
@@ -658,6 +708,7 @@ export const TREATMENTS: readonly Treatment[] = [
   treatment('IMPLANT', 'Implant placement',
     TreatmentCategory.IMPLANT, 90, 1,
     universal(), anaesthetic(), bleeding(), surgical(), sutures(10),
+    investigated(7),
     imaging('CBCT of the site', 14),
     smokingAdvice(),
     [item('PLAN_SIGNED', 'Implant plan, size and position agreed from the scan',
@@ -685,6 +736,7 @@ export const TREATMENTS: readonly Treatment[] = [
   treatment('BONE_GRAFT', 'Bone graft or sinus lift',
     TreatmentCategory.IMPLANT, 90, 1,
     universal(), anaesthetic(), bleeding(), surgical(), sutures(10),
+    investigated(7),
     imaging('CBCT of the site', 14),
     smokingAdvice(),
     [item('GRAFT_STOCK', 'Graft material, membrane and fixation reserved', INV,
@@ -862,6 +914,7 @@ export const TREATMENTS: readonly Treatment[] = [
   /* ── Emergency ──────────────────────────────────────────────────────── */
   treatment('EMERG_PAIN', 'Emergency — acute pain',
     TreatmentCategory.EMERGENCY, 30, 1,
+    emergencyPrep(),
     [item('TRIAGE', 'Triaged on arrival', REC, Objective.PATIENT_SAFE,
       CareStage.BEFORE, mins(5), CareGate.BLOCK,
       'An emergency patient has not been triaged')],
@@ -883,7 +936,7 @@ export const TREATMENTS: readonly Treatment[] = [
 
   treatment('EMERG_ABSCESS', 'Emergency — abscess drainage',
     TreatmentCategory.EMERGENCY, 45, 1,
-    universal(), anaesthetic(), bleeding(),
+    universal(), anaesthetic(), bleeding(), emergencyPrep(),
     [item('TRIAGE', 'Triaged on arrival', REC, Objective.PATIENT_SAFE,
       CareStage.BEFORE, mins(5), CareGate.BLOCK,
       'An emergency patient has not been triaged')],
@@ -902,7 +955,7 @@ export const TREATMENTS: readonly Treatment[] = [
 
   treatment('EMERG_TRAUMA', 'Emergency — dental trauma or avulsion',
     TreatmentCategory.EMERGENCY, 60, 1,
-    universal(), anaesthetic(),
+    universal(), anaesthetic(), emergencyPrep(),
     imaging('Periapical radiographs of the injured teeth', 0),
     [item('TRIAGE', 'Triaged on arrival', REC, Objective.PATIENT_SAFE,
       CareStage.BEFORE, mins(5), CareGate.BLOCK,

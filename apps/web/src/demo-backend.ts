@@ -38,7 +38,7 @@ import {
   sweep, board, FLOWS,
   careFor, careForAll, careOwedBy, TREATMENTS, NOTHING_KNOWN, UNRATIFIED_CATALOGUE,
   ASSETS, equipment as equipmentView, assetWorkFor, UNRATIFIED_REGISTER,
-  complianceFor,
+  complianceFor, readinessHorizon,
   STOCK_ITEMS, inventory as inventoryView,
   ClinicEvent as CE,
   type World, type Operatory, type RoleCode,
@@ -1495,6 +1495,12 @@ const gateView = (x: GateResult) => ({
 });
 
 const complianceView = (c: Compliance) => ({
+  stages: c.stages.map((s0) => ({
+    stage: s0.stage as string, label: s0.label,
+    clear: s0.clear, outstanding: s0.outstanding,
+    gateIds: s0.gates.map((g) => g.id),
+  })),
+  failure: c.failure as string,
   bookingId: c.bookingId,
   patientLabel: c.patientLabel,
   treatmentCode: c.treatmentCode,
@@ -2307,11 +2313,25 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     // is the only thing that can answer that.
     const inv = inventoryView(STOCK_ITEMS, DEMO_LOTS, stockEvents(now), now,
       DEMO_RESERVATIONS);
+    // The emergency kit is one fact about the clinic, read off the same asset
+    // register — a medical emergency is no likelier during an implant than
+    // during a scaling.
+    const emergencyReady = !['EMERGENCY-01', 'OXYGEN-01'].some(
+      (tag) => eq.unusable.some((r) => r.asset.tag === tag)
+        || eq.down.some((r) => r.asset.tag === tag));
+
     const gatesFor = new Map(DEMO_BOOKINGS.map((b) => [
       b.id,
       complianceFor(b, factsFor(b.id), events, now,
-        { unusableAssets, stockVouched: inv.gateStock }),
+        { unusableAssets, stockVouched: inv.gateStock, emergencyReady }),
     ]));
+
+    // "This should appear before the patient reaches the chair, not when the
+    // doctor asks for the component."
+    const horizon = readinessHorizon(
+      [...gatesFor.values()].filter((c): c is NonNullable<typeof c> => c !== null),
+      (id) => DEMO_BOOKINGS.find((b) => b.id === id)?.at ?? 0,
+      now);
 
     return json({
       now,
@@ -2337,6 +2357,16 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         items: TREATMENTS.reduce((n, t) => n + t.items.length, 0),
       },
       unratified: UNRATIFIED_CATALOGUE,
+      horizon: horizon.map((a) => ({
+        bookingId: a.bookingId, patientLabel: a.patientLabel,
+        treatmentName: a.treatmentName, at: a.at,
+        failure: a.failure as string, headline: a.headline,
+        severity: a.severity,
+        minutesOfWarning: a.minutesOfWarning,
+        couldHaveKnownEarlier: a.couldHaveKnownEarlier,
+        warningLostHours: a.warningLostHours,
+        missing: a.missing.map((m) => m.label),
+      })),
     });
   }
 

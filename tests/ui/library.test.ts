@@ -113,6 +113,12 @@ const LIBRARY = new Set([
   'gate-clinical', 'gate-record',
   'gate-tally', 'gate-tally-row', 'gate-tally-label', 'gate-tally-count',
   'breach', 'breach-title', 'breach-line',
+  /* the protocol spine, and the horizon that raises a failure before the
+     patient arrives rather than when the doctor asks for the component */
+  'spine', 'spine-stage', 'spine-mark', 'spine-verdict',
+  'horizon', 'horizon-row', 'horizon-sev', 'horizon-body', 'horizon-head',
+  'horizon-why', 'horizon-lost',
+  'is-critical', 'is-high', 'is-normal', 'is-clear',
   // shared state modifiers
   'is-good', 'is-warn', 'is-bad', 'is-done', 'is-here', 'is-urgent',
 ]);

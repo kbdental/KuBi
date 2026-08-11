@@ -2912,3 +2912,47 @@ label.field-label {
 .care.is-breached  { border-left: 3px solid #9d2f26; }
 .care.is-delivered { border-left: 3px solid #55655e; }
 .care-state.is-breached { background: #fbeceb; color: #9d2f26; }
+
+/* ── The protocol spine ──────────────────────────────────────────────────
+   The owner drew it as a chain: history ✓ → X-ray ✓ → consent ✓ →
+   instruments ✓ → documentation ✓ → READY. Five stages, one line, so a
+   person can see where a procedure has got to without reading fifteen rows. */
+.spine {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
+  margin-top: 14px; padding: 10px 0; border-top: 1px solid var(--line-soft, #f0f3f1);
+}
+.spine-stage {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12.5px; color: var(--ink-2, #55655e);
+}
+.spine-stage.is-clear { color: #0c5f4e; }
+.spine-stage.is-open  { color: #9d2f26; font-weight: 600; }
+.spine-mark { font-weight: 700; }
+.spine-verdict {
+  margin-left: auto; border-radius: 999px; padding: 3px 12px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: .04em;
+}
+.spine-verdict.is-clear { background: #e2efea; color: #0c5f4e; }
+.spine-verdict.is-open  { background: #fbeceb; color: #9d2f26; }
+
+/* ── The horizon ─────────────────────────────────────────────────────────
+   Above the bookings, not inside one: the point is that somebody sees it
+   while there is still time to ring the supplier. */
+.horizon { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.horizon-row {
+  display: flex; gap: 12px; padding: 11px 13px; border-radius: 5px;
+  border-left: 3px solid var(--line, #d9dfdc); background: var(--hover, #f7f8f7);
+}
+.horizon-row.is-critical { border-left-color: #9d2f26; background: #fbeceb; }
+.horizon-row.is-high     { border-left-color: #b8863a; background: #fdf5e8; }
+.horizon-sev {
+  flex: none; align-self: flex-start; border-radius: 3px; padding: 2px 7px;
+  font-size: 10px; font-weight: 700; letter-spacing: .05em;
+  background: var(--line, #e4e8e6); color: var(--ink-2, #55655e);
+}
+.horizon-sev.is-critical { background: #9d2f26; color: #fff; }
+.horizon-sev.is-high     { background: #b8863a; color: #fff; }
+.horizon-body { min-width: 0; }
+.horizon-head { font-size: 13.5px; font-weight: 650; }
+.horizon-why { margin-top: 3px; font-size: 13px; color: #9d2f26; line-height: 1.45; }
+.horizon-lost { margin-top: 3px; font-size: 12px; color: var(--ink-3, #7d8c86); }

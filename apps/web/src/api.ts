@@ -920,6 +920,21 @@ export interface CareView {
   mandatory: ComplianceView | null;
 }
 
+/** One booking that will not be ready, raised before the patient arrives. */
+export interface HorizonAlert {
+  bookingId: string;
+  patientLabel: string;
+  treatmentName: string;
+  at: number;
+  failure: string;
+  headline: string;
+  severity: 'CRITICAL' | 'HIGH' | 'NORMAL';
+  minutesOfWarning: number;
+  couldHaveKnownEarlier: boolean;
+  warningLostHours: number | null;
+  missing: string[];
+}
+
 export interface PatientEventsView {
   now: number;
   role: string;
@@ -934,6 +949,13 @@ export interface PatientEventsView {
    * says so rather than letting it pass as a ratified protocol.
    */
   unratified: boolean;
+  /**
+   * Bookings that will not be ready, soonest and hardest first.
+   *
+   * Raised here rather than inside a booking card, because the whole point is
+   * that somebody sees it while there is still time to ring the supplier.
+   */
+  horizon: HorizonAlert[];
 }
 
 /* -------------------------------------------------------------------------
@@ -1026,6 +1048,13 @@ export interface BreachView {
 }
 
 export interface ComplianceView {
+  /** The five stages of the protocol spine, in order. */
+  stages: Array<{
+    stage: string; label: string; clear: boolean;
+    outstanding: number; gateIds: string[];
+  }>;
+  /** What kind of failure it is, so the banner can name it. */
+  failure: string;
   bookingId: string;
   patientLabel: string;
   treatmentCode: string;
