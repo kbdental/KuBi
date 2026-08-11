@@ -855,6 +855,44 @@ export interface ClosingView {
   staffLeft: number;
 }
 
+/* -------------------------------------------------------------------------
+ * Attendance — part of readiness, not a module of its own
+ * ---------------------------------------------------------------------- */
+
+export interface AttendanceView {
+  /** ATT-008. Every position the morning needs, and whether it is held. */
+  coverage: Array<{
+    role: string; needed: number; here: number; onLeave: number; unknown: number;
+    covered: boolean; critical: boolean; owns: string;
+    neededBy: number | null; because: string;
+  }>;
+  staffed: boolean;
+  headline: string;
+  people: Array<{
+    employeeCode: string; label: string; roles: string[]; state: string;
+    inAt: number | null; lateBy: number | null; reason: string | null;
+    neededBy: number | null; lateForTheirWork: boolean; headline: string;
+  }>;
+  late: number;
+  lateUnexplained: number;
+  unaccounted: number;
+  shortNotice: number;
+  pendingApproval: number;
+  uncovered: Array<{ label: string; kind: string; because: string }>;
+  needsSundayRuling: number;
+  /** The Sunday rule is not built, and the screen has to say so. */
+  sundayRuleQuestion: string | null;
+  /**
+   * Roles that cannot meet the morning by arriving at 09:45 — arithmetic on
+   * two of the clinic's own published standards.
+   */
+  contradiction: Array<{
+    role: string; reportBy: number; workStartsAt: number;
+    shortMinutes: number; owns: string;
+  }>;
+  reportBy: number;
+}
+
 export interface ClinicView {
   now: number;
   first: EngineDecision | null;
@@ -864,6 +902,8 @@ export interface ClinicView {
   /** The signed-in role, so a screen can offer work only to whoever owns it. */
   role: string;
   readiness: ReadinessView;
+  /** Who is here, and whether the morning can be done by them. */
+  attendance: AttendanceView;
   closing: ClosingView;
   board: Array<{
     node: string; label: string; owner: string;

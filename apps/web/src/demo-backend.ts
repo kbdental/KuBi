@@ -36,6 +36,9 @@ import {
   ClinicEvent, emptyWorld, record as recordEvent,
   readiness, closing, decisions, decisionsFor, escalatedTo, mostImportant,
   sweep, board, FLOWS,
+  attendance as attendanceView, contradiction, REPORT_BY,
+  SUNDAY_RULE_DECIDED, SUNDAY_RULE_QUESTION,
+  type StaffMember, type AttendanceRow, type LeaveRow,
   careFor, careForAll, careOwedBy, TREATMENTS, NOTHING_KNOWN, UNRATIFIED_CATALOGUE,
   ASSETS, equipment as equipmentView, assetWorkFor, UNRATIFIED_REGISTER,
   complianceFor, readinessHorizon,
@@ -1521,6 +1524,91 @@ const complianceView = (c: Compliance) => ({
   delivered: c.delivered,
 });
 
+/* -------------------------------------------------------------------------
+ * Synthetic attendance, standing in for the clinic's own sheet
+ *
+ * Uneven on purpose, and each unevenness is one of the eight controls:
+ *
+ *   Meera    in at 10:05 with no reason         ATT-002 escalates
+ *   Anjali   nothing in the sheet at all        ATT-003 unaccounted
+ *   Rahul    approved leave, nobody covering    ATT-007
+ *   Sunita   in at 09:30 — inside the 09:45     the contradiction: her floors
+ *            standard and after her own work     had to start at 09:10
+ *            had to begin
+ * ---------------------------------------------------------------------- */
+
+const DEMO_STAFF: StaffMember[] = [
+  { employeeCode: 'e1', label: 'Priya', roles: ['DENTAL_ASSISTANT' as RoleCode], active: true },
+  { employeeCode: 'e2', label: 'Meera', roles: ['DENTAL_ASSISTANT' as RoleCode], active: true },
+  { employeeCode: 'e3', label: 'Kavita', roles: ['RECEPTION' as RoleCode], active: true },
+  { employeeCode: 'e4', label: 'Sunita', roles: ['HOUSEKEEPING' as RoleCode], active: true },
+  { employeeCode: 'e5', label: 'Rahul', roles: ['STERILIZATION_TECHNICIAN' as RoleCode], active: true },
+  { employeeCode: 'e6', label: 'Nisha', roles: ['SENIOR_ASSISTANT' as RoleCode], active: true },
+  { employeeCode: 'e7', label: 'Dr Iyer', roles: ['TREATING_DOCTOR' as RoleCode], active: true },
+  { employeeCode: 'e8', label: 'Anjali', roles: ['RECEPTION' as RoleCode], active: true },
+];
+
+const DEMO_ATTENDANCE: AttendanceRow[] = [
+  { employeeCode: 'e1', inAt: 8 * 60 + 40, outAt: null, status: 'PRESENT', reason: null },
+  { employeeCode: 'e2', inAt: 10 * 60 + 5, outAt: null, status: 'LATE', reason: null },
+  { employeeCode: 'e3', inAt: 8 * 60 + 55, outAt: null, status: 'PRESENT', reason: null },
+  { employeeCode: 'e4', inAt: 9 * 60 + 30, outAt: null, status: 'PRESENT', reason: null },
+  { employeeCode: 'e6', inAt: 8 * 60 + 50, outAt: null, status: 'PRESENT', reason: null },
+  { employeeCode: 'e7', inAt: 9 * 60 + 40, outAt: null, status: 'PRESENT', reason: null },
+  // e5 is on leave; e8 is simply not in the sheet.
+];
+
+const DEMO_TODAY = 400;
+
+const DEMO_LEAVE: LeaveRow[] = [
+  {
+    employeeCode: 'e5', fromDay: DEMO_TODAY, toDay: DEMO_TODAY + 1, kind: 'SICK',
+    status: 'APPROVED', requestedOnDay: DEMO_TODAY, coverEmployeeCode: null,
+    spansSunday: false,
+  },
+  {
+    employeeCode: 'e1', fromDay: DEMO_TODAY + 4, toDay: DEMO_TODAY + 6, kind: 'ANNUAL',
+    status: 'REQUESTED', requestedOnDay: DEMO_TODAY + 1, coverEmployeeCode: null,
+    spansSunday: true,
+  },
+];
+
+function attendanceFor(now: number, firstPatientAt: number | null) {
+  const v = attendanceView(DEMO_STAFF, DEMO_ATTENDANCE, DEMO_LEAVE,
+    firstPatientAt, DEMO_TODAY, now);
+  return {
+    coverage: v.coverage.map((c) => ({
+      role: c.role as string, needed: c.needed, here: c.here,
+      onLeave: c.onLeave, unknown: c.unknown, covered: c.covered,
+      critical: c.critical, owns: c.owns, neededBy: c.neededBy, because: c.because,
+    })),
+    staffed: v.staffed,
+    headline: v.headline,
+    people: v.people.map((p) => ({
+      employeeCode: p.employeeCode, label: p.label,
+      roles: p.roles as string[], state: p.state,
+      inAt: p.inAt, lateBy: p.lateBy, reason: p.reason,
+      neededBy: p.neededBy, lateForTheirWork: p.lateForTheirWork,
+      headline: p.headline,
+    })),
+    late: v.late.length,
+    lateUnexplained: v.lateUnexplained.length,
+    unaccounted: v.unaccounted.length,
+    shortNotice: v.shortNotice.length,
+    pendingApproval: v.pendingApproval.length,
+    uncovered: v.uncovered.map((u) => ({
+      label: u.label, kind: u.kind, because: u.because,
+    })),
+    needsSundayRuling: v.needsSundayRuling.length,
+    sundayRuleQuestion: SUNDAY_RULE_DECIDED ? null : SUNDAY_RULE_QUESTION,
+    contradiction: contradiction(firstPatientAt).map((c) => ({
+      role: c.role as string, reportBy: c.reportBy,
+      workStartsAt: c.workStartsAt, shortMinutes: c.shortMinutes, owns: c.owns,
+    })),
+    reportBy: REPORT_BY,
+  };
+}
+
 export function signInAs(key: string) {
   db.signedIn = PEOPLE.find((p) => p.key === key) ?? null;
 }
@@ -2268,6 +2356,7 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
       unlocked: w.events.some((e) => e.type === ClinicEvent.CLINIC_UNLOCKED),
       role: engineRole(),
       readiness: readiness(w.events, w.operatories, w.firstPatientAt, now),
+      attendance: attendanceFor(now, w.firstPatientAt),
       closing: closing(w.events, w.operatories, w.shutAt, now),
       board: board(w, now),
       late: sweep(w, now).alerts,

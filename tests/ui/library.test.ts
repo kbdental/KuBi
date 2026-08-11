@@ -119,6 +119,10 @@ const LIBRARY = new Set([
   'horizon', 'horizon-row', 'horizon-sev', 'horizon-body', 'horizon-head',
   'horizon-why', 'horizon-lost',
   'is-critical', 'is-high', 'is-normal', 'is-clear',
+  /* attendance, which lives inside readiness rather than in a tab of its own */
+  'staffing', 'staff-roles', 'staff-role', 'staff-mark', 'staff-name',
+  'staff-count', 'staff-owns',
+  'clash', 'clash-title', 'clash-row', 'clash-note',
   // shared state modifiers
   'is-good', 'is-warn', 'is-bad', 'is-done', 'is-here', 'is-urgent',
 ]);
