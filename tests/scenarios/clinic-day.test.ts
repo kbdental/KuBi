@@ -67,7 +67,11 @@ function openTheClinic(now = T(8, 45)): World {
   }
   w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
     w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
+  // HK-001 and HK-010. Housekeeping cleans the rooms before the assistants
+  // disinfect and set them up, and the hand hygiene protocol needs soap.
+  w = must(w, ClinicEvent.ROOMS_CLEANED, 'today', RoleCode.HOUSEKEEPING);
   w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
+  w = must(w, ClinicEvent.WASHROOM_STOCKED, 'today', RoleCode.HOUSEKEEPING);
   // OPEN-012 — the emergency kit. A mandatory block since it was built, so a
   // clinic that has not checked it may not seat anybody.
   w = must(w, ClinicEvent.EMERGENCY_CHECKED, 'e1#DENTAL_ASSISTANT',
@@ -143,8 +147,15 @@ describe('Scenario 1 · 08:45, clinic opening', () => {
     // The equipment round belongs to the head assistant, not to any assistant.
     expect(decisionsFor(w, RoleCode.SENIOR_ASSISTANT, T(8, 46)).map((d) => d.question))
       .toEqual(['Check the equipment']);
+    // Housekeeping's morning grew from one job to three when the HK matrix
+    // arrived, and the order is the order the clinic needs them: the rooms
+    // first, because the assistants cannot set up on top of an uncleaned room.
     expect(decisionsFor(w, RoleCode.HOUSEKEEPING, T(8, 46)).map((d) => d.question))
-      .toEqual(['Clean the floors, pantry and washroom']);
+      .toEqual([
+        'Clean the treatment rooms',
+        'Clean the floors, pantry and washroom',
+        'Stock the washroom — hand wash and tissue',
+      ]);
     expect(decisionsFor(w, RoleCode.STERILIZATION_TECHNICIAN, T(8, 46)).map((d) => d.question))
       .toEqual(['Release the morning sterilisation run']);
     expect(decisionsFor(w, RoleCode.RECEPTION, T(8, 46)).map((d) => d.question))

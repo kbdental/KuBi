@@ -94,12 +94,21 @@ export const ownedBy = (role: string) => (owner: string) =>
  * that hides its own history can only answer the first.
  */
 export function BlockList({
-  blocks, busy, mine, onReport,
+  blocks, busy, mine, onReport, hideOwner = false,
 }: {
   blocks: DayBlock[];
   busy: string | null;
   mine: (owner: string) => boolean;
   onReport: (b: DayBlock) => void;
+  /**
+   * Drop the owner from each row.
+   *
+   * For a list already sitting under a heading that names the role. Repeating
+   * "Dental assistant" on five consecutive rows inside a lane called *Dental
+   * assistants* is the kind of noise that makes the useful part of the line —
+   * the fifteen minutes, the time it was done — harder to find.
+   */
+  hideOwner?: boolean;
 }) {
   return (
     <div className="block-list">
@@ -111,9 +120,11 @@ export function BlockList({
           <div className="block-body">
             <div className="block-label">{b.label}</div>
             <div className="block-meta">
-              {who(b.owner)}
-              {b.expectMinutes ? ` · ${b.expectMinutes} min` : ''}
-              {b.done && b.doneAt !== null ? ` · done ${hhmm(b.doneAt)}` : ''}
+              {[
+                hideOwner ? null : who(b.owner),
+                b.expectMinutes ? `${b.expectMinutes} min` : null,
+                b.done && b.doneAt !== null ? `done ${hhmm(b.doneAt)}` : null,
+              ].filter(Boolean).join(' · ')}
             </div>
           </div>
           {/* Somebody else's job is shown, never offered. Watching a button

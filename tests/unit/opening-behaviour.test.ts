@@ -199,7 +199,7 @@ describe('OPEN-004 · a failed chair withdraws its room', () => {
   it('is derived — no event marks a room unavailable', () => {
     // Same rule as clinic readiness. If a room could be flagged by hand, the
     // flag and the chair would drift apart within a fortnight.
-    expect(Object.keys(ClinicEvent).filter((n) => /ROOM_|OPERATORY_UNAVAIL/.test(n)))
+    expect(Object.keys(ClinicEvent).filter((n) => /^ROOM_|OPERATORY_UNAVAIL/.test(n)))
       .toEqual([]);
   });
 });

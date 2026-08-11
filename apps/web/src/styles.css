@@ -3044,3 +3044,74 @@ label.field-label {
    adds only the two verdicts a position can be in. */
 .staff-role.is-done { color: #0c5f4e; }
 .staff-role.is-bad  { color: #9d2f26; font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   The readiness lanes
+
+   One role's whole morning, with its own fraction in the heading. The flat
+   list this replaced could say nine of eleven blocks were done and not say
+   whether the assistants were nearly finished or housekeeping had not started
+   — completely different mornings behind one number.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.lane { margin-top: 18px; }
+.lane:first-of-type { margin-top: 12px; }
+
+.lane-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--line, #e4e8e6);
+}
+.lane-who { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.lane-mark { width: 12px; font-weight: 700; color: #0c5f4e; }
+.lane-name {
+  font-size: 14px; font-weight: 700; letter-spacing: .01em;
+  color: var(--ink-1, #17211d);
+}
+.lane-question {
+  font-size: 12.5px; color: var(--ink-3, #7d8c86);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lane-count {
+  flex: none; font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums; color: #9d2f26;
+}
+.lane-count.is-done { color: #0c5f4e; }
+.lane.is-done .lane-name { color: var(--ink-2, #4a5a54); }
+
+/* ── HK-001 to HK-014, the rounds that are not the morning ──────────────
+   A five-column line rather than a block: a scheduled round is a record of
+   something that happened, not a task waiting for a button. */
+
+.hk-list {
+  display: flex; flex-direction: column; gap: 1px;
+  margin-top: 12px; border-top: 1px solid var(--line, #e4e8e6);
+}
+.hk {
+  display: grid;
+  grid-template-columns: 62px 1fr 118px 92px 132px;
+  gap: 10px; align-items: baseline;
+  padding: 7px 2px; font-size: 13px;
+  border-bottom: 1px solid var(--line, #eef1f0);
+}
+.hk-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; color: var(--ink-3, #7d8c86);
+}
+.hk-what { color: var(--ink-1, #17211d); }
+.hk-who, .hk-when { font-size: 12px; color: var(--ink-3, #7d8c86); }
+.hk-state { font-size: 12px; font-weight: 600; text-align: right; }
+
+.hk.is-done .hk-state { color: #0c5f4e; }
+.hk.is-waiting .hk-state { color: #9a6f24; }
+.hk.is-bad .hk-state { color: #b0322a; }
+.hk.is-bad .hk-what { font-weight: 650; }
+.hk.is-open .hk-state { color: #9d2f26; }
+.hk.is-dim { opacity: .55; }
+.hk.is-dim .hk-state { color: var(--ink-3, #7d8c86); font-weight: 400; }
+
+@media (max-width: 720px) {
+  .hk { grid-template-columns: 54px 1fr; row-gap: 2px; }
+  .hk-who, .hk-when { grid-column: 2; }
+  .hk-state { grid-column: 2; text-align: left; }
+}

@@ -52,6 +52,7 @@ import type { Compliance } from './compliance.js';
 import type { EquipmentView, RoomLinkage } from './equipment.js';
 import { ItemVerdict, type EmergencyReadiness } from './emergency.js';
 import type { InventoryView } from './inventory.js';
+import type { HygieneView } from './housekeeping.js';
 
 /* -------------------------------------------------------------------------
  * A failing parameter
@@ -294,6 +295,8 @@ export interface FailureInputs {
   rooms?: RoomLinkage;
   /** OPEN-012. See `emergencyReadiness`. */
   emergency?: EmergencyReadiness;
+  /** HK-001 to HK-014. See `housekeeping`. */
+  hygiene?: HygieneView;
   /** The minute now, for due-time wording. */
   now: number;
 }
@@ -506,6 +509,43 @@ export function gatherFailures(
         goes: 'Clinic readiness → Emergency kit',
       });
     }
+  }
+
+  /* ── Failed hygiene audits ────────────────────────────────────────── */
+  //
+  // The owner's fourth KPI, and the one outcome a tick sheet cannot produce:
+  // somebody looked at the work and was not satisfied. It is not "not done" —
+  // it is done, inspected and rejected, which is a different conversation with
+  // a different person.
+  for (const f of input.hygiene?.failedChecks ?? []) {
+    out.push({
+      id: `HK:FAIL:${f.control.id}`,
+      area: FailureArea.READINESS,
+      severity: f.blocksOpening ? FailureSeverity.STOPS : FailureSeverity.HOLDS,
+      what: `${f.control.activity} — the check failed`,
+      because: `${f.because} Reported done and rejected by the `
+        + `${String(f.control.checker ?? '').toLowerCase().replace(/_/g, ' ')}.`,
+      ownerRole: f.control.doer,
+      involved: people(f.control.doer),
+      dueAt: null,
+      goes: 'Clinic readiness → Cleaning rounds',
+    });
+  }
+  // Two questions, one control: HK-008 asks clean *and* working, and only the
+  // second raises a ticket. A dripping tap is not a cleaning failure and
+  // sending it to housekeeping wastes everybody's morning.
+  for (const d of input.hygiene?.defects ?? []) {
+    out.push({
+      id: `HK:DEFECT:${d.control.id}`,
+      area: FailureArea.EQUIPMENT,
+      severity: FailureSeverity.WATCH,
+      what: `${d.control.activity} — a defect was reported`,
+      because: `${d.because} ${d.control.failure}.`,
+      ownerRole: RoleCode.CLINIC_MANAGER,
+      involved: people(RoleCode.CLINIC_MANAGER),
+      dueAt: null,
+      goes: 'Equipment',
+    });
   }
 
   /* ── Patients booked today ────────────────────────────────────────── */

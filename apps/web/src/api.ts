@@ -821,10 +821,28 @@ export interface DayBlock {
   ifOutstanding: string;
 }
 
+/** One role's whole morning, with its own fraction. */
+export interface ReadinessLaneView {
+  role: string;
+  label: string;
+  question: string;
+  blocks: DayBlock[];
+  outstanding: DayBlock[];
+  done: number;
+  of: number;
+  percent: number;
+  ready: boolean;
+  startBy: number | null;
+}
+
 export interface ReadinessView {
   blocks: DayBlock[];
   outstanding: DayBlock[];
   advisory: DayBlock[];
+  /** The morning split by who owns it, in the order the work happens. */
+  lanes: ReadinessLaneView[];
+  /** `compliance` as a whole number, so every screen shows the same figure. */
+  percent: number;
   ready: boolean;
   readyAt: number | null;
   targetAt: number | null;
@@ -836,6 +854,42 @@ export interface ReadinessView {
   startBy: number | null;
   startDrivenBy: string | null;
   staffEntered: number;
+}
+
+export interface HygieneKpiView {
+  label: string;
+  /** Null when there is nothing to measure — never a reassuring zero. */
+  percent: number | null;
+  done: number;
+  of: number;
+}
+
+export interface HygieneRoundView {
+  id: string;
+  activity: string;
+  standard: string;
+  trigger: string;
+  doer: string;
+  checker: string | null;
+  area: string;
+  priority: string;
+  state: 'DONE' | 'AWAITING_CHECK' | 'FAILED_CHECK' | 'NOT_DONE' | 'NOT_DUE';
+  blocksOpening: boolean;
+  defect: boolean;
+  because: string;
+}
+
+export interface HygieneScreenView {
+  rounds: HygieneRoundView[];
+  outstanding: number;
+  failedAudits: number;
+  defects: HygieneRoundView[];
+  /** Checks somebody failed. `lane` names the opening lane it belongs to. */
+  failed: Array<HygieneRoundView & { lane: string | null }>;
+  headline: string;
+  kpis: HygieneKpiView[];
+  /** Overlaps between this matrix and the opening procedure the owner must settle. */
+  openQuestions: string[];
 }
 
 export interface ClosingView {
@@ -905,6 +959,8 @@ export interface ClinicView {
   /** Who is here, and whether the morning can be done by them. */
   attendance: AttendanceView;
   closing: ClosingView;
+  /** HK-001 to HK-014, and the owner's four hygiene KPIs. */
+  hygiene: HygieneScreenView;
   board: Array<{
     node: string; label: string; owner: string;
     patients: Array<{ subjectLabel: string; minutesHeld: number; minutesLate: number }>;

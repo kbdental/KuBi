@@ -1,4 +1,6 @@
-import type { AttendanceView } from '../api.js';
+import type {
+  AttendanceView, DayBlock, HygieneScreenView, ReadinessLaneView,
+} from '../api.js';
 import {
   useClinic, ownedBy, BlockList, Meter, Loading, hhmm, who,
 } from './day-blocks.js';
@@ -65,14 +67,24 @@ export function ClinicReadiness() {
             this at 09:15 needs to know which. */}
         <Staffing a={view.attendance} />
 
-        {/* Mandatory only. The as-required work has its own section below, and
-            listing it twice made the count and the list disagree. */}
-        <BlockList
-          blocks={r.blocks.filter((b) => b.mandatory !== false)}
-          busy={busy}
-          mine={mine}
-          onReport={(b) => void report(b)}
-        />
+        {/* One lane per role, in the order the work happens.
+            *"There should be clean demarcation of who is doing what."*
+
+            The flat list this replaced could tell you nine of eleven blocks
+            were done and not whether the assistants were nearly finished or
+            housekeeping had not started — completely different mornings, one
+            number. Each lane is one person's share, with its own fraction, so
+            the manager reads five short answers instead of one long one and
+            every one of them names somebody. */}
+        {r.lanes.map((lane) => (
+          <Lane
+            key={lane.role}
+            lane={lane}
+            busy={busy}
+            mine={mine}
+            onReport={(b) => void report(b)}
+          />
+        ))}
 
         {r.advisory.length > 0 && (
           <div className="ready-advisory">
@@ -82,9 +94,170 @@ export function ClinicReadiness() {
           </div>
         )}
       </section>
+
+      <Hygiene h={view.hygiene} />
     </div>
   );
 }
+
+/**
+ * One role's whole morning.
+ *
+ * The fraction sits in the heading rather than on the rows, because the
+ * question a manager is asking at 09:15 is "who is behind" and not "which of
+ * these forty items". Reading down five headings answers it in five seconds;
+ * reading eleven rows does not answer it at all.
+ */
+function Lane({
+  lane, busy, mine, onReport,
+}: {
+  lane: ReadinessLaneView;
+  busy: string | null;
+  mine: (owner: string) => boolean;
+  onReport: (b: DayBlock) => void;
+}) {
+  return (
+    <div className={`lane ${lane.ready ? 'is-done' : ''}`}>
+      <div className="lane-head">
+        <div className="lane-who">
+          <span className="lane-mark" aria-hidden="true">{lane.ready ? '✓' : ''}</span>
+          <span className="lane-name">{lane.label}</span>
+          <span className="lane-question">{lane.question}</span>
+        </div>
+        <span className={`lane-count ${lane.ready ? 'is-done' : ''}`}>
+          {lane.done}/{lane.of}
+        </span>
+      </div>
+      <BlockList
+        blocks={lane.blocks.filter((b) => b.mandatory !== false)}
+        busy={busy}
+        mine={mine}
+        onReport={onReport}
+        hideOwner
+      />
+    </div>
+  );
+}
+
+/**
+ * HK-001 to HK-014 — the cleaning that is not the morning.
+ *
+ * Three of the fourteen gate the opening and are already in housekeeping's
+ * lane above. The other eleven are scheduled, daily or after-use rounds: real
+ * work, measured, and no part of "may the clinic open". They are here rather
+ * than mixed into the lanes because a list that puts the plants next to the
+ * hand wash teaches people to skim both.
+ */
+function Hygiene({ h }: { h: HygieneScreenView }) {
+  return (
+    <section className="ready-panel">
+      <div className="ready-head">
+        <div>
+          <div className="ready-kicker">CLEANING ROUNDS — NOT PART OF OPENING</div>
+          <h2 className="ready-verdict">Rounds today</h2>
+          {/* The section's own sentence, over what it actually shows. The
+              engine's headline covers all fourteen controls, and leading this
+              list with one that lives in a lane above would send somebody
+              looking for a row that is not here. */}
+          <p className="ready-sub">
+            {h.rounds.filter((r) => r.state === 'NOT_DONE').length} of {h.rounds.length}{' '}
+            rounds outstanding. None of them holds the clinic.
+          </p>
+        </div>
+      </div>
+
+      <div className="facts">
+        {h.kpis.map((k) => (
+          <div key={k.label} className="fact">
+            {/* Null is "nothing to measure", never a reassuring zero — and the
+                denominator travels with the number, because 82% over eleven
+                and 82% over two are different statements. */}
+            <div className="fact-value">{k.percent === null ? '—' : `${k.percent}%`}</div>
+            <div className="fact-label">{k.label} · {k.done}/{k.of}</div>
+          </div>
+        ))}
+        <div className={`fact ${h.failedAudits > 0 ? 'fact-stop' : ''}`}>
+          <div className="fact-value">{h.failedAudits}</div>
+          <div className="fact-label">Failed hygiene audits</div>
+        </div>
+      </div>
+
+      <div className="hk-list">
+        {h.rounds.map((r) => (
+          <div key={r.id} className={`hk ${HK_STATE[r.state]}`}>
+            <span className="hk-id">{r.id}</span>
+            <span className="hk-what">{r.activity}</span>
+            <span className="hk-who">
+              {r.doer.split('/').map(who).join(' / ')}
+            </span>
+            <span className="hk-when">{TRIGGER_WORD[r.trigger] ?? r.trigger}</span>
+            <span className="hk-state">{STATE_WORD[r.state]}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* A failed check, said once and pointing at where the work lives. This
+          is what the owner's "Failed Hygiene Audits" KPI counts, and it is the
+          one outcome a tick sheet cannot produce: somebody looked and was not
+          satisfied. */}
+      {h.failed.map((f) => (
+        <p key={f.id} className="ready-note is-bad">
+          {f.id} {f.activity} — check failed. {f.because}
+          {f.lane !== null && ` This one is part of opening: it is in ${who(f.lane)}’s lane above.`}
+        </p>
+      ))}
+
+      {h.defects.map((d) => (
+        <p key={d.id} className="ready-note is-warn">
+          {d.id} raised a maintenance ticket — {d.because} A tap that is clean
+          and broken is a maintenance job, not a cleaning one.
+        </p>
+      ))}
+
+      {/* Named, not resolved. Constitution rule 4. */}
+      {h.openQuestions.length > 0 && (
+        <div className="clash">
+          <div className="clash-title">
+            {h.openQuestions.length} things this matrix does not settle
+          </div>
+          {h.openQuestions.map((q) => (
+            <div key={q} className="clash-row">{q}</div>
+          ))}
+          <div className="clash-note">
+            KuBi has taken a reading where the two documents agree and left
+            these alone. Each one changes what the engine reports.
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* Spelled out rather than built from the state, so the library test can see
+   every class name this file uses. */
+const HK_STATE: Record<HygieneScreenView['rounds'][number]['state'], string> = {
+  DONE: 'is-done',
+  AWAITING_CHECK: 'is-waiting',
+  FAILED_CHECK: 'is-bad',
+  NOT_DONE: 'is-open',
+  NOT_DUE: 'is-dim',
+};
+
+const STATE_WORD: Record<HygieneScreenView['rounds'][number]['state'], string> = {
+  DONE: 'Done',
+  AWAITING_CHECK: 'Waiting on the checker',
+  FAILED_CHECK: 'Check failed',
+  NOT_DONE: 'Not done',
+  NOT_DUE: 'Not due',
+};
+
+const TRIGGER_WORD: Record<string, string> = {
+  OPENING: 'Opening',
+  TURNOVER: 'Turnover',
+  DAILY: 'Daily',
+  SCHEDULED: 'Scheduled',
+  AFTER_USE: 'After use',
+};
 
 /**
  * Who is here.

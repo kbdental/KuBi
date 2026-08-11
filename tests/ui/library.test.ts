@@ -119,6 +119,16 @@ const LIBRARY = new Set([
   'horizon', 'horizon-row', 'horizon-sev', 'horizon-body', 'horizon-head',
   'horizon-why', 'horizon-lost',
   'is-critical', 'is-high', 'is-normal', 'is-clear',
+  /* ── the readiness lanes and the cleaning rounds ──────────────────────
+     A lane is one role's whole morning with its own fraction, which the flat
+     block list could not express: "nine of eleven" cannot tell you whether
+     the assistants are nearly finished or housekeeping has not started. The
+     HK row is a five-column line rather than a `block`, because a scheduled
+     round is a record of something that happened and not a task to press. */
+  'lane', 'lane-head', 'lane-who', 'lane-mark', 'lane-name', 'lane-question',
+  'lane-count',
+  'hk-list', 'hk', 'hk-id', 'hk-what', 'hk-who', 'hk-when', 'hk-state',
+  'is-waiting',
   /* attendance, which lives inside readiness rather than in a tab of its own */
   'staffing', 'staff-roles', 'staff-role', 'staff-mark', 'staff-name',
   'staff-count', 'staff-owns',

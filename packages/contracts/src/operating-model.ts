@@ -91,6 +91,24 @@ export const ClinicEvent = {
   EMERGENCY_CHECKED: 'EMERGENCY_CHECKED',
   EMERGENCY_VERIFIED: 'EMERGENCY_VERIFIED',
 
+  /* ── HK-001 and HK-010 ───────────────────────────────────────────────
+   * The housekeeping matrix gives housekeeping two jobs the morning
+   * cannot open without, and neither had an event.
+   *
+   *   ROOMS_CLEANED    HK-001. Housekeeping cleans the treatment room;
+   *                    the assistant then disinfects the clinical
+   *                    surfaces and sets it up. Two halves of one room,
+   *                    which is why they are two events and not one —
+   *                    a single `OPERATORY_READY` would have made the
+   *                    readiness percentage count the room twice or give
+   *                    one role's work to the other.
+   *   WASHROOM_STOCKED HK-010. The hand hygiene protocol cannot run
+   *                    without soap, which is why an "available" check
+   *                    is a C and holds the door.
+   * ------------------------------------------------------------------ */
+  ROOMS_CLEANED: 'ROOMS_CLEANED',
+  WASHROOM_STOCKED: 'WASHROOM_STOCKED',
+
   /* ── Closing ─────────────────────────────────────────────────────────
    * The owner's closing drill, one event per section of it. The day ends
    * with `CLINIC_LOCKED`, which is refused until these are reported — the

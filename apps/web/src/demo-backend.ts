@@ -45,6 +45,9 @@ import {
   complianceFor, readinessHorizon,
   STOCK_ITEMS, inventory as inventoryView,
   gatherFailures, holdersFrom, lensFor, placesFor, bookingWindow,
+  HYGIENE_CONTROLS, housekeeping as hygieneView, OPEN_OVERLAPS, HYGIENE_QUESTIONS,
+  HygieneTrigger,
+  type HygieneReport, type HygieneCheck,
   EMERGENCY_KIT, emergencyReadiness, checkFrom, verificationFrom,
   UNRATIFIED_EMERGENCY_KIT, EmergencyKind,
   type EmergencyCheckRow,
@@ -1707,6 +1710,109 @@ function emergencyNow(now: number) {
   );
 }
 
+/* -------------------------------------------------------------------------
+ * HK-001 to HK-014 — this morning's cleaning rounds
+ *
+ * Uneven on purpose. Housekeeping was 45 minutes late, so her opening rounds
+ * are half done:
+ *
+ *   HK-001 rooms      done, and the assistant's check failed on one bin
+ *   HK-010 hand wash  not done — a C, and it holds the door
+ *   HK-008 basins     done, with a dripping tap: a maintenance job, not a
+ *                     cleaning one
+ *   HK-014 plants     not done, and nobody should care at 09:15
+ * ---------------------------------------------------------------------- */
+
+function hygieneNow(now: number, openedAt: number | null) {
+  const reports: HygieneReport[] = [
+    { controlId: 'HK-001', at: 9 * 60 + 5, byEmployeeCode: 'e4',
+      subjectId: null, defectFound: null, note: null },
+    { controlId: 'HK-005', at: 9 * 60 + 8, byEmployeeCode: 'e4',
+      subjectId: null, defectFound: null, note: null },
+    { controlId: 'HK-008', at: 9 * 60 + 10, byEmployeeCode: 'e4',
+      subjectId: null, defectFound: true, note: 'Cold tap in the washroom drips' },
+    { controlId: 'HK-009', at: 9 * 60 + 11, byEmployeeCode: 'e4',
+      subjectId: null, defectFound: null, note: null },
+    { controlId: 'HK-013', at: 8 * 60 + 58, byEmployeeCode: 'e3',
+      subjectId: null, defectFound: null, note: null },
+  ];
+  const checks: HygieneCheck[] = [
+    // The outcome a tick sheet cannot produce: somebody looked and was not
+    // satisfied. This is what "Failed Hygiene Audits" counts.
+    { controlId: 'HK-001', at: 9 * 60 + 12, byEmployeeCode: 'e1',
+      byRole: 'DENTAL_ASSISTANT' as RoleCode, passed: false,
+      note: 'Bin in Operatory 2 not emptied' },
+  ];
+  return hygieneView(HYGIENE_CONTROLS, reports, checks, openedAt, [], now);
+}
+
+/**
+ * The housekeeping module as the readiness screen wants it.
+ *
+ * Everything is flattened to strings at this boundary, the same as every other
+ * view here — the screen renders what it is given and decides nothing.
+ */
+function hygieneScreen(now: number, w: World) {
+  const openedAt = w.events.find((e) => e.type === ClinicEvent.CLINIC_UNLOCKED)?.at
+    ?? null;
+  const v = hygieneNow(now, openedAt);
+  const row = (r: (typeof v.controls)[number]) => ({
+    id: r.control.id,
+    activity: r.control.activity,
+    standard: r.control.standard,
+    trigger: r.control.trigger as string,
+    // Both names where the matrix gives two. HK-013 says "HK/Reception", and
+    // rendering only the first would settle by omission a question the owner
+    // has not been asked.
+    doer: r.control.alsoDoneBy === null
+      ? (r.control.doer as string)
+      : `${r.control.doer as string}/${r.control.alsoDoneBy as string}`,
+    checker: (r.control.checker ?? null) as string | null,
+    area: r.control.area as string,
+    priority: r.control.priority as string,
+    state: r.state,
+    blocksOpening: r.blocksOpening,
+    defect: r.defect,
+    because: r.because,
+  });
+
+  return {
+    // Two exclusions, and the second is the whole point of the section.
+    //
+    // A turnover round at 09:15 is not outstanding — putting it on the list
+    // teaches people to skim. And a control that *is* the morning already
+    // appears in housekeeping's lane above: showing HK-001 there as a block
+    // and here as a round is the same job drawn twice, which is exactly the
+    // overlap this matrix was unpicked to remove.
+    rounds: v.controls
+      .filter((r) => r.control.opensAs === null)
+      .filter((r) => r.control.trigger !== HygieneTrigger.TURNOVER
+        || r.state !== 'NOT_DUE')
+      .map(row),
+    outstanding: v.outstanding.length,
+    failedAudits: v.failedHygieneAudits,
+    defects: v.defects.map(row),
+    // Failed checks travel separately from the rounds list, because one of
+    // them may belong to a control that is part of opening and so is drawn in
+    // housekeeping's lane instead. A failed audit must be visible wherever the
+    // work is, and named once.
+    failed: v.failedChecks.map((r) => ({
+      ...row(r),
+      // Where the reader should go to deal with it.
+      lane: r.control.opensAs === null ? null : (r.control.doer as string),
+    })),
+    headline: v.headline,
+    kpis: [
+      v.housekeepingCompliance, v.treatmentRoomHygiene, v.washroomCompliance,
+    ].map((k) => ({ label: k.label, percent: k.percent, done: k.done, of: k.of })),
+    // Named, not resolved. The one place the two documents still disagree.
+    openQuestions: [
+      ...OPEN_OVERLAPS.map((o) => `${o.what} ${o.taken}`),
+      ...HYGIENE_QUESTIONS,
+    ],
+  };
+}
+
 function failuresNow() {
   const w = engineWorld();
   const now = w.now;
@@ -1756,6 +1862,8 @@ function failuresNow() {
       // is holding the appointment book, not only the equipment screen.
       rooms: roomAvailability(w.operatories, eq),
       emergency: em,
+      hygiene: hygieneNow(now,
+        w.events.find((e) => e.type === ClinicEvent.CLINIC_UNLOCKED)?.at ?? null),
       now,
     }, holders),
   };
@@ -2510,6 +2618,7 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
       readiness: readiness(w.events, w.operatories, w.firstPatientAt, now),
       attendance: attendanceFor(now, w.firstPatientAt),
       closing: closing(w.events, w.operatories, w.shutAt, now),
+      hygiene: hygieneScreen(now, w),
       board: board(w, now),
       late: sweep(w, now).alerts,
       flows: w.flows.filter((f) => !f.done).map((f) => ({

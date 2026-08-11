@@ -28,6 +28,7 @@ export * from './compliance.js';
 export * from './inventory.js';
 export * from './attendance.js';
 export * from './emergency.js';
+export * from './housekeeping.js';
 export * from './lens.js';
 export * from './engine.js';
 export * from './decisions.js';

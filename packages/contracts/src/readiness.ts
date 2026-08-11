@@ -251,6 +251,39 @@ export interface ReadinessBlock {
   ifOutstanding: string;
 }
 
+/**
+ * One role's whole morning, gathered.
+ *
+ * The owner: *"there should be clean demarcation of who is doing what so that
+ * the dashboard shows a proper percentage of clinic readiness."*
+ *
+ * A flat list of eleven blocks cannot do that. Read down it and you cannot
+ * tell whether the clinic is nine-elevenths ready because the assistants are
+ * nearly finished or because housekeeping has not started — and those are
+ * completely different mornings. A lane is one role's share, with its own
+ * fraction, so the manager reads five short answers instead of one long one
+ * and each of them names somebody.
+ *
+ * Derived from the blocks, never stored beside them. A block added to the plan
+ * appears in its owner's lane without anybody maintaining a second list.
+ */
+export interface ReadinessLane {
+  role: RoleCode;
+  label: string;
+  /** What this person is actually being asked, in their words. */
+  question: string;
+  blocks: readonly ReadinessBlock[];
+  outstanding: readonly ReadinessBlock[];
+  /** Gating work only — the as-required items are counted separately. */
+  done: number;
+  of: number;
+  /** Whole per cent, so five screens cannot round it five ways. */
+  percent: number;
+  ready: boolean;
+  /** The minute this lane's own work had to begin. */
+  startBy: number | null;
+}
+
 export interface Readiness {
   blocks: readonly ReadinessBlock[];
   outstanding: readonly ReadinessBlock[];
@@ -285,6 +318,21 @@ export interface Readiness {
    * number.
    */
   advisory: readonly ReadinessBlock[];
+  /**
+   * The morning split by who owns it, in the order the work happens.
+   *
+   * This is the answer to *"clean demarcation of who is doing what"*, and it
+   * is a view over `blocks` rather than a second source of truth.
+   */
+  lanes: readonly ReadinessLane[];
+  /**
+   * `compliance` as a whole number, so every screen shows the same figure.
+   *
+   * Over the gating blocks only. The as-required work is real and is not part
+   * of "may the clinic open", and folding it in would make a finished morning
+   * read as ninety-something per cent for ever.
+   */
+  percent: number;
   /**
    * The latest minute the morning can begin and still be ready on time, and
    * the block that decides it.
@@ -382,10 +430,30 @@ function planFor(operatories: readonly Operatory[]): Array<Omit<ReadinessBlock, 
       ClinicEvent.EMERGENCY_CHECKED, null, null,
       'Nobody has checked the emergency kit today, so KuBi cannot say the '
       + 'clinic could handle a collapse in the chair'),
+    // HK-001. The first half of the treatment room, and the reason the
+    // housekeeping matrix needed unpicking before it could be built: HK-001
+    // gives the room to housekeeping and §2.1 gives it to the assistant.
+    // Both are right about their own half — housekeeping cleans, the assistant
+    // disinfects and sets up — and HK-001 naming the assistant as *Checker* is
+    // that handover written down. Two blocks, so the percentage counts the
+    // room once for each job rather than twice for one.
+    block('HK_ROOMS', 'Clean the treatment rooms',
+      RoleCode.HOUSEKEEPING, Objective.PATIENT_SAFE,
+      ClinicEvent.ROOMS_CLEANED, null, null,
+      'The rooms have not been cleaned, so there is nothing for the assistant '
+      + 'to disinfect and set up on top of'),
     block('COMMON_AREAS', 'Clean the floors, pantry and washroom',
       RoleCode.HOUSEKEEPING, Objective.PATIENT_SAFE,
       ClinicEvent.COMMON_AREAS_READY, null, HOUSEKEEPING_MINUTES,
       'The floors and shared areas have not been done'),
+    // HK-010, and the one "available" check on the matrix carrying a C. Hand
+    // hygiene is the infection control every other one rests on, and it cannot
+    // be performed without soap — so this holds the door and HK-011's paper,
+    // which is an I, does not.
+    block('WASHROOM_STOCK', 'Stock the washroom — hand wash and tissue',
+      RoleCode.HOUSEKEEPING, Objective.PATIENT_SAFE,
+      ClinicEvent.WASHROOM_STOCKED, null, null,
+      'There is no hand wash, so the hand hygiene protocol cannot be performed'),
     block('RECEPTION', 'Ready the waiting and billing area',
       RoleCode.RECEPTION, Objective.PATIENT_HAPPY,
       ClinicEvent.RECEPTION_READY, null, null,
@@ -459,6 +527,9 @@ export function readiness(
   return {
     blocks,
     outstanding,
+    lanes: lanesFor(blocks, targetAt),
+    percent: required.length === 0 ? 0
+      : Math.round((done.length / required.length) * 100),
     ready,
     readyAt,
     targetAt,
@@ -478,6 +549,71 @@ export function readiness(
     overdue: targetAt !== null && !ready && now > targetAt,
     minutesToTarget: targetAt === null ? null : targetAt - now,
   };
+}
+
+/**
+ * The order the morning is worked, and the question each role is answering.
+ *
+ * Sequence matters more than alphabet here. Housekeeping is first because
+ * everything else happens on top of what they do — the assistant cannot
+ * disinfect a chair in a room that has not been cleaned — and the sterilisation
+ * cycle sits at the end because it is the long pole nobody waits on to start
+ * anything else.
+ *
+ * A role with no blocks does not appear. An empty lane on a screen reads as a
+ * job somebody has forgotten, and the honest thing is that the morning does
+ * not ask that role for anything.
+ */
+const LANE_ORDER: ReadonlyArray<{ role: RoleCode; label: string; question: string }> = [
+  {
+    role: RoleCode.HOUSEKEEPING, label: 'Housekeeping',
+    question: 'Is the clinic clean and stocked?',
+  },
+  {
+    role: RoleCode.DENTAL_ASSISTANT, label: 'Dental assistants',
+    question: 'Are the rooms set up and the emergency kit checked?',
+  },
+  {
+    role: RoleCode.SENIOR_ASSISTANT, label: 'Senior assistant',
+    question: 'Does the equipment work?',
+  },
+  {
+    role: RoleCode.RECEPTION, label: 'Reception',
+    question: 'Is the front of the clinic ready for people?',
+  },
+  {
+    role: RoleCode.STERILIZATION_TECHNICIAN, label: 'Sterilisation',
+    question: 'Are there sterile packs in the cabinets?',
+  },
+];
+
+function lanesFor(
+  blocks: readonly ReadinessBlock[], targetAt: number | null,
+): ReadinessLane[] {
+  return LANE_ORDER.flatMap(({ role, label, question }) => {
+    const mine = blocks.filter((b) => b.owner === role);
+    if (mine.length === 0) return [];
+
+    const gating = mine.filter((b) => b.mandatory);
+    const done = gating.filter((b) => b.done).length;
+    // The longest job in the lane sets when the lane has to start, because
+    // the others fit inside it — this is the same reasoning the whole-morning
+    // start time uses, applied to one person.
+    const longest = Math.max(0, ...mine.map((b) => b.expectMinutes ?? 0));
+
+    return [{
+      role,
+      label,
+      question,
+      blocks: mine,
+      outstanding: gating.filter((b) => !b.done),
+      done,
+      of: gating.length,
+      percent: gating.length === 0 ? 0 : Math.round((done / gating.length) * 100),
+      ready: done === gating.length,
+      startBy: targetAt === null || longest === 0 ? null : targetAt - longest,
+    }];
+  });
 }
 
 /**

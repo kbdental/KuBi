@@ -459,3 +459,54 @@ describe('a withdrawn room reaches the appointment book', () => {
     expect(gatherFailures({ rooms, now: NOW }, holders)).toEqual([]);
   });
 });
+
+describe('a failed hygiene check is not the same as an undone one', () => {
+  const holders = new Map<RoleCode, readonly Involved[]>([
+    [RoleCode.HOUSEKEEPING, [person('e4', 'Sunita')]],
+    [RoleCode.CLINIC_MANAGER, [person('e9', 'Deepak')]],
+  ]);
+
+  it('says somebody looked and was not satisfied', () => {
+    // The owner's fourth KPI, and the one outcome a tick sheet cannot
+    // produce. "Not done" and "done, inspected and rejected" are different
+    // conversations with different people.
+    const hygiene = {
+      failedChecks: [{
+        control: {
+          id: 'HK-001', activity: 'Treatment-room cleaning',
+          doer: RoleCode.HOUSEKEEPING, checker: RoleCode.DENTAL_ASSISTANT,
+          failure: 'Room readiness fails',
+        },
+        blocksOpening: true,
+        because: 'Bin in Operatory 2 not emptied',
+      }],
+      defects: [],
+    } as never;
+    const [row] = gatherFailures({ hygiene, now: NOW }, holders);
+    expect(row!.severity).toBe(FailureSeverity.STOPS);
+    expect(row!.what).toBe('Treatment-room cleaning — the check failed');
+    expect(row!.because).toContain('rejected by the dental assistant');
+    expect(row!.involved.map((p) => p.label)).toEqual(['Sunita']);
+  });
+
+  it('sends a dripping tap to maintenance, not to housekeeping', () => {
+    // HK-008 asks two questions — clean *and* working — and only the second
+    // raises a ticket. A tap that is clean and broken is not a cleaning
+    // failure, and sending it back to the cleaner wastes everybody's morning.
+    const hygiene = {
+      failedChecks: [],
+      defects: [{
+        control: { id: 'HK-008', activity: 'Washbasins and taps',
+          doer: RoleCode.HOUSEKEEPING, checker: null,
+          failure: 'Maintenance ticket if defective' },
+        blocksOpening: false,
+        because: 'Done, and a defect was reported — cold tap drips.',
+      }],
+    } as never;
+    const [row] = gatherFailures({ hygiene, now: NOW }, holders);
+    expect(row!.area).toBe(FailureArea.EQUIPMENT);
+    expect(row!.severity).toBe(FailureSeverity.WATCH);
+    expect(row!.ownerRole).toBe(RoleCode.CLINIC_MANAGER);
+    expect(row!.goes).toBe('Equipment');
+  });
+});

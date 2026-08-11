@@ -56,7 +56,10 @@ function fullMorning(ops: Operatory[] = FOUR): World {
   w = sterilise(w);
   w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
     w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
+  // HK-001 and HK-010, the housekeeping matrix's two gating rows.
+  w = must(w, ClinicEvent.ROOMS_CLEANED, 'today', RoleCode.HOUSEKEEPING);
   w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
+  w = must(w, ClinicEvent.WASHROOM_STOCKED, 'today', RoleCode.HOUSEKEEPING);
   // OPEN-012 — the emergency kit, mandatory since it got a block.
   return must(w, ClinicEvent.EMERGENCY_CHECKED, 'e1#DENTAL_ASSISTANT',
     RoleCode.DENTAL_ASSISTANT);
@@ -249,11 +252,13 @@ describe('the owner’s two readiness measures', () => {
     for (const o of FOUR) {
       w = must(w, ClinicEvent.OPERATORY_READY, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
     }
-    // Ten blocks listed; nine of them mandatory. Compliance is four of the
-    // nine — the stock check is real work and is not part of "may the clinic
-    // open", so counting it would make a complete morning read as 90%.
-    expect(read(w).blocks).toHaveLength(10);
-    expect(read(w).compliance).toBe(4 / 9);
+    // Twelve blocks listed; eleven of them mandatory. Compliance is four of
+    // the eleven — the stock check is real work and is not part of "may the
+    // clinic open", so counting it would make a complete morning read as 92%.
+    expect(read(w).blocks).toHaveLength(12);
+    expect(read(w).compliance).toBe(4 / 11);
+    // The same figure as a whole number, so no two screens round it two ways.
+    expect(read(w).percent).toBe(36);
     expect(read(fullMorning()).compliance).toBe(1);
   });
 
@@ -404,8 +409,10 @@ describe('only the person whose job it is may report it done', () => {
     // an owner. If ownership were checked there too, every readiness item would
     // read BLOCKED on the list of the very person who owns it.
     const mineNow = decisionsFor(opened(), RoleCode.HOUSEKEEPING, T(8, 46));
-    expect(mineNow).toHaveLength(1);
-    expect(mineNow[0]!.verdict).toBe(Verdict.PROCEED);
+    // Three since the housekeeping matrix arrived: the rooms, the shared
+    // areas, and the washroom stock.
+    expect(mineNow).toHaveLength(3);
+    expect(mineNow.every((d) => d.verdict === Verdict.PROCEED)).toBe(true);
   });
 });
 
@@ -442,7 +449,9 @@ describe('a day with nobody booked has no deadline, and says so', () => {
     w = sterilise(w);
     w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
         w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
+    w = must(w, ClinicEvent.ROOMS_CLEANED, 'today', RoleCode.HOUSEKEEPING);
     w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
+    w = must(w, ClinicEvent.WASHROOM_STOCKED, 'today', RoleCode.HOUSEKEEPING);
     w = must(w, ClinicEvent.EMERGENCY_CHECKED, 'e1#DENTAL_ASSISTANT',
       RoleCode.DENTAL_ASSISTANT);
 
@@ -462,7 +471,9 @@ describe('a day with nobody booked has no deadline, and says so', () => {
     w = sterilise(w);
     w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
         w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
+    w = must(w, ClinicEvent.ROOMS_CLEANED, 'today', RoleCode.HOUSEKEEPING);
     w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
+    w = must(w, ClinicEvent.WASHROOM_STOCKED, 'today', RoleCode.HOUSEKEEPING);
     w = must(w, ClinicEvent.EMERGENCY_CHECKED, 'e1#DENTAL_ASSISTANT',
       RoleCode.DENTAL_ASSISTANT);
     expect(record(w, {
