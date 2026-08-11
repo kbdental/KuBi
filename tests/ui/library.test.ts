@@ -104,6 +104,15 @@ const LIBRARY = new Set([
   'asset-state-operational', 'asset-state-overdue', 'asset-state-down',
   'asset-state-unserviced',
   'fact-stop',
+  /* ── compliance ───────────────────────────────────────────────────────
+     A gate list is only worth reading if it says why each gate exists and
+     what would prove it. The basis badge carries the first; the breach block
+     is the one thing on that screen that cannot be fixed by doing the work,
+     so it is drawn as a block rather than as another row. */
+  'gate-basis', 'gate-statutory', 'gate-consent', 'gate-safety',
+  'gate-clinical', 'gate-record',
+  'gate-tally', 'gate-tally-row', 'gate-tally-label', 'gate-tally-count',
+  'breach', 'breach-title', 'breach-line',
   // shared state modifiers
   'is-good', 'is-warn', 'is-bad', 'is-done', 'is-here', 'is-urgent',
 ]);
@@ -128,6 +137,7 @@ const CONVERTED = [
   // Built on the vocabulary from the first line rather than converted onto it
   // afterwards, which is the point of having one.
   'now.tsx',
+  'compliance.tsx',
   'equipment.tsx',
   'patient-events.tsx',
   'readiness.tsx',

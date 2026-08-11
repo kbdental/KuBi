@@ -148,6 +148,22 @@ export const ClinicEvent = {
   CARE_ITEM_MET: 'CARE_ITEM_MET',
 
   /**
+   * Somebody tried to start a procedure that was not ready.
+   *
+   * The owner: *"The software should not quietly allow the missing
+   * requirement to disappear."* A refusal that leaves no trace is a refusal
+   * people learn to route around, so the attempt is an event like any other
+   * — in the append-only log, countable per gate and per week, and impossible
+   * to clear by meeting the requirement afterwards.
+   *
+   * The subject carries the booking and the gates that were missing at that
+   * minute, `booking#GATE,GATE`, so the count survives the requirement later
+   * being met. What was missing when somebody tried is a different fact from
+   * what is missing now.
+   */
+  TREATMENT_START_REFUSED: 'TREATMENT_START_REFUSED',
+
+  /**
    * An asset's own life, which is longer than any day.
    *
    * `ASSET_SERVICED` carries a compound subject, `tag#cycle`, for the same

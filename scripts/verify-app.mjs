@@ -117,7 +117,7 @@ for (const s of SIZES) {
   // everything role-specific — including the manager's command centre — is
   // reached through More, so that is where the clinic-wide check now looks.
   const rail = await page.$$eval('.rail-item', (els) => els.map((e) => e.textContent?.trim() ?? ''));
-  for (const want of ['Dashboard', 'Clinic readiness', 'Patient events', 'Equipment', 'Clinic closing']) {
+  for (const want of ['Dashboard', 'Clinic readiness', 'Patient events', 'Mandatory', 'Equipment', 'Clinic closing']) {
     if (!rail.some((t) => t.includes(want))) {
       problems.push(`${s.name}: the rail has no "${want}" (rail: ${rail.join(', ')})`);
     }
@@ -161,7 +161,8 @@ for (const s of SIZES) {
   // The two named places on the rail, plus one screen still under More.
   for (const [item, name] of [
     ['Clinic readiness', '04-readiness'], ['Patient events', '05-patient-events'],
-    ['Equipment', '06-equipment'], ['Clinic closing', '07-closing'],
+    ['Mandatory', '06-mandatory'], ['Equipment', '07-equipment'],
+    ['Clinic closing', '08-closing'],
   ]) {
     await page.click(`.rail-item:has-text("${item}")`);
     await page.waitForTimeout(500);

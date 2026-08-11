@@ -992,6 +992,62 @@ export interface EquipmentScreenView {
   unratified: boolean;
 }
 
+/* -------------------------------------------------------------------------
+ * The compliance engine
+ * ---------------------------------------------------------------------- */
+
+export interface GateResultView {
+  id: string;
+  label: string;
+  stage: 'BEFORE' | 'AFTER';
+  owner: string;
+  verdict: 'MET' | 'MISSING' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  basis: string;
+  evidence: string;
+  attestedBy: string | null;
+  because: string;
+}
+
+export interface BreachView {
+  gateId: string;
+  label: string;
+  basis: string;
+  evidence: string;
+  deliveredAt: number;
+  metLateAt: number | null;
+}
+
+export interface ComplianceView {
+  bookingId: string;
+  patientLabel: string;
+  treatmentCode: string;
+  treatmentName: string;
+  at: number;
+  ready: boolean;
+  verdict: 'READY' | 'NOT_READY';
+  headline: string;
+  gates: GateResultView[];
+  before: GateResultView[];
+  after: GateResultView[];
+  missing: GateResultView[];
+  refusals: Array<{ at: number; missing: string[] }>;
+  breaches: BreachView[];
+  delivered: boolean;
+}
+
+export interface ComplianceScreenView {
+  now: number;
+  role: string;
+  all: ComplianceView[];
+  notReady: ComplianceView[];
+  breached: ComplianceView[];
+  refusalCount: number;
+  worstGates: Array<{ id: string; label: string; count: number; basis: string }>;
+  rate: number;
+  /** How many mandatory gates the whole catalogue defines. */
+  gateCount: number;
+}
+
 export type RecordResult =
   | { ok: true; duplicate: boolean; consequences: Array<{ kind: string }> }
   | { ok: false; refusal: { because: string; fix: string; goes: string } };
@@ -1063,6 +1119,8 @@ export const api = {
   patientEvents: () => call<PatientEventsView>('/api/v1/patient-events'),
   /** The asset register, and the work each record generated. */
   equipment: () => call<EquipmentScreenView>('/api/v1/equipment'),
+  /** Mandatory gates: what is ready, what is not, and what was breached. */
+  compliance: () => call<ComplianceScreenView>('/api/v1/compliance'),
   /**
    * Record something that happened.
    *

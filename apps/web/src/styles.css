@@ -2866,3 +2866,41 @@ label.field-label {
 .asset-block { margin-top: 16px; }
 .asset-line { margin: 4px 0 0; font-size: 13.5px; color: var(--ink-2, #55655e); line-height: 1.5; }
 .asset-line.is-bad { color: #9d2f26; }
+
+/* ── Compliance ──────────────────────────────────────────────────────────
+   A gate list is only worth reading if it says WHY each gate exists and
+   WHAT would prove it. The basis badge carries the first; the evidence line
+   under each row carries the second. */
+
+.gate-basis {
+  display: inline-block; margin-left: 8px; vertical-align: 1px;
+  border-radius: 3px; padding: 1px 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: .04em;
+}
+.gate-statutory { background: #2b2f45; color: #fff; }
+.gate-consent   { background: #5b2d6e; color: #fff; }
+.gate-safety    { background: #9d2f26; color: #fff; }
+.gate-clinical  { background: #0c5f4e; color: #fff; }
+.gate-record    { background: #55655e; color: #fff; }
+
+.gate-tally { margin-top: 18px; }
+.gate-tally-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid var(--line-soft, #f0f3f1);
+  font-size: 13.5px;
+}
+.gate-tally-row:last-child { border-bottom: 0; }
+.gate-tally-label { flex: 1; min-width: 0; }
+.gate-tally-count {
+  font-variant-numeric: tabular-nums; font-weight: 700; color: #9d2f26;
+}
+
+/* A breach is the one thing on this screen that cannot be fixed by doing the
+   work, so it is drawn as a block of its own rather than as another row. */
+.breach {
+  margin-top: 12px; padding: 12px 14px;
+  background: #fbeceb; border-left: 3px solid #9d2f26; border-radius: 4px;
+}
+.breach-title { font-weight: 700; font-size: 14px; color: #9d2f26; }
+.breach-line { margin-top: 4px; font-size: 13px; color: #6d2a24; line-height: 1.5; }
+.breach-line.is-quiet { color: #8a5a55; }

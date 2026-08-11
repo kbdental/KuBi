@@ -38,10 +38,11 @@ import {
   sweep, board, FLOWS,
   careFor, careForAll, careOwedBy, TREATMENTS, NOTHING_KNOWN, UNRATIFIED_CATALOGUE,
   ASSETS, equipment as equipmentView, assetWorkFor, UNRATIFIED_REGISTER,
+  complianceFor, complianceAcross, mustListFor,
   ClinicEvent as CE,
   type World, type Operatory, type RoleCode,
   type Booking, type PatientFacts, type Care, type CareTask, type ReadinessEvent,
-  type AssetRecord, type AssetTask,
+  type AssetRecord, type AssetTask, type Compliance, type GateResult,
 } from '@kubi/contracts';
 
 type Role =
@@ -1402,6 +1403,46 @@ const assetView = (r: AssetRecord, _events: readonly ReadinessEvent[], now: numb
   })),
 });
 
+/**
+ * Two recorded attempts to start work that was not ready.
+ *
+ * Not decoration. A refusal nobody can count is a refusal people learn to
+ * route around, so the demo has to show what the count looks like — somebody
+ * tried to start the root canal twice while the consent was still unsigned.
+ */
+const DEMO_REFUSALS: ReadinessEvent[] = [
+  { type: CE.TREATMENT_START_REFUSED, subjectId: 'bk-3#CONSENT,DAM', at: 13 * 60 + 55 },
+  { type: CE.TREATMENT_START_REFUSED, subjectId: 'bk-3#CONSENT', at: 14 * 60 + 10 },
+];
+
+const gateView = (x: GateResult) => ({
+  id: x.id, label: x.label, stage: x.stage, owner: x.owner as string,
+  verdict: x.verdict, basis: x.spec.basis, evidence: x.spec.evidence,
+  attestedBy: (x.spec.attestedBy as string | null) ?? null,
+  because: x.because,
+});
+
+const complianceView = (c: Compliance) => ({
+  bookingId: c.bookingId,
+  patientLabel: c.patientLabel,
+  treatmentCode: c.treatmentCode,
+  treatmentName: c.treatmentName,
+  at: DEMO_BOOKINGS.find((b) => b.id === c.bookingId)?.at ?? 0,
+  ready: c.ready,
+  verdict: c.verdict,
+  headline: c.headline,
+  gates: c.gates.map(gateView),
+  before: c.before.map(gateView),
+  after: c.after.map(gateView),
+  missing: c.missing.map(gateView),
+  refusals: c.refusals.map((r) => ({ at: r.at, missing: [...r.missing] })),
+  breaches: c.breaches.map((b) => ({
+    gateId: b.gateId, label: b.label, basis: b.basis as string,
+    evidence: b.evidence, deliveredAt: b.deliveredAt, metLateAt: b.metLateAt,
+  })),
+  delivered: c.delivered,
+});
+
 export function signInAs(key: string) {
   db.signedIn = PEOPLE.find((p) => p.key === key) ?? null;
 }
@@ -2233,6 +2274,57 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
       checksDue: v.checksDue.map(named),
       categories: [...new Set(ASSETS.map((a) => a.category))],
       unratified: UNRATIFIED_REGISTER,
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     THE COMPLIANCE ENGINE
+
+     The gate list is not written here — it is derived from the same treatment
+     catalogue the patient event screen uses, so the two can never disagree
+     about what a treatment requires.
+
+     The equipment register is read into it. "Sterilization confirmed" is not
+     a fact about implants; it is a fact about the autoclave, and this is
+     where the two engines meet. Note what is NOT passed: there is no
+     override, no force, no authorisedBy.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  if (path === '/api/v1/compliance') {
+    const w = engineWorld();
+    const now = w.now;
+    const assetEvents = assetHistory(now);
+    const eq = equipmentView(ASSETS, assetEvents, now);
+    // Only the assets an operative procedure actually depends on. Listing
+    // every unusable asset in the building would have put the practice
+    // computer and the fridge in front of an implant surgeon, which is how a
+    // gate becomes noise and then becomes ignored.
+    const dependedOn = new Set(ASSETS
+      .filter((a) => a.category === 'STERILIZATION' || a.category === 'PLANT')
+      .map((a) => a.tag));
+    const unusableAssets = [...new Set([
+      ...eq.unusable.map((r) => r.asset.tag),
+      ...eq.down.map((r) => r.asset.tag),
+    ])].filter((tag) => dependedOn.has(tag));
+
+    const events = [...w.events, ...careProgressEvents(now, db.endOfDay), ...DEMO_REFUSALS];
+    const all = DEMO_BOOKINGS
+      .map((b) => complianceFor(b, factsFor(b.id), events, now, { unusableAssets }))
+      .filter((c): c is Compliance => c !== null);
+    const v = complianceAcross(all);
+
+    return json({
+      now,
+      role: engineRole(),
+      all: all.map(complianceView),
+      notReady: v.notReady.map(complianceView),
+      breached: v.breached.map(complianceView),
+      refusalCount: v.refusalCount,
+      worstGates: v.worstGates,
+      rate: v.rate,
+      gateCount: new Set(
+        TREATMENTS.flatMap((t) => mustListFor(t.code).map((m) => m.id)),
+      ).size,
     });
   }
 
