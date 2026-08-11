@@ -37,8 +37,11 @@ import {
   readiness, closing, decisions, decisionsFor, escalatedTo, mostImportant,
   sweep, board, FLOWS,
   careFor, careForAll, careOwedBy, TREATMENTS, NOTHING_KNOWN, UNRATIFIED_CATALOGUE,
+  ASSETS, equipment as equipmentView, assetWorkFor, UNRATIFIED_REGISTER,
+  ClinicEvent as CE,
   type World, type Operatory, type RoleCode,
   type Booking, type PatientFacts, type Care, type CareTask, type ReadinessEvent,
+  type AssetRecord, type AssetTask,
 } from '@kubi/contracts';
 
 type Role =
@@ -1304,6 +1307,101 @@ const careView = (c: Care) => ({
   owedAfter: c.owedAfter.map(careTaskView),
 });
 
+/* -------------------------------------------------------------------------
+ * Synthetic service history for the equipment engine
+ *
+ * Every date here is an event, exactly as a person tapping "serviced" would
+ * produce. Nothing is a status field.
+ *
+ * Deliberately uneven, and two of the unevennesses are the point:
+ *
+ *   AUTOCLAVE-01  spore test nine days ago — a week is the interval, so the
+ *                 autoclave is unusable and says why
+ *   COMPRESSOR-01 service 190 days ago against a 180-day interval — overdue
+ *   SEALER-01     no history at all — not "nothing due", which is what the
+ *                 obvious arithmetic would say
+ *   UPS-01        no history at all
+ *   CHAIR-03      failed this morning and not yet restored
+ * ---------------------------------------------------------------------- */
+
+/** Days ago, as a minute on the demo clock. */
+const daysAgo = (now: number, n: number) => now - n * 24 * 60;
+
+/** Assets whose history is deliberately absent. */
+const NO_HISTORY = new Set(['SEALER-01', 'UPS-01']);
+
+/** Cycles that are deliberately behind, by however many days. */
+const BEHIND: Record<string, number> = {
+  'AUTOCLAVE-01#SPORE': 9,
+  'COMPRESSOR-01#SERVICE': 190,
+  'FRIDGE-01#TEMP_LOG': 12,
+  'CURE-02#RADIOMETER': 44,
+  'SERVER-01#RESTORE_TEST': 120,
+};
+
+function assetHistory(now: number): ReadinessEvent[] {
+  const out: ReadinessEvent[] = [];
+  for (const a of ASSETS) {
+    if (NO_HISTORY.has(a.tag)) continue;
+    for (const c of a.cycles) {
+      const key = `${a.tag}#${c.id}`;
+      // Behind where the table says so; otherwise a third of the way through
+      // the interval, so most of the register is quietly in date.
+      const ago = BEHIND[key] ?? Math.floor(c.everyDays / 3);
+      out.push({ type: CE.ASSET_SERVICED, subjectId: key, at: daysAgo(now, ago) });
+    }
+    // The morning's checks, all done except the ones nobody got to.
+    if (a.dailyCheck !== null && a.tag !== 'PUMP-01' && a.tag !== 'OXYGEN-01') {
+      out.push({ type: CE.ASSET_CHECKED, subjectId: a.tag, at: now - 45 });
+    }
+  }
+  // One chair down since first thing, and one long-closed failure behind it.
+  out.push({ type: CE.ASSET_FAILED, subjectId: 'CHAIR-03', at: now - 130 });
+  out.push({ type: CE.ASSET_FAILED, subjectId: 'SUCTION-01', at: daysAgo(now, 20) });
+  out.push({ type: CE.ASSET_RESTORED, subjectId: 'SUCTION-01', at: daysAgo(now, 20) + 300 });
+  return out;
+}
+
+/** A minute rendered as a day, because a service date is not a clock time. */
+const dayWord = (m: number | null, now: number): string | null => {
+  if (m === null) return null;
+  const d = Math.round((now - m) / (24 * 60));
+  if (d === 0) return 'today';
+  if (d === 1) return 'yesterday';
+  if (d > 0) return `${d} days ago`;
+  return `in ${-d} days`;
+};
+
+const assetTaskView = (t: AssetTask) => ({
+  assetTag: t.assetTag, assetName: t.assetName, cycleId: t.cycleId,
+  label: t.label, owner: t.owner as string, dueAt: t.dueAt,
+  overdue: t.overdue, daysLate: t.daysLate, blocks: t.blocks, because: t.because,
+});
+
+const assetView = (r: AssetRecord, _events: readonly ReadinessEvent[], now: number) => ({
+  tag: r.asset.tag, name: r.asset.name, category: r.asset.category as string,
+  location: r.asset.location, responsible: r.asset.responsible as string,
+  criticality: r.asset.criticality as string,
+  make: r.asset.make, model: r.asset.model, serial: r.asset.serial,
+  state: r.state, headline: r.headline,
+  hasServiceCycle: r.hasServiceCycle,
+  lastServicedDay: dayWord(r.lastServicedAt, now),
+  nextServiceDay: dayWord(r.nextServiceAt, now),
+  checkDue: r.checkDue, dailyCheck: r.asset.dailyCheck,
+  breakdowns: r.breakdowns, downtimeMinutes: r.downtimeMinutes,
+  amcAction: r.amcAction,
+  amcVendor: r.asset.amc?.vendor ?? null,
+  amcCovers: r.asset.amc?.covers ?? null,
+  documents: [...r.asset.documents],
+  unknowns: [...r.unknowns],
+  cycles: r.asset.cycles.map((c) => ({
+    id: c.id, label: c.label, everyDays: c.everyDays,
+    owner: c.owner as string, blocks: c.blocks,
+    due: r.due.find((t) => t.cycleId === c.id)
+      ? assetTaskView(r.due.find((t) => t.cycleId === c.id)!) : null,
+  })),
+});
+
 export function signInAs(key: string) {
   db.signedIn = PEOPLE.find((p) => p.key === key) ?? null;
 }
@@ -2099,6 +2197,42 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         items: TREATMENTS.reduce((n, t) => n + t.items.length, 0),
       },
       unratified: UNRATIFIED_CATALOGUE,
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     THE EQUIPMENT ENGINE
+
+     The real functions again. Nothing below decides what is due — the
+     register holds each asset's intervals, the log holds what was done, and
+     `equipment()` does the arithmetic.
+
+     The service history is deliberately uneven, because a register where
+     everything was serviced last week shows a table and hides the engine.
+     Two assets have no history at all, which is the state the whole file
+     exists to stop being read as "nothing due".
+     ═══════════════════════════════════════════════════════════════════ */
+
+  if (path === '/api/v1/equipment') {
+    const w = engineWorld();
+    const now = w.now;
+    const events = assetHistory(now);
+    const v = equipmentView(ASSETS, events, now);
+    const role = engineRole() as RoleCode;
+    const named = (r: AssetRecord) => ({ tag: r.asset.tag, name: r.asset.name });
+
+    return json({
+      now,
+      role,
+      records: v.records.map((r) => assetView(r, events, now)),
+      tasks: v.tasks.map(assetTaskView),
+      mine: assetWorkFor(v, role).map(assetTaskView),
+      down: v.down.map(named),
+      unusable: v.unusable.map(named),
+      unserviced: v.unserviced.map(named),
+      checksDue: v.checksDue.map(named),
+      categories: [...new Set(ASSETS.map((a) => a.category))],
+      unratified: UNRATIFIED_REGISTER,
     });
   }
 

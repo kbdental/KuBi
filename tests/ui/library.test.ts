@@ -93,6 +93,17 @@ const LIBRARY = new Set([
   'care-why',
   'is-met', 'is-open', 'is-late', 'is-unknown', 'is-aside',
   'is-ready', 'is-held', 'is-dim', 'is-quiet',
+  /* ── equipment ────────────────────────────────────────────────────────
+     An asset card is a record, not a task: identity, state, facts, then the
+     cycles. It reuses `fact`, `tag`, `switch` and `block` from the library
+     and adds only the frame around them. */
+  'asset-list', 'asset', 'asset-head', 'asset-id', 'asset-name', 'asset-where',
+  'asset-headline', 'asset-state', 'asset-facts', 'asset-detail', 'asset-block',
+  'asset-line',
+  'asset-operational', 'asset-overdue', 'asset-down', 'asset-unserviced',
+  'asset-state-operational', 'asset-state-overdue', 'asset-state-down',
+  'asset-state-unserviced',
+  'fact-stop',
   // shared state modifiers
   'is-good', 'is-warn', 'is-bad', 'is-done', 'is-here', 'is-urgent',
 ]);
@@ -117,6 +128,7 @@ const CONVERTED = [
   // Built on the vocabulary from the first line rather than converted onto it
   // afterwards, which is the point of having one.
   'now.tsx',
+  'equipment.tsx',
   'patient-events.tsx',
   'readiness.tsx',
   'retention.tsx',

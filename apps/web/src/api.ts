@@ -928,6 +928,70 @@ export interface PatientEventsView {
   unratified: boolean;
 }
 
+/* -------------------------------------------------------------------------
+ * The equipment engine
+ * ---------------------------------------------------------------------- */
+
+export interface AssetTaskView {
+  assetTag: string;
+  assetName: string;
+  cycleId: string;
+  label: string;
+  owner: string;
+  dueAt: number | null;
+  overdue: boolean;
+  daysLate: number | null;
+  blocks: boolean;
+  because: string;
+}
+
+export interface AssetRecordView {
+  tag: string;
+  name: string;
+  category: string;
+  location: string;
+  responsible: string;
+  criticality: string;
+  make: string;
+  model: string;
+  serial: string;
+  state: 'OPERATIONAL' | 'OVERDUE' | 'DOWN' | 'UNSERVICED';
+  headline: string;
+  /** False when the asset has no vendor service interval — not the same as never serviced. */
+  hasServiceCycle: boolean;
+  /** Rendered server-side as a day number, because a date is not a minute. */
+  lastServicedDay: string | null;
+  nextServiceDay: string | null;
+  checkDue: boolean;
+  dailyCheck: string | null;
+  breakdowns: number;
+  downtimeMinutes: number;
+  amcAction: string;
+  amcVendor: string | null;
+  amcCovers: string | null;
+  documents: string[];
+  unknowns: string[];
+  cycles: Array<{
+    id: string; label: string; everyDays: number; owner: string;
+    blocks: boolean; due: AssetTaskView | null;
+  }>;
+}
+
+export interface EquipmentScreenView {
+  now: number;
+  role: string;
+  records: AssetRecordView[];
+  tasks: AssetTaskView[];
+  mine: AssetTaskView[];
+  down: Array<{ tag: string; name: string }>;
+  unusable: Array<{ tag: string; name: string }>;
+  unserviced: Array<{ tag: string; name: string }>;
+  checksDue: Array<{ tag: string; name: string }>;
+  categories: string[];
+  /** True while the register is synthetic rather than the clinic's own list. */
+  unratified: boolean;
+}
+
 export type RecordResult =
   | { ok: true; duplicate: boolean; consequences: Array<{ kind: string }> }
   | { ok: false; refusal: { because: string; fix: string; goes: string } };
@@ -997,6 +1061,8 @@ export const api = {
   clinic: () => call<ClinicView>('/api/v1/clinic'),
   /** Booked treatments and the work each one generated. */
   patientEvents: () => call<PatientEventsView>('/api/v1/patient-events'),
+  /** The asset register, and the work each record generated. */
+  equipment: () => call<EquipmentScreenView>('/api/v1/equipment'),
   /**
    * Record something that happened.
    *

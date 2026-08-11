@@ -147,6 +147,24 @@ export const ClinicEvent = {
   TREATMENT_DELIVERED: 'TREATMENT_DELIVERED',
   CARE_ITEM_MET: 'CARE_ITEM_MET',
 
+  /**
+   * An asset's own life, which is longer than any day.
+   *
+   * `ASSET_SERVICED` carries a compound subject, `tag#cycle`, for the same
+   * reason care items do: an asset has several clocks running at once — the
+   * ordinary service, the spore test, the AERB licence — and each needs its
+   * own last-done date. One event type per cycle would make the operating
+   * model a mirror of the asset register.
+   *
+   * `ASSET_FAILED` and `ASSET_RESTORED` bracket downtime. Both are needed:
+   * a failure with no restoration is what "down right now" means, and it is
+   * the absence of the second event rather than a status field.
+   */
+  ASSET_CHECKED: 'ASSET_CHECKED',
+  ASSET_SERVICED: 'ASSET_SERVICED',
+  ASSET_FAILED: 'ASSET_FAILED',
+  ASSET_RESTORED: 'ASSET_RESTORED',
+
   // The clinical record, which outlives the visit
   NOTES_COMPLETED: 'NOTES_COMPLETED',
   FOLLOWUP_CALLED: 'FOLLOWUP_CALLED',
