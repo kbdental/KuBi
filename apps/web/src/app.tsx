@@ -19,11 +19,12 @@ import { Gate } from './screens/gate.js';
 import { Clinic } from './screens/clinic.js';
 import { Patient360 } from './screens/patient-360.js';
 import { CommandPalette, useCommandKey } from './screens/command-palette.js';
-import { IconToday, IconClinic, IconOverview } from './icons.js';
+import { IconToday, IconClinic, IconOverview, IconPatients } from './icons.js';
 import { Shell, type RailItem } from './app/shell.js';
 import { Dashboard } from './screens/dashboard.js';
 import { ClinicReadiness } from './screens/readiness.js';
 import { ClinicClosing } from './screens/closing.js';
+import { PatientEvents } from './screens/patient-events.js';
 
 /**
  * The shell.
@@ -229,6 +230,9 @@ export function App() {
   const rail: RailItem[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: <IconOverview filled={here === 'DASHBOARD'} /> },
     { id: 'READINESS', label: 'Clinic readiness', icon: <IconClinic filled={here === 'READINESS'} /> },
+    // Straight after readiness, on the owner's instruction: the clinic is made
+    // ready, and then the patients it was made ready for arrive.
+    { id: 'PATIENT_EVENTS', label: 'Patient events', icon: <IconPatients filled={here === 'PATIENT_EVENTS'} /> },
     { id: 'CLOSING', label: 'Clinic closing', icon: <IconToday filled={here === 'CLOSING'} /> },
     {
       id: 'MORE', label: 'More', icon: <IconToday filled={here === 'MORE'} />,
@@ -239,12 +243,13 @@ export function App() {
   const TITLES: Record<string, string> = {
     DASHBOARD: 'Dashboard',
     READINESS: 'Clinic readiness',
+    PATIENT_EVENTS: 'Patient events',
     CLOSING: 'Clinic closing',
     MORE: 'More',
   };
 
   // Everything under More is the previous shell's set, reached by its own id.
-  const inMore = !['DASHBOARD', 'READINESS', 'CLOSING'].includes(here);
+  const inMore = !['DASHBOARD', 'READINESS', 'PATIENT_EVENTS', 'CLOSING'].includes(here);
 
   return (
     <>
@@ -260,6 +265,7 @@ export function App() {
     >
       {here === 'DASHBOARD' && <Dashboard go={setChosen} />}
       {here === 'READINESS' && <ClinicReadiness />}
+      {here === 'PATIENT_EVENTS' && <PatientEvents />}
       {here === 'CLOSING' && <ClinicClosing />}
       {here === 'MORE' && (
         <MoreMenu

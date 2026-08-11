@@ -36,7 +36,9 @@ import {
   ClinicEvent, emptyWorld, record as recordEvent,
   readiness, closing, decisions, decisionsFor, escalatedTo, mostImportant,
   sweep, board, FLOWS,
+  careFor, careForAll, careOwedBy, TREATMENTS, NOTHING_KNOWN, UNRATIFIED_CATALOGUE,
   type World, type Operatory, type RoleCode,
+  type Booking, type PatientFacts, type Care, type CareTask, type ReadinessEvent,
 } from '@kubi/contracts';
 
 type Role =
@@ -1175,6 +1177,133 @@ export function jumpToEndOfDay() {
   }
 }
 
+/* -------------------------------------------------------------------------
+ * Synthetic bookings for the patient event engine
+ *
+ * Six treatments across six categories, at real hours of the demo day. None
+ * is a task list — each is one row, and every requirement on screen was
+ * derived from it by the engine.
+ * ---------------------------------------------------------------------- */
+
+const at = (h: number, m = 0) => h * 60 + m;
+
+export const DEMO_BOOKINGS: Booking[] = [
+  { id: 'bk-1', treatmentCode: 'IMPLANT', patientLabel: 'Anita Rao', at: at(11, 0), sitting: 1 },
+  { id: 'bk-2', treatmentCode: 'EXTRACT', patientLabel: 'Sunil Mehta', at: at(12, 30), sitting: 1 },
+  { id: 'bk-3', treatmentCode: 'RCT_POST', patientLabel: 'Farah Qureshi', at: at(14, 0), sitting: 1 },
+  { id: 'bk-4', treatmentCode: 'SCALE', patientLabel: 'Devika Nair', at: at(15, 30), sitting: 1 },
+  { id: 'bk-5', treatmentCode: 'CROWN', patientLabel: 'Imran Shaikh', at: at(16, 15), sitting: 2 },
+  { id: 'bk-6', treatmentCode: 'EMERG_ABSCESS', patientLabel: 'Rakesh Pillai', at: at(17, 0), sitting: 1 },
+];
+
+/**
+ * What is known about each of them, and it is not the same for each.
+ *
+ * Sunil is anticoagulated, which adds work. Rakesh walked in this afternoon
+ * and nobody has asked him anything, which is why his abscess will not start
+ * — not because anything is wrong with him, but because nobody knows.
+ */
+const KNOWN: PatientFacts = {
+  anticoagulated: false, prophylaxisIndicated: false, diabetic: false,
+  antiresorptive: false, pregnant: false, penicillinAllergy: false,
+  smoker: false, minor: false,
+};
+
+const DEMO_FACTS: Record<string, PatientFacts> = {
+  'bk-1': { ...KNOWN, smoker: true },
+  'bk-2': { ...KNOWN, anticoagulated: true },
+  'bk-3': { ...KNOWN, diabetic: true },
+  'bk-4': KNOWN,
+  'bk-5': KNOWN,
+  'bk-6': NOTHING_KNOWN,
+};
+
+const factsFor = (bookingId: string): PatientFacts =>
+  DEMO_FACTS[bookingId] ?? NOTHING_KNOWN;
+
+/**
+ * How far each booking has got — as events, not as state.
+ *
+ * A demo where nothing has been done makes every card block on the same first
+ * item, which shows the list and hides the engine. So each booking is worked
+ * up to a different point and each one is held by something different:
+ *
+ *   Anita     ready to go, one advisory outstanding
+ *   Sunil     everything done except the bleeding plan — he is anticoagulated
+ *   Farah     consent and rubber dam still to come
+ *   Devika    clear
+ *   Imran     waiting on the laboratory
+ *   Rakesh    walked in this afternoon and nobody has asked him anything
+ *
+ * `except` names what has NOT been done. Everything else blocking is reported
+ * met, which is done by asking the engine what is outstanding rather than by
+ * listing item ids here — so this stays true when the protocol changes.
+ */
+const DEMO_PROGRESS: Record<string, readonly string[]> = {
+  'bk-1': ['GUIDE'],
+  'bk-2': ['ANTICOAG'],
+  'bk-3': ['CONSENT', 'DAM'],
+  'bk-4': [],
+  'bk-5': ['LAB_BACK', 'FIT_APPT'],
+  'bk-6': [],
+};
+
+/**
+ * Nothing here is a state field. Every one of these is a `CARE_ITEM_MET`
+ * event, exactly as a person tapping Done would produce, and the screen
+ * derives everything it shows from them.
+ *
+ * Deliveries appear only once the day has been wound forward, because a
+ * treatment at 16:15 has not happened at 09:15 and pretending otherwise would
+ * be the one thing the design principle forbids.
+ */
+function careProgressEvents(now: number, endOfDay: boolean): ReadinessEvent[] {
+  const out: ReadinessEvent[] = [];
+  for (const b of DEMO_BOOKINGS) {
+    const skip = DEMO_PROGRESS[b.id] ?? [];
+    const fresh = careFor(b, factsFor(b.id), [], now);
+    if (fresh === null) continue;
+    for (const t of fresh.before) {
+      if (t.state !== 'OUTSTANDING' || skip.includes(t.id)) continue;
+      out.push({
+        type: ClinicEvent.CARE_ITEM_MET,
+        subjectId: `${b.id}#${t.id}`,
+        at: Math.min(t.dueAt, now),
+      });
+    }
+    if (endOfDay && b.at <= now) {
+      out.push({ type: ClinicEvent.TREATMENT_DELIVERED, subjectId: b.id, at: b.at + 30 });
+    }
+  }
+  return out;
+}
+
+const careTaskView = (t: CareTask) => ({
+  id: t.id, label: t.label, owner: t.owner as string,
+  stage: t.stage, gate: t.gate, state: t.state,
+  dueAt: t.dueAt, doneAt: t.doneAt, late: t.late,
+  because: t.because, standsAsideBecause: t.standsAsideBecause,
+});
+
+const careView = (c: Care) => ({
+  bookingId: c.booking.id,
+  patientLabel: c.booking.patientLabel,
+  treatmentCode: c.treatment.code,
+  treatmentName: c.treatment.name,
+  category: c.treatment.category as string,
+  at: c.booking.at,
+  sitting: c.booking.sitting,
+  sittings: c.treatment.sittings,
+  before: c.before.map(careTaskView),
+  after: c.after.map(careTaskView),
+  open: c.open.map(careTaskView),
+  mayStart: c.mayStart,
+  blockedBy: c.blockedBy,
+  unknownFacts: c.unknownFacts as string[],
+  delivered: c.delivered,
+  owedAfter: c.owedAfter.map(careTaskView),
+});
+
 export function signInAs(key: string) {
   db.signedIn = PEOPLE.find((p) => p.key === key) ?? null;
 }
@@ -1930,6 +2059,46 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         node: FLOWS[f.kind].nodes[f.at]?.id ?? null,
       })),
       eventCount: w.events.length,
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     THE PATIENT EVENT ENGINE
+
+     Again the real functions. `careForAll` derives every requirement and
+     consequence from the bookings below — nothing here is a task list, and
+     removing a booking removes its work without anybody deleting a row.
+
+     The facts are deliberately uneven. One patient is fully known, one is on
+     a blood thinner, and one has never been asked anything — because a demo
+     where every patient is straightforward never shows the rule that matters.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  if (path === '/api/v1/patient-events') {
+    const w = engineWorld();
+    const now = w.now;
+    const all = careForAll(DEMO_BOOKINGS, factsFor,
+      [...w.events, ...careProgressEvents(now, db.endOfDay)], now);
+    const role = engineRole() as RoleCode;
+
+    return json({
+      now,
+      role,
+      care: all.map(careView),
+      mine: careOwedBy(all, role).map((t) => {
+        const owner = all.find((c) => c.open.includes(t));
+        return {
+          ...careTaskView(t),
+          patientLabel: owner?.booking.patientLabel ?? '',
+          bookingId: owner?.booking.id ?? '',
+        };
+      }),
+      catalogue: {
+        treatments: TREATMENTS.length,
+        categories: new Set(TREATMENTS.map((t) => t.category)).size,
+        items: TREATMENTS.reduce((n, t) => n + t.items.length, 0),
+      },
+      unratified: UNRATIFIED_CATALOGUE,
     });
   }
 

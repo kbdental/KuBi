@@ -874,6 +874,60 @@ export interface ClinicView {
   eventCount: number;
 }
 
+/* -------------------------------------------------------------------------
+ * The patient event engine
+ * ---------------------------------------------------------------------- */
+
+/** One derived piece of work, already decided server-side. */
+export interface CareTaskView {
+  id: string;
+  label: string;
+  owner: string;
+  stage: 'BEFORE' | 'AFTER';
+  gate: 'BLOCK' | 'ADVISE';
+  state: 'MET' | 'OUTSTANDING' | 'NOT_APPLICABLE' | 'UNKNOWN';
+  dueAt: number;
+  doneAt: number | null;
+  late: boolean;
+  because: string;
+  standsAsideBecause: string | null;
+}
+
+export interface CareView {
+  bookingId: string;
+  patientLabel: string;
+  treatmentCode: string;
+  treatmentName: string;
+  category: string;
+  at: number;
+  sitting: number;
+  sittings: number;
+  before: CareTaskView[];
+  after: CareTaskView[];
+  open: CareTaskView[];
+  mayStart: boolean;
+  blockedBy: string | null;
+  unknownFacts: string[];
+  delivered: boolean;
+  owedAfter: CareTaskView[];
+}
+
+export interface PatientEventsView {
+  now: number;
+  role: string;
+  /** Today's bookings, each with the work its own existence created. */
+  care: CareView[];
+  /** What the signed-in role owes across every booking, worst first. */
+  mine: Array<CareTaskView & { patientLabel: string; bookingId: string }>;
+  /** How many treatments the catalogue knows, and in how many categories. */
+  catalogue: { treatments: number; categories: number; items: number };
+  /**
+   * True while the catalogue is a scaffold nobody has signed off. The screen
+   * says so rather than letting it pass as a ratified protocol.
+   */
+  unratified: boolean;
+}
+
 export type RecordResult =
   | { ok: true; duplicate: boolean; consequences: Array<{ kind: string }> }
   | { ok: false; refusal: { because: string; fix: string; goes: string } };
@@ -941,6 +995,8 @@ export const api = {
   now: () => call<NowView>('/api/v1/now'),
   /** One clinic, not seven modules: every decision, the board, what is late. */
   clinic: () => call<ClinicView>('/api/v1/clinic'),
+  /** Booked treatments and the work each one generated. */
+  patientEvents: () => call<PatientEventsView>('/api/v1/patient-events'),
   /**
    * Record something that happened.
    *

@@ -81,6 +81,18 @@ const LIBRARY = new Set([
   'block-list', 'block', 'block-mark', 'block-body', 'block-label',
   'block-meta', 'block-do',
   'meter', 'meter-value',
+  /* ── patient events ──────────────────────────────────────────────────
+     One genuinely new shape, and the reason it is new: a care item has four
+     states, not two. Met, outstanding, unknown and not-applicable cannot be
+     drawn with `block-mark`, which is a tick or a blank — and the whole
+     argument of that screen is that an unanswered question is not the same
+     as an undone task. So `care-pip` exists, and nothing else on the screen
+     does: the rows underneath it are `block`, the panels are `ready-panel`. */
+  'care', 'care-head', 'care-title', 'care-state', 'care-counts', 'care-count',
+  'care-more', 'care-detail', 'care-group', 'care-group-title', 'care-pip',
+  'care-why',
+  'is-met', 'is-open', 'is-late', 'is-unknown', 'is-aside',
+  'is-ready', 'is-held', 'is-dim', 'is-quiet',
   // shared state modifiers
   'is-good', 'is-warn', 'is-bad', 'is-done', 'is-here', 'is-urgent',
 ]);
@@ -105,6 +117,7 @@ const CONVERTED = [
   // Built on the vocabulary from the first line rather than converted onto it
   // afterwards, which is the point of having one.
   'now.tsx',
+  'patient-events.tsx',
   'readiness.tsx',
   'retention.tsx',
   'rules.tsx',

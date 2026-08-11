@@ -123,6 +123,30 @@ export const ClinicEvent = {
   INSTRUCTIONS_GIVEN: 'INSTRUCTIONS_GIVEN',
   RECALL_BOOKED: 'RECALL_BOOKED',
 
+  /**
+   * A booked treatment, and the work its own existence creates.
+   *
+   * `TREATMENT_BOOKED` is a trigger and not a task: booking an implant is
+   * what makes the consent, the inventory check and the pre-op scan exist,
+   * and nobody types them in. `TREATMENT_DELIVERED` is the mirror trigger at
+   * the other end.
+   *
+   * `TREATMENT_DELIVERED` is deliberately not `TREATMENT_FINISHED`. That one
+   * ends a *visit*; this one ends a *treatment*, and one visit can deliver
+   * three of them — an extraction, a filling and a scaling in the same hour.
+   * Collapsing the two would make it impossible to say which post-op
+   * instruction belongs to which piece of work.
+   *
+   * `CARE_ITEM_MET` carries a compound subject, `booking#item`, rather than
+   * giving each of the two hundred-odd care items its own event type. The
+   * item ids are data — a clinic that adds a treatment adds rows, not enum
+   * members — and an event type per item would make the operating model a
+   * mirror of the catalogue instead of a description of what can happen.
+   */
+  TREATMENT_BOOKED: 'TREATMENT_BOOKED',
+  TREATMENT_DELIVERED: 'TREATMENT_DELIVERED',
+  CARE_ITEM_MET: 'CARE_ITEM_MET',
+
   // The clinical record, which outlives the visit
   NOTES_COMPLETED: 'NOTES_COMPLETED',
   FOLLOWUP_CALLED: 'FOLLOWUP_CALLED',

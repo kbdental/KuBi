@@ -2776,3 +2776,53 @@ label.field-label {
 }
 .more-row:last-child { border-bottom: 0; }
 .more-row:hover { background: var(--hover, #f7f7f8); }
+
+/* ── Patient events ──────────────────────────────────────────────────────
+   The work a booking made for itself. Four states, four marks — because an
+   unanswered question is more serious than an undone task, not less, and a
+   tick box has no way of saying so. */
+
+.care-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+}
+.care-title { margin: 4px 0 0; font-size: 19px; font-weight: 650; line-height: 1.25; }
+
+.care-state {
+  flex: none; border-radius: 999px; padding: 4px 11px;
+  font-size: 12px; font-weight: 650; letter-spacing: .02em;
+  background: var(--hover, #f2f4f3); color: var(--ink-2, #55655e);
+}
+.care-state.is-ready { background: #e2efea; color: #0c5f4e; }
+.care-state.is-held  { background: #fbeceb; color: #9d2f26; }
+.care-state.is-done  { background: #eceff2; color: #4a5560; }
+
+.care-counts { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; }
+.care-count { font-size: 13px; color: var(--ink-2, #55655e); }
+.care-count strong { font-weight: 700; color: var(--ink, #16211d); }
+.care-count.is-bad strong { color: #9d2f26; }
+
+.care-more { margin-top: 14px; }
+.care-detail { margin-top: 6px; }
+.care-group { margin-top: 18px; }
+.care-group.is-dim { opacity: .55; }
+.care-group-title {
+  font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-3, #7d8c86); font-weight: 650;
+}
+
+/* The pip. Grey met, amber outstanding, red unknown, hollow not applicable. */
+.care-pip {
+  flex: none; width: 12px; height: 12px; margin: 5px 12px 0 0;
+  border-radius: 50%; border: 2px solid var(--line, #d9dfdc);
+}
+.care-pip.is-met     { background: #0c5f4e; border-color: #0c5f4e; }
+.care-pip.is-open    { background: transparent; border-color: #b8863a; }
+.care-pip.is-late    { background: #b8863a; border-color: #b8863a; }
+.care-pip.is-unknown { background: #9d2f26; border-color: #9d2f26; }
+.care-pip.is-aside   { background: transparent; border-style: dotted; }
+
+.care-why { margin-top: 3px; font-size: 12.5px; color: #9d2f26; line-height: 1.45; }
+.care-why.is-quiet { color: var(--ink-3, #7d8c86); }
+
+.ready-note.is-warn { color: #7d5610; }
