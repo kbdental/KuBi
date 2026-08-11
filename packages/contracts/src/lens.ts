@@ -53,6 +53,7 @@ import type { EquipmentView, RoomLinkage } from './equipment.js';
 import { ItemVerdict, type EmergencyReadiness } from './emergency.js';
 import type { InventoryView } from './inventory.js';
 import type { HygieneView } from './housekeeping.js';
+import type { ReceptionView } from './reception.js';
 
 /* -------------------------------------------------------------------------
  * A failing parameter
@@ -62,6 +63,8 @@ import type { HygieneView } from './housekeeping.js';
 export const FailureArea = {
   ATTENDANCE: 'ATTENDANCE',
   READINESS: 'READINESS',
+  /** The appointment book and the front desk — APT and PAT. */
+  BOOK: 'BOOK',
   PATIENT: 'PATIENT',
   EQUIPMENT: 'EQUIPMENT',
   STOCK: 'STOCK',
@@ -72,6 +75,7 @@ export type FailureArea = (typeof FailureArea)[keyof typeof FailureArea];
 export const AREA_LABEL: Readonly<Record<FailureArea, string>> = {
   ATTENDANCE: 'Staffing',
   READINESS: 'Clinic readiness',
+  BOOK: 'Reception',
   PATIENT: 'Patients today',
   EQUIPMENT: 'Equipment',
   STOCK: 'Stock',
@@ -297,6 +301,8 @@ export interface FailureInputs {
   emergency?: EmergencyReadiness;
   /** HK-001 to HK-014. See `housekeeping`. */
   hygiene?: HygieneView;
+  /** APT-001 to APT-012 and PAT-001 to PAT-009. See `reception`. */
+  book?: ReceptionView;
   /** The minute now, for due-time wording. */
   now: number;
 }
@@ -548,6 +554,28 @@ export function gatherFailures(
     });
   }
 
+  /* ── The appointment book ─────────────────────────────────────────── */
+  //
+  // One row per problem rather than one per slot, because a slot can be short
+  // of several things at once and the fixable one must not be hidden behind
+  // the un-fixable one. Priority comes straight from the matrix, so a missing
+  // medical history outranks an unsent reminder without anybody deciding.
+  for (const p of input.book?.problems ?? []) {
+    out.push({
+      id: `BOOK:${p.control}:${p.what.slice(0, 40)}`,
+      area: FailureArea.BOOK,
+      severity: p.priority === 'PS' || p.priority === 'C'
+        ? FailureSeverity.STOPS
+        : p.priority === 'I' ? FailureSeverity.HOLDS : FailureSeverity.WATCH,
+      what: `${p.control} — ${p.what}`,
+      because: `From the appointment book, as of now.`,
+      ownerRole: p.ownerRole,
+      involved: people(p.ownerRole),
+      dueAt: null,
+      goes: 'Reception',
+    });
+  }
+
   /* ── Patients booked today ────────────────────────────────────────── */
   for (const c of input.compliance ?? []) {
     // A breach is not a failing parameter to be chased — it is a thing that
@@ -763,7 +791,8 @@ export function gatherFailures(
  * front of staffing is answering a question that has not been asked yet.
  */
 const AREA_ORDER: Record<FailureArea, number> = {
-  ATTENDANCE: 0, READINESS: 1, PATIENT: 2, EQUIPMENT: 3, STOCK: 4, CLOSING: 5,
+  ATTENDANCE: 0, READINESS: 1, BOOK: 2, PATIENT: 3,
+  EQUIPMENT: 4, STOCK: 5, CLOSING: 6,
 };
 
 /**
@@ -833,6 +862,10 @@ const hhmm = (m: number) =>
 export const Place = {
   DASHBOARD: 'DASHBOARD',
   READINESS: 'READINESS',
+  // The owner: *"this needs an extra tab after clinic readiness."* And that
+  // is the right sequence as well as the requested one — the clinic is made
+  // ready, then the patient arrives, then the patient event happens.
+  RECEPTION: 'RECEPTION',
   PATIENT_EVENTS: 'PATIENT_EVENTS',
   EQUIPMENT: 'EQUIPMENT',
   CLOSING: 'CLOSING',
@@ -858,34 +891,42 @@ export type Place = (typeof Place)[keyof typeof Place];
  */
 const PLACES: Partial<Record<RoleCode, readonly Place[]>> = {
   [RoleCode.OWNER_DIRECTOR]: [
-    Place.DASHBOARD, Place.READINESS, Place.PATIENT_EVENTS,
+    Place.DASHBOARD, Place.READINESS, Place.RECEPTION, Place.PATIENT_EVENTS,
     Place.EQUIPMENT, Place.CLOSING, Place.MORE,
   ],
   [RoleCode.CLINIC_HEAD]: [
-    Place.DASHBOARD, Place.READINESS, Place.PATIENT_EVENTS,
+    Place.DASHBOARD, Place.READINESS, Place.RECEPTION, Place.PATIENT_EVENTS,
     Place.EQUIPMENT, Place.CLOSING, Place.MORE,
   ],
   [RoleCode.CLINIC_MANAGER]: [
-    Place.DASHBOARD, Place.READINESS, Place.PATIENT_EVENTS,
+    Place.DASHBOARD, Place.READINESS, Place.RECEPTION, Place.PATIENT_EVENTS,
     Place.EQUIPMENT, Place.CLOSING, Place.MORE,
   ],
   [RoleCode.QUALITY_COMPLIANCE]: [
     Place.DASHBOARD, Place.READINESS, Place.PATIENT_EVENTS, Place.MORE,
   ],
-  // The doctor's day is patients. The morning is somebody else's job and the
-  // equipment register is a place they would only ever visit to complain.
-  [RoleCode.TREATING_DOCTOR]: [Place.DASHBOARD, Place.PATIENT_EVENTS],
-  // Reception owns the front of the clinic and the book. They are on the
-  // readiness list, so the morning is theirs too.
-  [RoleCode.RECEPTION]: [Place.DASHBOARD, Place.READINESS, Place.PATIENT_EVENTS],
+  // The doctor's day is patients, and now also the book — APT-001.b assigns
+  // them to slots and PAT-005 puts medical risks in front of them, so the
+  // front desk is no longer somewhere they never look.
+  [RoleCode.TREATING_DOCTOR]: [
+    Place.DASHBOARD, Place.RECEPTION, Place.PATIENT_EVENTS,
+  ],
+  // Reception owns the book outright — every one of APT-001 to APT-012 and
+  // PAT-001 to PAT-009 names them as Doer or Checker.
+  [RoleCode.RECEPTION]: [
+    Place.DASHBOARD, Place.READINESS, Place.RECEPTION, Place.PATIENT_EVENTS,
+  ],
   // The equipment round is the senior assistant's and nobody else may report
   // it, so she is the only assistant with Equipment on her rail.
   [RoleCode.SENIOR_ASSISTANT]: [
-    Place.DASHBOARD, Place.READINESS, Place.PATIENT_EVENTS,
+    Place.DASHBOARD, Place.READINESS, Place.RECEPTION, Place.PATIENT_EVENTS,
     Place.EQUIPMENT, Place.CLOSING,
   ],
+  // PAT-001.a: assistants "must be aware of all appointments for the day in
+  // their assigned operatory". They cannot be aware of a book they cannot see.
   [RoleCode.DENTAL_ASSISTANT]: [
-    Place.DASHBOARD, Place.READINESS, Place.PATIENT_EVENTS, Place.CLOSING,
+    Place.DASHBOARD, Place.READINESS, Place.RECEPTION, Place.PATIENT_EVENTS,
+    Place.CLOSING,
   ],
   [RoleCode.STERILIZATION_TECHNICIAN]: [
     Place.DASHBOARD, Place.READINESS, Place.EQUIPMENT, Place.CLOSING,
@@ -910,7 +951,7 @@ export function placesFor(roles: readonly RoleCode[]): Place[] {
   const seen = new Set<Place>([Place.DASHBOARD]);
   for (const r of roles) for (const p of PLACES[r] ?? []) seen.add(p);
   const order: Place[] = [
-    Place.DASHBOARD, Place.READINESS, Place.PATIENT_EVENTS,
+    Place.DASHBOARD, Place.READINESS, Place.RECEPTION, Place.PATIENT_EVENTS,
     Place.EQUIPMENT, Place.CLOSING, Place.MORE,
   ];
   return order.filter((p) => seen.has(p));

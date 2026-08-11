@@ -3115,3 +3115,120 @@ label.field-label {
   .hk-who, .hk-when { grid-column: 2; }
   .hk-state { grid-column: 2; text-align: left; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Reception — the appointment book
+
+   A slot is built around what will go wrong with it. Every practice system
+   already shows a time-sorted list with a status column, and that is why
+   reception keeps a paper list beside it: what they need at 09:15 is which of
+   these is going to fail, so the findings are the body of the row rather than
+   an icon somebody has to hover.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.slot-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+
+.slot {
+  padding: 10px 14px; border-radius: 4px;
+  background: var(--paper-2, #fbfcfb);
+  border: 1px solid var(--line, #e4e8e6);
+  border-left-width: 3px; border-left-color: var(--line, #e4e8e6);
+}
+.slot-ok   { border-left-color: #0c5f4e; }
+.slot-here { border-left-color: #2f6fb0; background: #f5f9fd; }
+.slot-open { border-left-color: #b8863a; background: #fdfaf4; }
+.slot-late { border-left-color: #b0322a; background: #fdf6f5; }
+.slot-bad  { border-left-color: #b0322a; background: #fdf6f5; }
+.slot-off  { opacity: .62; }
+
+.slot-head {
+  display: flex; align-items: baseline; gap: 12px;
+}
+.slot-time {
+  flex: none; width: 46px;
+  font-variant-numeric: tabular-nums; font-weight: 700; font-size: 14px;
+  color: var(--ink-1, #17211d);
+}
+.slot-who {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px;
+}
+.slot-name { font-size: 14.5px; font-weight: 650; color: var(--ink-1, #17211d); }
+.slot-tag {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--ink-3, #7d8c86);
+  border: 1px solid var(--line, #dde3e0); border-radius: 3px; padding: 1px 5px;
+}
+.slot-tag.is-warn { color: #9a6f24; border-color: #e3d3b0; background: #fdf8ee; }
+.slot-state {
+  flex: none; font-size: 11px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--ink-3, #7d8c86);
+}
+.slot-late .slot-state, .slot-bad .slot-state { color: #b0322a; }
+.slot-here .slot-state { color: #2f6fb0; }
+
+.slot-meta {
+  margin-top: 3px; font-size: 12.5px; color: var(--ink-3, #7d8c86);
+}
+.slot-special {
+  margin-top: 5px; font-size: 12.5px; color: #7d5610;
+}
+
+.slot-why {
+  margin-top: 6px; font-size: 12.5px; line-height: 1.5;
+  color: var(--ink-2, #4a5a54);
+}
+.slot-why.is-bad  { color: #9d2f26; }
+.slot-why.is-warn { color: #8a6218; }
+.slot-control {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; font-weight: 600; opacity: .8;
+}
+
+/* ── the check-in script, two columns because the clinic has two ────────── */
+
+.script {
+  margin-top: 10px; border: 1px solid var(--line, #e4e8e6); border-radius: 4px;
+  overflow: hidden;
+}
+.script-head, .script-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+  background: var(--line, #eef1f0);
+}
+.script-head { background: var(--paper-2, #f6f8f7); }
+.script-col {
+  padding: 7px 12px; background: var(--paper-2, #f6f8f7);
+  font-size: 11px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--ink-3, #7d8c86);
+}
+.script-line {
+  padding: 8px 12px; background: var(--paper, #fff);
+  font-size: 13px; color: var(--ink-1, #17211d);
+}
+
+/* ── the registration form, with a reason per field ─────────────────────── */
+
+.form-list { display: flex; flex-direction: column; margin-top: 10px; }
+.ff {
+  display: grid; grid-template-columns: 36px minmax(0, 260px) 1fr;
+  gap: 12px; align-items: baseline;
+  padding: 7px 2px; font-size: 13px;
+  border-bottom: 1px solid var(--line, #eef1f0);
+}
+.ff-num {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; color: var(--ink-3, #7d8c86);
+}
+.ff-label { color: var(--ink-1, #17211d); font-weight: 550; }
+.ff.is-bad .ff-label { color: #9d2f26; }
+.ff-opt {
+  margin-left: 7px; font-size: 11px; font-weight: 400;
+  color: var(--ink-3, #7d8c86);
+}
+.ff-why { font-size: 12px; color: var(--ink-3, #7d8c86); line-height: 1.5; }
+
+@media (max-width: 720px) {
+  .script-head, .script-row { grid-template-columns: 1fr; }
+  .ff { grid-template-columns: 28px 1fr; }
+  .ff-why { grid-column: 2; }
+}

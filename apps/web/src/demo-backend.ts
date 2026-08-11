@@ -45,6 +45,10 @@ import {
   complianceFor, readinessHorizon,
   STOCK_ITEMS, inventory as inventoryView,
   gatherFailures, holdersFrom, lensFor, placesFor, bookingWindow,
+  reception as receptionView, Confirmation,
+  REGISTRATION_FORM, CHECK_IN_SCRIPT, HOSPITALITY_STANDARDS,
+  RECEPTION_QUESTIONS, GREETING, CONSULTATION_FEE,
+  type Appointment,
   HYGIENE_CONTROLS, housekeeping as hygieneView, OPEN_OVERLAPS, HYGIENE_QUESTIONS,
   HygieneTrigger,
   type HygieneReport, type HygieneCheck,
@@ -1131,6 +1135,8 @@ function demoMinute(): number { return DEMO_MINUTE; }
 function startedMorning(): World {
   let w = emptyWorld(8 * 60 + 30, {
     operatories: DEMO_OPERATORIES,
+    // A seed value only. The real one is resolved in `engineWorld()` from the
+    // appointment book — see the note there.
     firstPatientAt: 10 * 60,
     shutAt: 18 * 60 + 30,
   });
@@ -1813,6 +1819,178 @@ function hygieneScreen(now: number, w: World) {
   };
 }
 
+/* -------------------------------------------------------------------------
+ * Today's appointment book
+ *
+ * Derived from the same bookings the patient-event engine already uses, so the
+ * two screens cannot disagree about who is coming — and then given the four
+ * things a `Booking` never carried: a room, a doctor, an assistant and a
+ * confirmation state.
+ *
+ * Uneven on purpose, and each unevenness is one of the controls:
+ *
+ *   Anita Rao     confirmed, in the chair          the waiting-time KPI
+ *   Sunil Mehta   no response since 07:10          APT-004 retry is due
+ *   Farah Qureshi booked into Operatory 3          APT-001.c — chair is down
+ *   Rakesh Pillai never contacted, new patient     APT-002 and PAT-002
+ *   Nikhil Shah   cancelled, no reason given       APT-009
+ * ---------------------------------------------------------------------- */
+
+/**
+ * The four things a `Booking` never carried, added to the bookings that exist.
+ *
+ * Derived rather than written out, so the appointment book and the patient
+ * event engine cannot disagree about who is coming — which was the first thing
+ * that went wrong when this list was hand-written: the ids did not match, so
+ * `factsFor` returned nothing-known and every single patient was reported as
+ * having no medical history. Two lists of the same patients is exactly the
+ * disease this engine exists to cure, and the demo had it within an hour.
+ */
+const SLOT_DETAIL: Record<string, {
+  operatoryId: string | null;
+  doctor: string | null;
+  assistant: string | null;
+  buffer: number;
+  isNew: boolean;
+  special: string | null;
+  confirmation: Confirmation;
+  contactedAt: number | null;
+  attempts: number;
+  cancellationReason: string | null;
+  contact: string;
+  complaint: string;
+}> = {
+  'bk-1': {
+    operatoryId: 'op-1', doctor: 'e7', assistant: 'e1', buffer: 30, isNew: false,
+    special: 'Implant surgery — components and sterile kit must be laid out',
+    confirmation: Confirmation.CONFIRMED, contactedAt: 8 * 60 + 20, attempts: 1,
+    cancellationReason: null,
+    contact: '98200 00001', complaint: 'Missing lower left first molar',
+  },
+  'bk-2': {
+    operatoryId: 'op-2', doctor: 'e7', assistant: 'e2', buffer: 0, isNew: false,
+    special: 'On an anticoagulant — the prescriber’s plan is needed first',
+    // Contacted at 07:10 and nothing came back. Past the two-hour window, so
+    // APT-004's retry is due rather than merely pending.
+    confirmation: Confirmation.NO_RESPONSE, contactedAt: 7 * 60 + 10, attempts: 2,
+    cancellationReason: null,
+    contact: '98200 00003', complaint: 'Broken upper right molar',
+  },
+  'bk-3': {
+    // Operatory 3, whose chair is down. OPEN-004 reaching a real patient.
+    operatoryId: 'op-3', doctor: 'e7', assistant: 'e1', buffer: 15, isNew: false,
+    special: null,
+    confirmation: Confirmation.CONFIRMED, contactedAt: 8 * 60 + 25, attempts: 1,
+    cancellationReason: null,
+    contact: '98200 00004', complaint: 'Pain on biting, lower right',
+  },
+  'bk-4': {
+    // APT-009: cancelled, and nobody wrote down why.
+    operatoryId: 'op-2', doctor: 'e7', assistant: 'e1', buffer: 0, isNew: false,
+    special: null,
+    confirmation: Confirmation.CANCELLED, contactedAt: 8 * 60 + 40, attempts: 1,
+    cancellationReason: null,
+    contact: '98200 00006', complaint: 'Scaling',
+  },
+  'bk-5': {
+    // No room assigned. APT-001.c's other failure mode.
+    operatoryId: null, doctor: 'e7', assistant: 'e2', buffer: 0, isNew: false,
+    special: 'Crown fit — the laboratory case must be back and checked',
+    confirmation: Confirmation.CONFIRMED, contactedAt: 8 * 60 + 45, attempts: 1,
+    cancellationReason: null,
+    contact: '98200 00007', complaint: 'Crown fit, second sitting',
+  },
+  'bk-6': {
+    // Walked in, never registered, never contacted: PAT-002 and APT-002 at once.
+    operatoryId: 'op-4', doctor: 'e7', assistant: 'e2', buffer: 0, isNew: true,
+    special: null,
+    confirmation: Confirmation.NOT_CONTACTED, contactedAt: null, attempts: 0,
+    cancellationReason: null,
+    contact: '98200 00005', complaint: 'Swelling, cannot sleep',
+  },
+};
+
+const DEMO_APPOINTMENTS: Appointment[] = DEMO_BOOKINGS.map((b) => {
+  const d = SLOT_DETAIL[b.id]!;
+  return {
+    id: b.id,
+    // The appointment and the patient are different records. A walk-in has an
+    // appointment and no patient, which is PAT-002's whole subject.
+    patientId: d.isNew ? null : `p-${b.id}`,
+    patientLabel: b.patientLabel,
+    contact: d.contact,
+    alternateContact: null,
+    chiefComplaint: d.complaint,
+    referredBy: null,
+    treatmentCode: b.treatmentCode,
+    at: b.at,
+    minutes: null,
+    bufferMinutes: d.buffer,
+    sitting: b.sitting,
+    operatoryId: d.operatoryId,
+    doctorEmployeeCode: d.doctor,
+    assistantEmployeeCode: d.assistant,
+    isNewPatient: d.isNew,
+    special: d.special !== null,
+    specialBecause: d.special,
+    confirmation: d.confirmation,
+    contactedAt: d.contactedAt,
+    attempts: d.attempts,
+    cancellationReason: d.cancellationReason,
+  };
+});
+
+/**
+ * The book as of `now`, standing on every other engine rather than guessing.
+ *
+ * This is the join the clinic never had: attendance decides whether the slot's
+ * own assistant is here, the equipment register decides whether its room may
+ * take a patient, and compliance decides whether a special patient's
+ * preparation is done. Reception asks all three; it answers none of them.
+ */
+function bookNow(now: number) {
+  const w = engineWorld();
+  const a = attendanceView(DEMO_STAFF, DEMO_ATTENDANCE, DEMO_LEAVE,
+    w.firstPatientAt, DEMO_TODAY, now);
+  const eq = equipmentView(ASSETS, assetHistory(now), now);
+  const rooms = roomAvailability(w.operatories, eq);
+
+  const present = new Set(a.people
+    .filter((p) => p.inAt !== null).map((p) => p.employeeCode));
+  const onLeave = new Set(a.people
+    .filter((p) => p.state === 'ON_LEAVE').map((p) => p.employeeCode));
+
+  // PAT-004. A patient whose history has never been recorded — read off the
+  // same facts the mandatory gates use, so the front desk and the chair
+  // cannot disagree about whether the question was asked.
+  const historyMissing = new Set(
+    DEMO_APPOINTMENTS
+      .filter((ap) => Object.values(factsFor(ap.id)).every((v) => v === null))
+      .map((ap) => ap.patientId)
+      .filter((id): id is string => id !== null));
+
+  return receptionView(
+    DEMO_APPOINTMENTS,
+    [...w.events, ...careProgressEvents(now, db.endOfDay)],
+    (code) => TREATMENTS.find((t) => t.code === code)?.minutes ?? 30,
+    {
+      present,
+      onLeave,
+      roomsWithdrawn: new Set(rooms.unavailable.map((r) => r.operatoryId)),
+      knownRooms: new Set(w.operatories.map((o) => o.id)),
+      historyMissing,
+      // PAT-005, read off the same facts the mandatory gates use rather than
+      // from a second list — a risk the front desk knows and the chair does
+      // not is the failure this control exists to prevent.
+      risks: new Map(DEMO_APPOINTMENTS
+        .filter((ap) => ap.patientId !== null && factsFor(ap.id).anticoagulated === true)
+        .map((ap) => [ap.patientId!, ['on an anticoagulant, with no plan from '
+          + 'the prescriber']])),
+    },
+    now,
+  );
+}
+
 function failuresNow() {
   const w = engineWorld();
   const now = w.now;
@@ -1864,6 +2042,7 @@ function failuresNow() {
       emergency: em,
       hygiene: hygieneNow(now,
         w.events.find((e) => e.type === ClinicEvent.CLINIC_UNLOCKED)?.at ?? null),
+      book: bookNow(now),
       now,
     }, holders),
   };
@@ -1923,8 +2102,37 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
 /** The world at this minute. The demo's end-of-day control moves the clock. */
+/**
+ * The first appointment in today's book, and nothing else.
+ *
+ * Cancellations excluded: opening an hour early for somebody who cancelled is
+ * exactly the waste a derived number should prevent.
+ */
+function firstAppointmentMinute(): number | null {
+  const live = DEMO_BOOKINGS.filter(
+    (b) => SLOT_DETAIL[b.id]?.confirmation !== Confirmation.CANCELLED);
+  return live.length === 0 ? null : Math.min(...live.map((b) => b.at));
+}
+
+/**
+ * The world every engine reads, with the first patient resolved from the book.
+ *
+ * This is the payoff, and the reason the appointment book is the missing link.
+ * `firstPatientAt` used to be the constant 10:00 while the booking list began
+ * at 11:00 — so the readiness screen and the patient list disagreed about when
+ * the day started, and neither was wrong on its own. It is now read off the
+ * only thing that actually knows.
+ *
+ * Resolved here rather than in the seed because the seed runs before the book
+ * exists, which is itself the right shape: a world does not know its own first
+ * patient, it is told by reception.
+ */
 function engineWorld(): World {
-  return { ...db.world, now: db.endOfDay ? 18 * 60 + 40 : demoMinute() };
+  return {
+    ...db.world,
+    now: db.endOfDay ? 18 * 60 + 40 : demoMinute(),
+    firstPatientAt: firstAppointmentMinute(),
+  };
 }
 
 /** Whoever is signed in, as a role the engine knows. */
@@ -2718,6 +2926,78 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
           honest: w.honest, because: w.because,
         };
       })(),
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     RECEPTION — the appointment book and the front desk
+
+     APT-001 to APT-012 and PAT-001 to PAT-009. The engine that produces
+     `firstPatientAt`, which every other engine has been assuming.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  if (path === '/api/v1/reception') {
+    const now = engineWorld().now;
+    const v = bookNow(now);
+
+    return json({
+      now,
+      role: engineRole() as string,
+      firstAppointmentAt: v.firstAppointmentAt,
+      reviewBy: v.reviewBy,
+      reviewComplete: v.reviewComplete,
+      reviewScore: v.reviewScore,
+      headline: v.headline,
+      slots: v.slots.map((s) => ({
+        id: s.appointment.id,
+        patientLabel: s.appointment.patientLabel,
+        treatmentCode: s.appointment.treatmentCode,
+        treatmentName: TREATMENTS.find((t) => t.code === s.appointment.treatmentCode)?.name
+          ?? s.appointment.treatmentCode,
+        chiefComplaint: s.appointment.chiefComplaint,
+        at: s.appointment.at,
+        endsAt: s.endsAt,
+        bufferMinutes: s.appointment.bufferMinutes,
+        operatoryId: s.appointment.operatoryId,
+        doctor: s.appointment.doctorEmployeeCode,
+        assistant: s.appointment.assistantEmployeeCode,
+        isNewPatient: s.appointment.isNewPatient,
+        special: s.appointment.special,
+        specialBecause: s.appointment.specialBecause,
+        confirmation: s.appointment.confirmation as string,
+        state: s.state as string,
+        arrivedAt: s.arrivedAt,
+        seatedAt: s.seatedAt,
+        waitingMinutes: s.waitingMinutes,
+        stillWaiting: s.stillWaiting,
+        because: s.because,
+        problems: s.problems.map((p) => ({
+          control: p.control, priority: p.priority as string,
+          what: p.what, ownerRole: p.ownerRole as string,
+        })),
+      })),
+      unconfirmed: v.unconfirmed.length,
+      retryDue: v.retryDue.length,
+      special: v.special.length,
+      callNow: v.callNow.length,
+      noShows: v.noShows.length,
+      gaps: v.gaps.map((g) => ({
+        from: g.from, to: g.to, minutes: g.minutes, because: g.because,
+      })),
+      waiting: v.waiting,
+      blockers: v.reviewBlockers.map((p) => ({
+        control: p.control, priority: p.priority as string,
+        what: p.what, ownerRole: p.ownerRole as string,
+      })),
+      // The form, the script and the standards travel with the screen because
+      // they are the SOP, and a receptionist reading them on a wall is a
+      // receptionist reading them somewhere KuBi cannot keep them current.
+      greeting: GREETING,
+      script: CHECK_IN_SCRIPT.map((l) => ({ ...l })),
+      form: REGISTRATION_FORM.map((f) => ({ ...f, priority: f.priority as string })),
+      hospitality: [...HOSPITALITY_STANDARDS],
+      consultationFee: CONSULTATION_FEE,
+      openQuestions: [...RECEPTION_QUESTIONS],
     });
   }
 

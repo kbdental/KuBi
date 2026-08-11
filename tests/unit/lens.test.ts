@@ -358,13 +358,20 @@ describe('a different look, not a smaller one', () => {
   it('gives the housekeeper three places, and none of them is the implant register', () => {
     // *"So that confusion does not happen."* A rail offering her the patient
     // event engine would be telling her she had missed something.
+    // Unchanged by the appointment book: a housekeeper has no reason to see
+    // who is booked in, and giving her the tab would be the confusion the
+    // owner asked to remove.
     expect(placesFor([RoleCode.HOUSEKEEPING]))
       .toEqual(['DASHBOARD', 'READINESS', 'CLOSING']);
   });
 
-  it('gives the doctor patients and nothing about the building', () => {
+  it('gives the doctor patients and the book, and nothing about the building', () => {
+    // Reception joined the doctor's rail when the appointment book arrived:
+    // APT-001.b assigns them to slots and PAT-005 puts medical risks in front
+    // of them. The equipment register is still a place they would only visit
+    // to complain.
     expect(placesFor([RoleCode.TREATING_DOCTOR]))
-      .toEqual(['DASHBOARD', 'PATIENT_EVENTS']);
+      .toEqual(['DASHBOARD', 'RECEPTION', 'PATIENT_EVENTS']);
   });
 
   it('keeps the dashboard for everybody', () => {

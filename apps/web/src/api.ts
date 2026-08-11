@@ -892,6 +892,76 @@ export interface HygieneScreenView {
   openQuestions: string[];
 }
 
+/* -------------------------------------------------------------------------
+ * Reception — the appointment book
+ * ---------------------------------------------------------------------- */
+
+export interface SlotProblemView {
+  control: string;
+  priority: 'PS' | 'C' | 'I' | 'R';
+  what: string;
+  ownerRole: string;
+}
+
+export interface SlotView {
+  id: string;
+  patientLabel: string;
+  treatmentCode: string;
+  treatmentName: string;
+  chiefComplaint: string | null;
+  at: number;
+  endsAt: number;
+  bufferMinutes: number;
+  operatoryId: string | null;
+  doctor: string | null;
+  assistant: string | null;
+  isNewPatient: boolean;
+  special: boolean;
+  specialBecause: string | null;
+  confirmation: string;
+  state: 'UNCONFIRMED' | 'CONFIRMED' | 'CANCELLED' | 'ARRIVED' | 'SEATED'
+    | 'LATE' | 'NO_SHOW';
+  arrivedAt: number | null;
+  seatedAt: number | null;
+  waitingMinutes: number | null;
+  stillWaiting: boolean;
+  because: string;
+  problems: SlotProblemView[];
+}
+
+export interface ReceptionScreenView {
+  now: number;
+  role: string;
+  firstAppointmentAt: number | null;
+  reviewBy: number | null;
+  reviewComplete: boolean;
+  reviewScore: number;
+  headline: string;
+  slots: SlotView[];
+  unconfirmed: number;
+  retryDue: number;
+  special: number;
+  callNow: number;
+  noShows: number;
+  gaps: Array<{ from: number; to: number; minutes: number; because: string }>;
+  waiting: {
+    averageMinutes: number | null;
+    longestMinutes: number | null;
+    seated: number;
+    overdue: number;
+  };
+  blockers: SlotProblemView[];
+  greeting: string;
+  script: Array<{ newPatient: string; returningPatient: string }>;
+  form: Array<{
+    numeral: string; label: string; required: boolean;
+    priority: string; why: string;
+  }>;
+  hospitality: string[];
+  consultationFee: number;
+  openQuestions: string[];
+}
+
 export interface ClosingView {
   blocks: DayBlock[];
   outstanding: DayBlock[];
@@ -1320,6 +1390,8 @@ export const api = {
   lens: () => call<LensView>('/api/v1/lens'),
   /** Booked treatments, the work each one generated, and its mandatory list. */
   patientEvents: () => call<PatientEventsView>('/api/v1/patient-events'),
+  /** The appointment book and the front desk — APT-001..012, PAT-001..009. */
+  reception: () => call<ReceptionScreenView>('/api/v1/reception'),
   /** Report one care item done. Append-only: there is no un-report. */
   reportCareItem: (bookingId: string, itemId: string) =>
     call<{ ok: true }>('/api/v1/care-item', {

@@ -28,6 +28,7 @@ import { Dashboard } from './screens/dashboard.js';
 import { ClinicReadiness } from './screens/readiness.js';
 import { ClinicClosing } from './screens/closing.js';
 import { PatientEvents } from './screens/patient-events.js';
+import { Reception } from './screens/reception.js';
 import { Equipment } from './screens/equipment.js';
 
 /**
@@ -245,6 +246,7 @@ export function App() {
   const ICON: Record<string, ReactNode> = {
     DASHBOARD: <IconOverview filled={here === 'DASHBOARD'} />,
     READINESS: <IconClinic filled={here === 'READINESS'} />,
+    RECEPTION: <IconPatients filled={here === 'RECEPTION'} />,
     PATIENT_EVENTS: <IconPatients filled={here === 'PATIENT_EVENTS'} />,
     EQUIPMENT: <IconOperations filled={here === 'EQUIPMENT'} />,
     CLOSING: <IconToday filled={here === 'CLOSING'} />,
@@ -255,6 +257,10 @@ export function App() {
     // Straight after the dashboard, on the owner's instruction: the clinic is
     // made ready, and then the patients it was made ready for arrive.
     READINESS: 'Clinic readiness',
+    // *"This needs an extra tab after clinic readiness."* And it is the right
+    // sequence: the clinic is made ready, the patient arrives, the patient
+    // event happens.
+    RECEPTION: 'Reception',
     PATIENT_EVENTS: 'Patient events',
     EQUIPMENT: 'Equipment',
     CLOSING: 'Clinic closing',
@@ -275,6 +281,10 @@ export function App() {
   const TITLES: Record<string, string> = {
     DASHBOARD: 'Dashboard',
     READINESS: 'Clinic readiness',
+    // *"This needs an extra tab after clinic readiness."* And it is the right
+    // sequence: the clinic is made ready, the patient arrives, the patient
+    // event happens.
+    RECEPTION: 'Reception',
     PATIENT_EVENTS: 'Patient events',
     EQUIPMENT: 'Equipment',
     CLOSING: 'Clinic closing',
@@ -282,7 +292,7 @@ export function App() {
   };
 
   // Everything under More is the previous shell's set, reached by its own id.
-  const inMore = !['DASHBOARD', 'READINESS', 'PATIENT_EVENTS',
+  const inMore = !['DASHBOARD', 'READINESS', 'RECEPTION', 'PATIENT_EVENTS',
     'EQUIPMENT', 'CLOSING'].includes(here);
 
   /**
@@ -293,7 +303,7 @@ export function App() {
    * here so a stale link or a back button lands on a sentence rather than on
    * an empty screen that looks broken.
    */
-  const forbidden = ['READINESS', 'PATIENT_EVENTS', 'EQUIPMENT', 'CLOSING']
+  const forbidden = ['READINESS', 'RECEPTION', 'PATIENT_EVENTS', 'EQUIPMENT', 'CLOSING']
     .includes(here) && !myPlaces.includes(here);
 
   return (
@@ -318,6 +328,7 @@ export function App() {
       )}
       {here === 'DASHBOARD' && <Dashboard go={setChosen} />}
       {here === 'READINESS' && !forbidden && <ClinicReadiness />}
+      {here === 'RECEPTION' && !forbidden && <Reception />}
       {here === 'PATIENT_EVENTS' && !forbidden && <PatientEvents />}
       {here === 'EQUIPMENT' && !forbidden && <Equipment />}
       {here === 'CLOSING' && !forbidden && <ClinicClosing />}

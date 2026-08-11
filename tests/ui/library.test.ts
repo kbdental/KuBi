@@ -129,6 +129,19 @@ const LIBRARY = new Set([
   'lane-count',
   'hk-list', 'hk', 'hk-id', 'hk-what', 'hk-who', 'hk-when', 'hk-state',
   'is-waiting',
+  /* ── reception, the appointment book ──────────────────────────────────
+     A slot is built around what will go wrong with it: the problems are the
+     body of the row rather than an icon, because a row that hides its own
+     findings is a row somebody has to open every one of. The script is two
+     columns because the clinic has two scripts, and the form is a numbered
+     list with a reason per field. None of them is a `block` — nothing here
+     is a task waiting for a button. */
+  'slot-list', 'slot', 'slot-head', 'slot-time', 'slot-who', 'slot-name',
+  'slot-tag', 'slot-state', 'slot-meta', 'slot-special', 'slot-why',
+  'slot-control',
+  'slot-ok', 'slot-open', 'slot-off', 'slot-here', 'slot-late', 'slot-bad',
+  'script', 'script-head', 'script-col', 'script-row', 'script-line',
+  'form-list', 'ff', 'ff-num', 'ff-label', 'ff-opt', 'ff-why',
   /* attendance, which lives inside readiness rather than in a tab of its own */
   'staffing', 'staff-roles', 'staff-role', 'staff-mark', 'staff-name',
   'staff-count', 'staff-owns',
@@ -171,6 +184,7 @@ const CONVERTED = [
   'equipment.tsx',
   'patient-events.tsx',
   'readiness.tsx',
+  'reception.tsx',
   'retention.tsx',
   'rules.tsx',
   'today.tsx',
