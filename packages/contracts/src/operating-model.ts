@@ -201,6 +201,17 @@ export const ClinicEvent = {
   // Stock
   STOCK_ORDERED: 'STOCK_ORDERED',
   STOCK_RECEIVED: 'STOCK_RECEIVED',
+  /**
+   * Stock leaving the shelf, and stock held for a named case.
+   *
+   * `STOCK_RESERVED` is the one that matters. Two implant cases booked on the
+   * same fixture is the failure the inventory engine exists to prevent, and it
+   * only shows up if a reservation removes the item from what the next case
+   * can see. Quantity rides in the subject as `SKU#qty`, because an event here
+   * carries no payload — ugly, and honest about the constraint.
+   */
+  STOCK_CONSUMED: 'STOCK_CONSUMED',
+  STOCK_RESERVED: 'STOCK_RESERVED',
 
   // Money
   INVOICE_RAISED: 'INVOICE_RAISED',

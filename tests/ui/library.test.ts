@@ -137,7 +137,6 @@ const CONVERTED = [
   // Built on the vocabulary from the first line rather than converted onto it
   // afterwards, which is the point of having one.
   'now.tsx',
-  'compliance.tsx',
   'equipment.tsx',
   'patient-events.tsx',
   'readiness.tsx',

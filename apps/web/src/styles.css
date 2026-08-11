@@ -2904,3 +2904,11 @@ label.field-label {
 .breach-title { font-weight: 700; font-size: 14px; color: #9d2f26; }
 .breach-line { margin-top: 4px; font-size: 13px; color: #6d2a24; line-height: 1.5; }
 .breach-line.is-quiet { color: #8a5a55; }
+
+/* The booking card's verdict edge. The mandatory list lives on the booking
+   now, so the card itself has to carry the verdict. */
+.care.is-ready     { border-left: 3px solid #0c5f4e; }
+.care.is-held      { border-left: 3px solid #b8863a; }
+.care.is-breached  { border-left: 3px solid #9d2f26; }
+.care.is-delivered { border-left: 3px solid #55655e; }
+.care-state.is-breached { background: #fbeceb; color: #9d2f26; }

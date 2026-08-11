@@ -1,31 +1,46 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, type PatientEventsView, type CareView, type CareTaskView } from '../api.js';
+import {
+  api, type PatientEventsView, type CareView, type CareTaskView, type GateResultView,
+} from '../api.js';
 import { hhmm, who, Loading } from './day-blocks.js';
 
 /**
- * PATIENT EVENTS — the work a booking made for itself.
+ * PATIENT EVENTS — the work a booking made for itself, and what it may not
+ * start without.
  *
  * The owner: *"The patient's clinical journey automatically generates work…
  * Nobody needs to manually create these tasks."*
  *
- * So this screen shows six bookings and about ninety pieces of work, and
- * nobody typed any of the ninety. Every row was derived from the booking by
- * the engine, which means the screen has nothing to add up and nothing to
- * decide: `mayStart`, `blockedBy` and the state of each item all arrive from
- * `/api/v1/patient-events` already settled, exactly as readiness and closing
- * do. A number here and the rule that refuses an event cannot disagree.
+ * And then, correcting me after I put the mandatory list in a tab of its own:
+ * *"why have you made a separate tab for mandatory — it should have been a
+ * part of patient event, as what procedure is required, that treatment's
+ * mandatory task become visible and clickable whether done it or not done
+ * it."*
  *
- * The one thing the screen does insist on is the difference between an item
- * that is **outstanding** and one that is **unknown**. They look identical on
- * a checklist and they are not the same thing at all — the first is work
- * somebody has not done, the second is a question nobody has asked, and only
- * the second is fixed by talking to the patient.
+ * He is right, and the reason is worth writing down. A mandatory item is not a
+ * category of work — it is a property of *this booking*, and the person who can
+ * satisfy it is the person looking at the booking. Putting it on its own screen
+ * meant an assistant had to know that the consent she was about to take was
+ * "compliance" and go somewhere else to say so. Now the gate is on the card,
+ * marked done or not done, and one tap reports it.
+ *
+ * So each booking shows, in this order:
+ *
+ *   the verdict          READY / NOT READY / BREACHED
+ *   MUST BE DONE FIRST   the mandatory gates, clickable
+ *   also to do           the advisory work
+ *   after delivery       once it has happened
+ *
+ * There is still no button anywhere that lets somebody past a gate. Tapping a
+ * gate reports that the work was **done**, which is the only way through — the
+ * engine takes no argument that could override one.
  */
 
 export function PatientEvents() {
   const [view, setView] = useState<PatientEventsView | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -42,12 +57,23 @@ export function PatientEvents() {
     return () => clearInterval(t);
   }, [load]);
 
+  const report = useCallback(async (bookingId: string, itemId: string) => {
+    setBusy(`${bookingId}#${itemId}`);
+    try {
+      await api.reportCareItem(bookingId, itemId);
+      await load();
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : 'That did not go through.');
+    } finally {
+      setBusy(null);
+    }
+  }, [load]);
+
   if (view === null) return <Loading problem={problem} />;
 
-  const held = view.care.filter((c) => !c.mayStart && !c.delivered);
-  const unknown = view.care.filter((c) => c.unknownFacts.length > 0);
-  // Everything the bookings generated, not only what is still open — the
-  // point being made is how much work exists that nobody typed in.
+  const held = view.care.filter(
+    (c) => !(c.mandatory?.ready ?? c.mayStart) && !c.delivered);
+  const breached = view.care.filter((c) => (c.mandatory?.breaches.length ?? 0) > 0);
   const generated = view.care.reduce((n, c) => n + c.before.length + c.after.length, 0);
   const stillOpen = view.care.reduce((n, c) => n + c.open.length, 0);
 
@@ -55,12 +81,12 @@ export function PatientEvents() {
     <div className="screen screen-wide">
       {problem && <div className="notice notice-stop" role="alert">{problem}</div>}
 
-      {/* ── Where the day is, before what anybody owes ─────────────────── */}
       <section className="ready-panel">
         <div className="ready-head">
           <div>
             <div className="ready-kicker">BOOKED TODAY</div>
-            <h2 className={`ready-verdict ${held.length > 0 ? 'is-bad' : 'is-good'}`}>
+            <h2 className={`ready-verdict ${held.length > 0 || breached.length > 0
+              ? 'is-bad' : 'is-good'}`}>
               {view.care.length} treatment{view.care.length === 1 ? '' : 's'} generated{' '}
               {generated} pieces of work
             </h2>
@@ -72,43 +98,24 @@ export function PatientEvents() {
         </div>
         {held.length > 0 && (
           <p className="ready-note is-bad">
-            {held.length} cannot start yet.
-            {unknown.length > 0
-              && ` ${unknown.length} of those is waiting on a question nobody has asked.`}
+            {held.length} cannot start — something mandatory is missing.
+          </p>
+        )}
+        {breached.length > 0 && (
+          <p className="ready-note is-bad">
+            {breached.length} {breached.length === 1 ? 'was' : 'were'} delivered
+            without something mandatory. That cannot be undone.
           </p>
         )}
       </section>
 
-      {/* ── What the signed-in role owes, across every patient ──────────── */}
-      {view.mine.length > 0 && (
-        <section className="ready-panel">
-          <div className="ready-kicker">{who(view.role).toUpperCase()} — ACROSS EVERY PATIENT</div>
-          <div className="block-list">
-            {view.mine.slice(0, 8).map((t) => (
-              <div key={`${t.bookingId}#${t.id}`} className="block">
-                <span className={`care-pip ${pipClass(t)}`} aria-hidden="true" />
-                <div className="block-body">
-                  <div className="block-label">{t.label}</div>
-                  <div className="block-meta">
-                    {t.patientLabel} · due {dueWord(t.dueAt)}
-                    {t.late ? ' · late' : ''}
-                    {holds(t)}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── The bookings ───────────────────────────────────────────────── */}
       {view.care.map((c) => (
-        <Booking key={c.bookingId} care={c}
+        <Booking key={c.bookingId} care={c} busy={busy}
           expanded={open === c.bookingId}
-          onToggle={() => setOpen(open === c.bookingId ? null : c.bookingId)} />
+          onToggle={() => setOpen(open === c.bookingId ? null : c.bookingId)}
+          onReport={(itemId) => void report(c.bookingId, itemId)} />
       ))}
 
-      {/* ── What this catalogue is, and what it is not ──────────────────── */}
       <section className="ready-panel">
         <div className="ready-kicker">THE CATALOGUE</div>
         <p className="ready-sub">
@@ -133,14 +140,36 @@ export function PatientEvents() {
  * One booking
  * ---------------------------------------------------------------------- */
 
-function Booking({ care, expanded, onToggle }: {
-  care: CareView; expanded: boolean; onToggle: () => void;
+function Booking({ care, busy, expanded, onToggle, onReport }: {
+  care: CareView; busy: string | null; expanded: boolean;
+  onToggle: () => void; onReport: (itemId: string) => void;
 }) {
   const c = care;
-  const live = c.delivered ? c.after : c.before;
+  const m = c.mandatory;
+  const breaches = m?.breaches ?? [];
+  /**
+   * The verdict comes from the mandatory list, not from the care engine.
+   *
+   * They can disagree, and when they do the mandatory one is right: the care
+   * engine knows whether somebody reported the stock check, and the mandatory
+   * one knows whether the fixture is on the shelf. A card that said "may
+   * start" while a stock gate underneath it read MISSING would be the exact
+   * kind of quiet disappearance this whole engine exists to stop.
+   */
+  const ready = m === null ? c.mayStart : m.ready;
+  const state = breaches.length > 0 ? 'BREACHED'
+    : c.delivered ? 'DELIVERED' : ready ? 'READY' : 'NOT_READY';
+
+  // The mandatory gates, in the order somebody works them: what holds the
+  // chair, then what holds the day.
+  const gatesBefore = m?.before ?? [];
+  const gatesAfter = m?.after ?? [];
+  const gateIds = new Set((m?.gates ?? []).map((x) => x.id));
+  const advisory = [...c.before, ...(c.delivered ? c.after : [])]
+    .filter((t) => !gateIds.has(t.id));
 
   return (
-    <section className={`ready-panel care ${c.mayStart ? '' : 'is-held'}`}>
+    <section className={`ready-panel care ${VERDICT_EDGE[state]}`}>
       <div className="care-head">
         <div>
           <div className="ready-kicker">
@@ -149,58 +178,140 @@ function Booking({ care, expanded, onToggle }: {
           </div>
           <h3 className="care-title">{c.treatmentName}</h3>
         </div>
-        <span className={`care-state ${c.delivered ? 'is-done' : c.mayStart ? 'is-ready' : 'is-held'}`}>
-          {c.delivered ? 'Delivered' : c.mayStart ? 'May start' : 'Held'}
-        </span>
+        <span className={`care-state ${VERDICT_PILL[state]}`}>{VERDICT_WORD[state]}</span>
       </div>
 
       {/* The one sentence for whoever is standing next to the chair. */}
-      {c.blockedBy !== null && <p className="ready-note is-bad">{c.blockedBy}</p>}
+      {state === 'NOT_READY' && m !== null && (
+        <p className="ready-note is-bad">{m.headline}</p>
+      )}
 
-      {c.delivered && c.owedAfter.length > 0 && (
-        <p className="ready-note is-warn">
-          {c.owedAfter.length} thing{c.owedAfter.length === 1 ? '' : 's'} owed
-          before the day can close on this treatment.
+      {/* A breach is permanent, so it is said before anything else about
+          the case rather than found at the bottom of a list. */}
+      {breaches.map((b) => (
+        <div key={b.gateId} className="breach">
+          <div className="breach-title">Delivered without: {b.label}</div>
+          <div className="breach-line">
+            Not held at {hhmm(b.deliveredAt % 1440)}.
+            {b.metLateAt !== null
+              ? ` Recorded afterwards at ${hhmm(b.metLateAt % 1440)} — which does not undo it.`
+              : ' Still not held.'}
+          </div>
+          <div className="breach-line is-quiet">Would have needed: {b.evidence}</div>
+        </div>
+      ))}
+
+      {(m?.refusals.length ?? 0) > 0 && (
+        <p className="asset-line is-bad">
+          {m!.refusals.length} recorded attempt{m!.refusals.length === 1 ? '' : 's'} to
+          start this anyway — {m!.refusals.map((r) => hhmm(r.at % 1440)).join(', ')}.
         </p>
       )}
 
-      <div className="care-counts">
-        <Count n={live.filter((t) => t.state === 'MET').length} what="done" />
-        <Count n={live.filter((t) => t.state === 'OUTSTANDING').length} what="to do" />
-        <Count n={live.filter((t) => t.state === 'UNKNOWN').length} what="unknown" bad />
-        <Count n={live.filter((t) => t.state === 'NOT_APPLICABLE').length} what="not applicable" />
-      </div>
+      {/* ── The mandatory list, on the booking, clickable ─────────────── */}
+      {gatesBefore.length > 0 && (
+        <GateGroup
+          title={`MUST BE DONE FIRST — ${gatesBefore.filter(open_).length} of ${gatesBefore.length} outstanding`}
+          gates={gatesBefore} busy={busy} bookingId={c.bookingId} onReport={onReport} />
+      )}
+
+      {c.delivered && gatesAfter.length > 0 && (
+        <GateGroup
+          title={`MUST BE DONE BEFORE THE DAY CLOSES — ${gatesAfter.filter(open_).length} of ${gatesAfter.length} outstanding`}
+          gates={gatesAfter} busy={busy} bookingId={c.bookingId} onReport={onReport} />
+      )}
 
       <button className="btn btn-quiet care-more" type="button" onClick={onToggle}>
-        {expanded ? 'Hide the work' : `Show all ${c.before.length + c.after.length}`}
+        {expanded ? 'Hide the rest' : `Also to do — ${advisory.length}`}
       </button>
 
       {expanded && (
         <div className="care-detail">
-          <TaskGroup title="Before the appointment" tasks={c.before} />
-          <TaskGroup title={c.delivered ? 'After delivery' : 'After delivery — not live yet'}
-            tasks={c.after} dim={!c.delivered} />
+          <TaskGroup title="Not mandatory, and still somebody’s job" tasks={advisory} />
+          {!c.delivered && gatesAfter.length > 0 && (
+            <div className="care-group is-dim">
+              <div className="care-group-title">
+                Mandatory after delivery — not live yet
+              </div>
+              <div className="block-list">
+                {gatesAfter.map((x) => (
+                  <div key={x.id} className="block">
+                    <span className="care-pip is-open" aria-hidden="true" />
+                    <div className="block-body">
+                      <div className="block-label">{x.label}</div>
+                      <div className="block-meta">{who(x.owner)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </section>
   );
 }
 
-function Count({ n, what, bad }: { n: number; what: string; bad?: boolean }) {
-  if (n === 0) return null;
+const open_ = (x: GateResultView) =>
+  x.verdict === 'MISSING' || x.verdict === 'UNKNOWN';
+
+/**
+ * A mandatory gate, drawn so that done and not-done are unmistakable, and
+ * tappable by whoever can satisfy it.
+ *
+ * The button says **Done** and nothing else. It reports that the work
+ * happened; it does not waive the gate, and there is no control here that
+ * could — the engine takes no argument that would let one through.
+ */
+function GateGroup({ title, gates, busy, bookingId, onReport }: {
+  title: string; gates: GateResultView[]; busy: string | null;
+  bookingId: string; onReport: (itemId: string) => void;
+}) {
   return (
-    <span className={`care-count ${bad ? 'is-bad' : ''}`}>
-      <strong>{n}</strong> {what}
-    </span>
+    <div className="care-group">
+      <div className="care-group-title">{title}</div>
+      <div className="block-list">
+        {gates.map((x) => {
+          const id = `${bookingId}#${x.id}`;
+          const outstanding = open_(x);
+          return (
+            <div key={x.id} className={`block ${x.verdict === 'MET' ? 'is-done' : ''}`}>
+              <span className={`care-pip ${gatePip(x.verdict)}`} aria-hidden="true" />
+              <div className="block-body">
+                <div className="block-label">
+                  {x.label}
+                  <span className={`gate-basis ${basisClass(x.basis)}`}>{x.basis}</span>
+                </div>
+                <div className="block-meta">
+                  {who(x.owner)}
+                  {x.attestedBy !== null ? ` · only ${who(x.attestedBy)} may attest it` : ''}
+                  {x.verdict === 'MET' ? ' · done' : ''}
+                  {x.verdict === 'NOT_APPLICABLE' ? ' · does not apply' : ''}
+                </div>
+                <div className="care-why is-quiet">Proved by: {x.evidence}</div>
+                {x.verdict === 'UNKNOWN' && <div className="care-why">{x.because}</div>}
+              </div>
+              {/* Offered only where there is something to report. A button on a
+                  done item invites a second click that means nothing. */}
+              {outstanding && (
+                <button className="btn btn-quiet block-do" type="button"
+                  disabled={busy === id}
+                  onClick={() => onReport(x.id)}>
+                  {busy === id ? 'Saving…' : 'Done'}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
-function TaskGroup({ title, tasks, dim }: {
-  title: string; tasks: CareTaskView[]; dim?: boolean;
-}) {
+function TaskGroup({ title, tasks }: { title: string; tasks: CareTaskView[] }) {
   if (tasks.length === 0) return null;
   return (
-    <div className={`care-group ${dim ? 'is-dim' : ''}`}>
+    <div className="care-group">
       <div className="care-group-title">{title}</div>
       <div className="block-list">
         {tasks.map((t) => (
@@ -211,9 +322,7 @@ function TaskGroup({ title, tasks, dim }: {
               <div className="block-meta">
                 {who(t.owner)} · due {dueWord(t.dueAt)}
                 {t.late ? ' · late' : ''}
-                {holds(t)}
               </div>
-              {/* An unknown says what is unknown, not what is undone. */}
               {t.state === 'UNKNOWN' && (
                 <div className="care-why">Nobody has asked. {t.because}</div>
               )}
@@ -232,8 +341,8 @@ function TaskGroup({ title, tasks, dim }: {
  * A due minute that may fall on another day, said the way a person would.
  *
  * The implant scan is due a fortnight before the appointment and the next-day
- * call a day after it, so a due time is not always today — and formatting one
- * with the clock alone produced "due -7:00", which is not a time.
+ * call a day after it, so formatting one with the clock alone produced
+ * "due -7:00", which is not a time.
  */
 function dueWord(m: number): string {
   const day = Math.floor(m / 1440);
@@ -244,28 +353,50 @@ function dueWord(m: number): string {
   return day < 0 ? `${clock}, ${-day} days before` : `${clock}, ${day} days on`;
 }
 
-/**
- * What an outstanding gate actually holds.
- *
- * Before the appointment it holds the patient out of the chair. After it, the
- * patient has gone home and it holds the *day* — the clinic cannot be closed
- * on an unwritten note. Saying "holds the chair" about a post-operative
- * instruction is the kind of small wrongness that teaches people the words
- * mean nothing.
- */
-const holds = (t: CareTaskView) =>
-  t.gate === 'BLOCK' ? (t.stage === 'BEFORE' ? ' · holds the chair' : ' · holds the day') : '';
-
-/**
- * The pip, which is the whole reason this screen is not a checklist.
- *
- * Four states, four marks. Grey for met, amber for outstanding, red for
- * unknown, hollow for not applicable — because an unanswered question is more
- * serious than an undone task, not less, and a tick box has no way to say so.
- */
 function pipClass(t: CareTaskView): string {
   if (t.state === 'MET') return 'is-met';
   if (t.state === 'NOT_APPLICABLE') return 'is-aside';
   if (t.state === 'UNKNOWN') return 'is-unknown';
   return t.late ? 'is-late' : 'is-open';
 }
+
+const gatePip = (v: string) =>
+  v === 'MET' ? 'is-met'
+    : v === 'NOT_APPLICABLE' ? 'is-aside'
+      : v === 'UNKNOWN' ? 'is-unknown' : 'is-late';
+
+const VERDICT_EDGE: Record<string, string> = {
+  READY: 'is-ready',
+  NOT_READY: 'is-held',
+  BREACHED: 'is-breached',
+  DELIVERED: 'is-delivered',
+};
+
+const VERDICT_PILL: Record<string, string> = {
+  READY: 'is-ready',
+  NOT_READY: 'is-held',
+  BREACHED: 'is-breached',
+  DELIVERED: 'is-done',
+};
+
+const VERDICT_WORD: Record<string, string> = {
+  READY: 'May start',
+  NOT_READY: 'NOT READY',
+  BREACHED: 'Breached',
+  DELIVERED: 'Delivered',
+};
+
+/**
+ * The basis is shown on every gate, because it decides who may argue.
+ *
+ * A clinical gate is the clinical director's to change. A statutory one is
+ * nobody's — an exposure with no written justification is not a matter of
+ * house style, and a badge that says so stops the whole list being read as one.
+ */
+const basisClass = (b: string) => ({
+  STATUTORY: 'gate-statutory',
+  CONSENT: 'gate-consent',
+  SAFETY: 'gate-safety',
+  CLINICAL: 'gate-clinical',
+  RECORD: 'gate-record',
+}[b] ?? 'gate-clinical');

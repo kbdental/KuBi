@@ -38,11 +38,12 @@ import {
   sweep, board, FLOWS,
   careFor, careForAll, careOwedBy, TREATMENTS, NOTHING_KNOWN, UNRATIFIED_CATALOGUE,
   ASSETS, equipment as equipmentView, assetWorkFor, UNRATIFIED_REGISTER,
-  complianceFor, complianceAcross, mustListFor,
+  complianceFor,
+  STOCK_ITEMS, inventory as inventoryView,
   ClinicEvent as CE,
   type World, type Operatory, type RoleCode,
   type Booking, type PatientFacts, type Care, type CareTask, type ReadinessEvent,
-  type AssetRecord, type AssetTask, type Compliance, type GateResult,
+  type AssetRecord, type AssetTask, type Compliance, type GateResult, type Lot,
 } from '@kubi/contracts';
 
 type Role =
@@ -1261,6 +1262,22 @@ const DEMO_PROGRESS: Record<string, readonly string[]> = {
  * treatment at 16:15 has not happened at 09:15 and pretending otherwise would
  * be the one thing the design principle forbids.
  */
+/**
+ * Care items reported by tapping one on screen.
+ *
+ * Held apart from the seeded progress so that "what the demo starts with" and
+ * "what this person just did" stay distinguishable. Append-only, like the real
+ * log — there is no way to un-report something, because a clinic cannot un-take
+ * a consent.
+ */
+const reported: ReadinessEvent[] = [];
+
+export function reportCareItem(bookingId: string, itemId: string, at: number) {
+  const subjectId = `${bookingId}#${itemId}`;
+  if (reported.some((e) => e.subjectId === subjectId)) return;
+  reported.push({ type: CE.CARE_ITEM_MET, subjectId, at });
+}
+
 function careProgressEvents(now: number, endOfDay: boolean): ReadinessEvent[] {
   const out: ReadinessEvent[] = [];
   for (const b of DEMO_BOOKINGS) {
@@ -1279,7 +1296,7 @@ function careProgressEvents(now: number, endOfDay: boolean): ReadinessEvent[] {
       out.push({ type: ClinicEvent.TREATMENT_DELIVERED, subjectId: b.id, at: b.at + 30 });
     }
   }
-  return out;
+  return [...out, ...reported];
 }
 
 const careTaskView = (t: CareTask) => ({
@@ -1410,6 +1427,61 @@ const assetView = (r: AssetRecord, _events: readonly ReadinessEvent[], now: numb
  * route around, so the demo has to show what the count looks like — somebody
  * tried to start the root canal twice while the consent was still unsigned.
  */
+/* -------------------------------------------------------------------------
+ * Synthetic stock, for the inventory engine
+ *
+ * Deliberately uneven, and the unevenness is the demonstration:
+ *
+ *   the 4.5 x 15 fixture is not on the shelf, so Anita's implant cannot have
+ *   its stock gate vouched for however many times somebody ticks it
+ *
+ *   anaesthetic cartridges are past their reorder point, with a lot expiring
+ *   inside the lead time
+ *
+ *   nobody has ever counted the head caps, which is not the same as none
+ * ---------------------------------------------------------------------- */
+
+const inDays = (now: number, n: number) => now + n * 24 * 60;
+
+const DEMO_LOTS: Lot[] = [
+  { sku: 'GLOVE-EXAM', lot: 'GX-4471', expiresAt: null, quantity: 9 },
+  { sku: 'GLOVE-SURG', lot: 'GS-2210', expiresAt: 400 * 1440, quantity: 40 },
+  { sku: 'MASK-3PLY', lot: 'M3-0091', expiresAt: null, quantity: 6 },
+  { sku: 'GAUZE', lot: 'GZ-8812', expiresAt: null, quantity: 22 },
+  { sku: 'LA-CART', lot: 'LA-5521', expiresAt: 405 * 1440, quantity: 70 },
+  { sku: 'NEEDLE-LA', lot: 'NL-3390', expiresAt: 700 * 1440, quantity: 5 },
+  { sku: 'TIP-SUCTION', lot: 'TS-1180', expiresAt: null, quantity: 9 },
+  { sku: 'POUCH-STER', lot: 'PS-6640', expiresAt: null, quantity: 8 },
+  { sku: 'WATER-DIST', lot: 'WD-2201', expiresAt: null, quantity: 24 },
+  { sku: 'BACILOL', lot: 'BC-7719', expiresAt: 600 * 1440, quantity: 11 },
+  { sku: 'SUTURE', lot: 'SU-4402', expiresAt: 800 * 1440, quantity: 26 },
+  { sku: 'COMPOSITE', lot: 'CO-9931', expiresAt: 700 * 1440, quantity: 20 },
+  { sku: 'FILE-ROTARY', lot: 'FR-3312', expiresAt: null, quantity: 9 },
+  { sku: 'DAM-RUBBER', lot: 'DR-5580', expiresAt: null, quantity: 4 },
+  { sku: 'IMPLANT-4013', lot: 'IM-13-771', expiresAt: 900 * 1440, quantity: 2 },
+  { sku: 'IMPLANT-4011', lot: 'IM-11-448', expiresAt: 900 * 1440, quantity: 2 },
+  // The 4.5 x 15 is not here. That is the point.
+  { sku: 'COVER-SCREW', lot: 'CS-1102', expiresAt: null, quantity: 6 },
+];
+
+/** What is actually held for each booking. */
+const DEMO_RESERVATIONS: Record<string, readonly string[]> = {
+  'bk-1': ['IMPLANT-4013', 'IMPLANT-4011', 'COVER-SCREW'],   // one size short
+  'bk-2': ['GAUZE', 'SUTURE'],
+  'bk-3': ['GAUZE', 'SUTURE'],
+};
+
+function stockEvents(now: number): ReadinessEvent[] {
+  return [
+    { type: CE.STOCK_CONSUMED, subjectId: 'GLOVE-EXAM#3', at: now - 120 },
+    { type: CE.STOCK_CONSUMED, subjectId: 'LA-CART#14', at: now - 90 },
+    { type: CE.STOCK_ORDERED, subjectId: 'MASK-3PLY', at: now - 3 * 1440 },
+    { type: CE.STOCK_RESERVED, subjectId: 'IMPLANT-4013#1', at: now - 2 * 1440 },
+    { type: CE.STOCK_RESERVED, subjectId: 'COVER-SCREW#1', at: now - 2 * 1440 },
+    { type: CE.STOCK_CONSUMED, subjectId: 'SUTURE#4', at: inDays(now, -1) },
+  ];
+}
+
 const DEMO_REFUSALS: ReadinessEvent[] = [
   { type: CE.TREATMENT_START_REFUSED, subjectId: 'bk-3#CONSENT,DAM', at: 13 * 60 + 55 },
   { type: CE.TREATMENT_START_REFUSED, subjectId: 'bk-3#CONSENT', at: 14 * 60 + 10 },
@@ -2216,14 +2288,41 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
   if (path === '/api/v1/patient-events') {
     const w = engineWorld();
     const now = w.now;
-    const all = careForAll(DEMO_BOOKINGS, factsFor,
-      [...w.events, ...careProgressEvents(now, db.endOfDay)], now);
+    const events = [...w.events, ...careProgressEvents(now, db.endOfDay), ...DEMO_REFUSALS];
+    const all = careForAll(DEMO_BOOKINGS, factsFor, events, now);
     const role = engineRole() as RoleCode;
+
+    // The mandatory list belongs on the booking, not in a room of its own.
+    // Same engine, same minute — so a card cannot say "may start" while the
+    // gate list on it says otherwise.
+    const eq = equipmentView(ASSETS, assetHistory(now), now);
+    const dependedOn = new Set(ASSETS
+      .filter((a) => a.category === 'STERILIZATION' || a.category === 'PLANT')
+      .map((a) => a.tag));
+    const unusableAssets = [...new Set([
+      ...eq.unusable.map((r) => r.asset.tag), ...eq.down.map((r) => r.asset.tag),
+    ])].filter((tag) => dependedOn.has(tag));
+    // Inventory decides the stock gates. A tick will not do where the
+    // evidence line says "lot numbers physically in the clinic" — the shelf
+    // is the only thing that can answer that.
+    const inv = inventoryView(STOCK_ITEMS, DEMO_LOTS, stockEvents(now), now,
+      DEMO_RESERVATIONS);
+    const gatesFor = new Map(DEMO_BOOKINGS.map((b) => [
+      b.id,
+      complianceFor(b, factsFor(b.id), events, now,
+        { unusableAssets, stockVouched: inv.gateStock }),
+    ]));
 
     return json({
       now,
       role,
-      care: all.map(careView),
+      care: all.map((c) => ({
+        ...careView(c),
+        mandatory: (() => {
+          const g = gatesFor.get(c.booking.id);
+          return g === null || g === undefined ? null : complianceView(g);
+        })(),
+      })),
       mine: careOwedBy(all, role).map((t) => {
         const owner = all.find((c) => c.open.includes(t));
         return {
@@ -2254,6 +2353,12 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
      exists to stop being read as "nothing due".
      ═══════════════════════════════════════════════════════════════════ */
 
+  if (path === '/api/v1/care-item' && method === 'POST') {
+    const b = body as { bookingId: string; itemId: string };
+    reportCareItem(b.bookingId, b.itemId, engineWorld().now);
+    return json({ ok: true });
+  }
+
   if (path === '/api/v1/equipment') {
     const w = engineWorld();
     const now = w.now;
@@ -2274,57 +2379,6 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
       checksDue: v.checksDue.map(named),
       categories: [...new Set(ASSETS.map((a) => a.category))],
       unratified: UNRATIFIED_REGISTER,
-    });
-  }
-
-  /* ═══════════════════════════════════════════════════════════════════
-     THE COMPLIANCE ENGINE
-
-     The gate list is not written here — it is derived from the same treatment
-     catalogue the patient event screen uses, so the two can never disagree
-     about what a treatment requires.
-
-     The equipment register is read into it. "Sterilization confirmed" is not
-     a fact about implants; it is a fact about the autoclave, and this is
-     where the two engines meet. Note what is NOT passed: there is no
-     override, no force, no authorisedBy.
-     ═══════════════════════════════════════════════════════════════════ */
-
-  if (path === '/api/v1/compliance') {
-    const w = engineWorld();
-    const now = w.now;
-    const assetEvents = assetHistory(now);
-    const eq = equipmentView(ASSETS, assetEvents, now);
-    // Only the assets an operative procedure actually depends on. Listing
-    // every unusable asset in the building would have put the practice
-    // computer and the fridge in front of an implant surgeon, which is how a
-    // gate becomes noise and then becomes ignored.
-    const dependedOn = new Set(ASSETS
-      .filter((a) => a.category === 'STERILIZATION' || a.category === 'PLANT')
-      .map((a) => a.tag));
-    const unusableAssets = [...new Set([
-      ...eq.unusable.map((r) => r.asset.tag),
-      ...eq.down.map((r) => r.asset.tag),
-    ])].filter((tag) => dependedOn.has(tag));
-
-    const events = [...w.events, ...careProgressEvents(now, db.endOfDay), ...DEMO_REFUSALS];
-    const all = DEMO_BOOKINGS
-      .map((b) => complianceFor(b, factsFor(b.id), events, now, { unusableAssets }))
-      .filter((c): c is Compliance => c !== null);
-    const v = complianceAcross(all);
-
-    return json({
-      now,
-      role: engineRole(),
-      all: all.map(complianceView),
-      notReady: v.notReady.map(complianceView),
-      breached: v.breached.map(complianceView),
-      refusalCount: v.refusalCount,
-      worstGates: v.worstGates,
-      rate: v.rate,
-      gateCount: new Set(
-        TREATMENTS.flatMap((t) => mustListFor(t.code).map((m) => m.id)),
-      ).size,
     });
   }
 

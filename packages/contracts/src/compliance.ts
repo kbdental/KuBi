@@ -396,7 +396,34 @@ export interface ComplianceInputs {
    * register, which is `UNKNOWN` and fails the gate rather than passing it.
    */
   unusableAssets?: readonly string[];
+  /**
+   * Whether inventory can vouch for each stock-backed gate, keyed
+   * `booking#gate`.
+   *
+   * Supplied by the inventory engine. This is what turns *"lot numbers for the
+   * planned fixture and one size either side, physically in the clinic"* from
+   * a sentence in the evidence column into something the software actually
+   * decides — before this, a stock gate could be satisfied by a tap.
+   *
+   * Absent means nobody asked inventory, which is `UNKNOWN`. A procedure that
+   * passed because the software could not reach the stock register would have
+   * passed for the worst possible reason.
+   */
+  stockVouched?: Readonly<Record<string, boolean>>;
 }
+
+/**
+ * The gates inventory decides rather than a person.
+ *
+ * Everything else on the mandatory list is somebody's word that they did a
+ * thing. These are different: the question is not whether anybody looked, it
+ * is whether the box is on the shelf, and only the stock register can answer
+ * that.
+ */
+export const STOCK_BACKED_GATES: readonly string[] = [
+  'STOCK', 'IMPLANT_STOCK', 'GRAFT_STOCK', 'ABUTMENT_STOCK',
+  'IMPRESSION_PARTS', 'BRACKET_STOCK',
+];
 
 /**
  * Whether a treatment may start, and what it is missing.
@@ -490,6 +517,7 @@ function evaluate(
 
   return mustListFor(booking.treatmentCode).map((m) => {
     if (m.id === 'EQUIPMENT_FIT') return equipmentGate(m, inputs);
+    if (STOCK_BACKED_GATES.includes(m.id)) return stockGate(m, booking.id, inputs);
 
     const task = byId.get(m.id);
     // A gate the care engine does not know about cannot be assumed met. It is
@@ -539,6 +567,31 @@ function equipmentGate(m: MustGate, inputs: ComplianceInputs): GateResult {
     return {
       ...m, verdict: GateOutcome.MISSING, metAt: null,
       because: `Cannot be used: ${inputs.unusableAssets.join(', ')}`,
+    };
+  }
+  return { ...m, verdict: GateOutcome.MET, metAt: null, because: m.label };
+}
+
+/**
+ * The gate that reaches into the stock register.
+ *
+ * A tick will not do here and never should have. Somebody confirming they
+ * checked the implant sizes is not the same fact as the sizes being on the
+ * shelf, and the second is the one that decides whether a case opens and
+ * closes without an implant.
+ */
+function stockGate(m: MustGate, bookingId: string, inputs: ComplianceInputs): GateResult {
+  const vouched = inputs.stockVouched?.[`${bookingId}#${m.id}`];
+  if (vouched === undefined) {
+    return {
+      ...m, verdict: GateOutcome.UNKNOWN, metAt: null,
+      because: `Nobody has asked the stock register whether ${lower(m.label)}`,
+    };
+  }
+  if (!vouched) {
+    return {
+      ...m, verdict: GateOutcome.MISSING, metAt: null,
+      because: `${m.label} — not reserved against a lot held in the clinic`,
     };
   }
   return { ...m, verdict: GateOutcome.MET, metAt: null, because: m.label };

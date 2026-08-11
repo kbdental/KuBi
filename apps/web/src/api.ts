@@ -910,6 +910,14 @@ export interface CareView {
   unknownFacts: string[];
   delivered: boolean;
   owedAfter: CareTaskView[];
+  /**
+   * The mandatory list for this booking, on the booking itself.
+   *
+   * The owner: *"it should have been a part of patient event… that treatment's
+   * mandatory task become visible and clickable whether done it or not done
+   * it."* Null only if the treatment code is unknown to the engine.
+   */
+  mandatory: ComplianceView | null;
 }
 
 export interface PatientEventsView {
@@ -1115,12 +1123,15 @@ export const api = {
   now: () => call<NowView>('/api/v1/now'),
   /** One clinic, not seven modules: every decision, the board, what is late. */
   clinic: () => call<ClinicView>('/api/v1/clinic'),
-  /** Booked treatments and the work each one generated. */
+  /** Booked treatments, the work each one generated, and its mandatory list. */
   patientEvents: () => call<PatientEventsView>('/api/v1/patient-events'),
+  /** Report one care item done. Append-only: there is no un-report. */
+  reportCareItem: (bookingId: string, itemId: string) =>
+    call<{ ok: true }>('/api/v1/care-item', {
+      method: 'POST', body: JSON.stringify({ bookingId, itemId }),
+    }),
   /** The asset register, and the work each record generated. */
   equipment: () => call<EquipmentScreenView>('/api/v1/equipment'),
-  /** Mandatory gates: what is ready, what is not, and what was breached. */
-  compliance: () => call<ComplianceScreenView>('/api/v1/compliance'),
   /**
    * Record something that happened.
    *

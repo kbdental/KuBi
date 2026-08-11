@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ClinicEvent, RoleCode, complianceFor, complianceAcross, mustListFor, mayStart,
   GATE_EVIDENCE, GateBasis, GateOutcome, TREATMENTS, CareGate, CareStage,
-  NOTHING_KNOWN,
+  NOTHING_KNOWN, STOCK_BACKED_GATES,
   type Booking, type PatientFacts, type ReadinessEvent, type Compliance,
 } from '@kubi/contracts';
 
@@ -39,7 +39,20 @@ const met = (bookingId: string, gateId: string, at: number): ReadinessEvent =>
 const delivered = (bookingId: string, at: number): ReadinessEvent =>
   ({ type: ClinicEvent.TREATMENT_DELIVERED, subjectId: bookingId, at });
 
-const FIT = { unusableAssets: [] as string[] };
+/**
+ * Equipment fit and stock present.
+ *
+ * The stock gates are decided by the inventory engine now, not by a tick —
+ * `IMPLANT_STOCK`'s evidence always said "lot numbers physically in the
+ * clinic", and a tap is not that. So a compliance test has to supply the stock
+ * register the way the real caller does, and the tests that check a missing
+ * stock gate override one entry rather than relying on a `CARE_ITEM_MET`.
+ */
+const vouchedFor = (bookingId: string, except: readonly string[] = []) =>
+  Object.fromEntries(STOCK_BACKED_GATES
+    .map((g) => [`${bookingId}#${g}`, !except.includes(g)]));
+
+const FIT = { unusableAssets: [] as string[], stockVouched: vouchedFor('bk-1') };
 
 /** Every BEFORE gate met, except the ones named. */
 function metAllBut(code: string, skip: readonly string[], at = APPT - 60): ReadinessEvent[] {
@@ -51,6 +64,13 @@ function metAllBut(code: string, skip: readonly string[], at = APPT - 60): Readi
 const of = (code: string, events: ReadinessEvent[], now = APPT,
   facts: PatientFacts = KNOWN, inputs = FIT): Compliance =>
   complianceFor(booking(code), facts, events, now, inputs)!;
+
+/** The same, with named stock gates reported unavailable by the register. */
+const without = (code: string, skip: readonly string[], now = APPT): Compliance =>
+  complianceFor(booking(code), KNOWN, metAllBut(code, skip), now, {
+    unusableAssets: [],
+    stockVouched: vouchedFor('bk-1', skip.filter((g) => STOCK_BACKED_GATES.includes(g))),
+  })!;
 
 /* ═══════════════════════════════════════════════════════════════════════ */
 
@@ -141,7 +161,7 @@ describe('⚠ PROCEDURE NOT READY', () => {
 
   it('leads on the most serious thing missing, not the first', () => {
     // Consent outranks a stock reservation, whatever order the list is in.
-    const c = of('IMPLANT', metAllBut('IMPLANT', ['CONSENT', 'IMPLANT_STOCK']));
+    const c = without('IMPLANT', ['CONSENT', 'IMPLANT_STOCK']);
     expect(c.missing[0]!.id).toBe('CONSENT');
     expect(c.missing.map((m) => m.id)).toContain('IMPLANT_STOCK');
   });
@@ -197,7 +217,7 @@ describe('the four ways a requirement disappears', () => {
     // A compliance engine that passes an implant because it could not read the
     // equipment register has passed it for the worst possible reason.
     const c = complianceFor(booking('IMPLANT'), KNOWN,
-      metAllBut('IMPLANT', []), APPT, {})!;
+      metAllBut('IMPLANT', []), APPT, { stockVouched: vouchedFor('bk-1') })!;
     expect(c.ready).toBe(false);
     expect(c.gates.find((x) => x.id === 'EQUIPMENT_FIT')!.verdict)
       .toBe(GateOutcome.UNKNOWN);
@@ -207,7 +227,7 @@ describe('the four ways a requirement disappears', () => {
     // The owner's "sterilization confirmed" is two facts: a released pack for
     // this patient, and an autoclave that is fit to have released it.
     const c = complianceFor(booking('IMPLANT'), KNOWN, metAllBut('IMPLANT', []),
-      APPT, { unusableAssets: ['AUTOCLAVE-01'] })!;
+      APPT, { unusableAssets: ['AUTOCLAVE-01'], stockVouched: vouchedFor('bk-1') })!;
     expect(c.ready).toBe(false);
     expect(c.missing.map((m) => m.id)).toContain('EQUIPMENT_FIT');
     expect(c.gates.find((x) => x.id === 'EQUIPMENT_FIT')!.because)
@@ -216,7 +236,7 @@ describe('the four ways a requirement disappears', () => {
 
   /* ── 3. The refusal is silent ─────────────────────────────────────── */
   it('hands back an event that has to be written, not an optional one', () => {
-    const c = of('IMPLANT', metAllBut('IMPLANT', ['CONSENT', 'DRILL_KIT']));
+    const c = without('IMPLANT', ['CONSENT', 'DRILL_KIT']);
     const attempt = mayStart(c);
     expect(attempt.allowed).toBe(false);
     if (attempt.allowed) return;
@@ -329,11 +349,11 @@ describe('across the clinic', () => {
   const day = (): Compliance[] => [
     complianceFor(booking('IMPLANT', { id: 'b1', patientLabel: 'Anita Rao' }),
       KNOWN, metAllBut('IMPLANT', []).map((e) => ({ ...e, subjectId: e.subjectId.replace('bk-1', 'b1') })),
-      APPT, FIT)!,
+      APPT, { unusableAssets: [], stockVouched: vouchedFor('b1') })!,
     complianceFor(booking('EXTRACT', { id: 'b2', patientLabel: 'Sunil Mehta' }),
-      KNOWN, [], APPT, FIT)!,
+      KNOWN, [], APPT, { unusableAssets: [], stockVouched: vouchedFor('b2') })!,
     complianceFor(booking('SCALE', { id: 'b3', patientLabel: 'Farah Qureshi' }),
-      KNOWN, [], APPT, FIT)!,
+      KNOWN, [], APPT, { unusableAssets: [], stockVouched: vouchedFor('b3') })!,
   ];
 
   it('counts what is not ready right now', () => {
@@ -380,7 +400,7 @@ describe('what the older gate register could not do', () => {
    */
   it('decides consent, history, radiograph, stock and sterility from events', () => {
     for (const id of ['CONSENT', 'HISTORY', 'IMAGING', 'IMPLANT_STOCK', 'STERILE_PACK']) {
-      const missing = of('IMPLANT', metAllBut('IMPLANT', [id]));
+      const missing = without('IMPLANT', [id]);
       expect(missing.ready, `${id} does not refuse`).toBe(false);
       expect(missing.missing.map((m) => m.id)).toContain(id);
 

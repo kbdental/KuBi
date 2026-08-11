@@ -25,6 +25,7 @@ export * from './closing.js';
 export * from './patient-events.js';
 export * from './equipment.js';
 export * from './compliance.js';
+export * from './inventory.js';
 export * from './engine.js';
 export * from './decisions.js';
 export * from './briefing-headline.js';

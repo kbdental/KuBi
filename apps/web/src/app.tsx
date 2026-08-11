@@ -20,7 +20,7 @@ import { Clinic } from './screens/clinic.js';
 import { Patient360 } from './screens/patient-360.js';
 import { CommandPalette, useCommandKey } from './screens/command-palette.js';
 import {
-  IconToday, IconClinic, IconOverview, IconPatients, IconOperations, IconChecks,
+  IconToday, IconClinic, IconOverview, IconPatients, IconOperations,
 } from './icons.js';
 import { Shell, type RailItem } from './app/shell.js';
 import { Dashboard } from './screens/dashboard.js';
@@ -28,7 +28,6 @@ import { ClinicReadiness } from './screens/readiness.js';
 import { ClinicClosing } from './screens/closing.js';
 import { PatientEvents } from './screens/patient-events.js';
 import { Equipment } from './screens/equipment.js';
-import { ComplianceScreen } from './screens/compliance.js';
 
 /**
  * The shell.
@@ -237,12 +236,6 @@ export function App() {
     // Straight after readiness, on the owner's instruction: the clinic is made
     // ready, and then the patients it was made ready for arrive.
     { id: 'PATIENT_EVENTS', label: 'Patient events', icon: <IconPatients filled={here === 'PATIENT_EVENTS'} /> },
-    // The owner's word, twice over: first *"I will put it as requirement tab
-    // rather than compliance tab"*, then *"Mandatory is a better word for
-    // requirement"*. He is right both times. Nobody opens a compliance
-    // department; and a requirement is something you might negotiate, while
-    // mandatory is the whole point of the screen.
-    { id: 'MANDATORY', label: 'Mandatory', icon: <IconChecks filled={here === 'MANDATORY'} /> },
     { id: 'EQUIPMENT', label: 'Equipment', icon: <IconOperations filled={here === 'EQUIPMENT'} /> },
     { id: 'CLOSING', label: 'Clinic closing', icon: <IconToday filled={here === 'CLOSING'} /> },
     {
@@ -255,14 +248,13 @@ export function App() {
     DASHBOARD: 'Dashboard',
     READINESS: 'Clinic readiness',
     PATIENT_EVENTS: 'Patient events',
-    MANDATORY: 'Mandatory',
     EQUIPMENT: 'Equipment',
     CLOSING: 'Clinic closing',
     MORE: 'More',
   };
 
   // Everything under More is the previous shell's set, reached by its own id.
-  const inMore = !['DASHBOARD', 'READINESS', 'PATIENT_EVENTS', 'MANDATORY',
+  const inMore = !['DASHBOARD', 'READINESS', 'PATIENT_EVENTS',
     'EQUIPMENT', 'CLOSING'].includes(here);
 
   return (
@@ -280,7 +272,6 @@ export function App() {
       {here === 'DASHBOARD' && <Dashboard go={setChosen} />}
       {here === 'READINESS' && <ClinicReadiness />}
       {here === 'PATIENT_EVENTS' && <PatientEvents />}
-      {here === 'MANDATORY' && <ComplianceScreen />}
       {here === 'EQUIPMENT' && <Equipment />}
       {here === 'CLOSING' && <ClinicClosing />}
       {here === 'MORE' && (
