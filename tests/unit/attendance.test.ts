@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import {
   RoleCode, attendance, contradiction, parseClock,
   REPORT_BY, REQUIRED_ROLES, LEAVE_NOTICE_DAYS,
+  EARLIEST_APPOINTMENT, bookingWindow, reportByFor,
   SUNDAY_RULE_DECIDED, SUNDAY_RULE_QUESTION,
   ATTENDANCE_SHEET_COLUMNS, LEAVE_SHEET_COLUMNS,
   AttendanceState, readiness,
@@ -61,14 +62,48 @@ const leaveRow = (over: Partial<LeaveRow> = {}): LeaveRow => ({
 
 /* ═══════════════════════════════════════════════════════════════════════ */
 
-describe('ATT-001 · report for duty by 09:45', () => {
-  it('holds the owner’s standard exactly', () => {
-    expect(REPORT_BY).toBe(T(9, 45));
+describe('ATT-001 · report for duty, by role', () => {
+  it('holds the owner’s corrected standard', () => {
+    // The matrix said 09:45; the owner corrected it to 09:00 once the
+    // arithmetic showed five of six roles could not make the morning.
+    expect(REPORT_BY).toBe(T(9, 0));
   });
 
-  it('is on time at 09:45 and late at 09:46', () => {
-    expect(view([row('e1', T(9, 45))]).late).toHaveLength(0);
-    const late = view([row('e1', T(9, 46), { reason: 'Traffic' })]).late;
+  it('gives housekeeping her own hour rather than the clinic-wide one', () => {
+    // *"One thing I forgot — the house keeping staff arrives at 8.45."*
+    // Judged against a blanket 09:00 she would read fifteen minutes early
+    // every day of her working life, which is how a column stops being read.
+    expect(reportByFor([RoleCode.HOUSEKEEPING])).toBe(T(8, 45));
+    expect(reportByFor([RoleCode.DENTAL_ASSISTANT])).toBe(REPORT_BY);
+
+    const v = view(allIn());
+    const sunita = v.people.find((p) => p.employeeCode === 'e4')!;
+    expect(sunita.dueIn).toBe(T(8, 45));
+    expect(sunita.state).toBe(AttendanceState.PRESENT);
+
+    // Same minute, different verdict — the assistant is early, not on time.
+    const priya = v.people.find((p) => p.employeeCode === 'e1')!;
+    expect(priya.dueIn).toBe(REPORT_BY);
+  });
+
+  it('makes housekeeping late at 08:46, when nobody else is', () => {
+    const v = view(allIn().map((r) =>
+      r.employeeCode === 'e4' ? row('e4', T(8, 46)) : r));
+    expect(v.late.map((p) => p.employeeCode)).toEqual(['e4']);
+    expect(v.late[0]!.lateBy).toBe(1);
+  });
+
+  it('takes the earlier hour when somebody holds two roles', () => {
+    // You cannot do the 08:45 job at 09:00. Absence of a rule is not
+    // permission to arrive whenever, so an unnamed role falls back to 09:00.
+    expect(reportByFor([RoleCode.DENTAL_ASSISTANT, RoleCode.HOUSEKEEPING]))
+      .toBe(T(8, 45));
+    expect(reportByFor([RoleCode.LAB_COORDINATOR])).toBe(REPORT_BY);
+  });
+
+  it('is on time at 09:00 and late at 09:01', () => {
+    expect(view([row('e1', T(9, 0))]).late).toHaveLength(0);
+    const late = view([row('e1', T(9, 1), { reason: 'Traffic' })]).late;
     expect(late).toHaveLength(1);
     expect(late[0]!.lateBy).toBe(1);
   });
@@ -77,7 +112,9 @@ describe('ATT-001 · report for duty by 09:45', () => {
     const p = view([row('e1', T(10, 5), { reason: 'Train' })]).people
       .find((x) => x.employeeCode === 'e1')!;
     expect(p.headline).toContain('10:05');
-    expect(p.headline).toContain('20 minutes late');
+    // Against their own hour, and it says which hour that was — an assistant
+    // and a housekeeper both "65 minutes late" would mean two different times.
+    expect(p.headline).toContain('65 minutes after their 09:00');
   });
 });
 
@@ -280,22 +317,22 @@ describe('two of the clinic’s own standards cannot both be met', () => {
    * differ by role, the first patient moves, or the morning belongs to an
    * earlier shift.
    */
-  it('finds the roles that cannot make it', () => {
+  it('is down to one role at 09:00, and names it', () => {
+    // The owner's correction did the work. At 09:45 five of six roles could
+    // not make the morning; at 09:00 only the technician is short, because a
+    // 75-minute cycle before a 10:00 patient has to start at 08:45.
     const found = contradiction(FIRST_PATIENT);
-    expect(found.length).toBeGreaterThan(0);
-    const tech = found.find((c) => c.role === RoleCode.STERILIZATION_TECHNICIAN)!;
-    expect(tech.workStartsAt).toBe(T(8, 45));
-    expect(tech.shortMinutes).toBe(60);
+    expect(found.map((c) => c.role)).toEqual([RoleCode.STERILIZATION_TECHNICIAN]);
+    expect(found[0]!.workStartsAt).toBe(T(8, 45));
+    expect(found[0]!.shortMinutes).toBe(15);
   });
 
-  it('puts the worst one first', () => {
-    const found = contradiction(FIRST_PATIENT);
-    expect(found[0]!.role).toBe(RoleCode.STERILIZATION_TECHNICIAN);
-  });
-
-  it('leaves the doctor alone, who genuinely can arrive at 09:45', () => {
-    expect(contradiction(FIRST_PATIENT).map((c) => c.role))
-      .not.toContain(RoleCode.TREATING_DOCTOR);
+  it('leaves the fifty-minute roles alone, which now have ten minutes in hand', () => {
+    const roles = contradiction(FIRST_PATIENT).map((c) => c.role);
+    for (const r of [RoleCode.HOUSEKEEPING, RoleCode.DENTAL_ASSISTANT,
+      RoleCode.SENIOR_ASSISTANT, RoleCode.RECEPTION, RoleCode.TREATING_DOCTOR]) {
+      expect(roles, `${r} should now be comfortable`).not.toContain(r);
+    }
   });
 
   it('says nothing when there is no first patient to work back from', () => {
@@ -307,13 +344,64 @@ describe('two of the clinic’s own standards cannot both be met', () => {
     expect(contradiction(T(12, 0))).toEqual([]);
   });
 
-  it('flags somebody inside the 09:45 standard who is still late for their own work', () => {
+  it('flags somebody inside the standard who is still late for their own work', () => {
+    // In at 08:55: inside the 09:00 standard, and after the cycle had to start.
     const v = view(allIn().map((r) =>
-      r.employeeCode === 'e5' ? row('e5', T(9, 30)) : r));
+      r.employeeCode === 'e5' ? row('e5', T(8, 55)) : r));
     const tech = v.people.find((p) => p.employeeCode === 'e5')!;
-    expect(tech.state).toBe(AttendanceState.PRESENT);   // inside 09:45
-    expect(tech.lateForTheirWork).toBe(true);           // and after 08:45
+    expect(tech.state).toBe(AttendanceState.PRESENT);
+    expect(tech.lateForTheirWork).toBe(true);
     expect(tech.headline).toContain('after their own work had to start');
+  });
+});
+
+describe('the booking book promises what the roster cannot deliver', () => {
+  /**
+   * *"Appointments can start at 9.30."*
+   *
+   * That is a promise made to a patient on the telephone. This block is the
+   * arithmetic nobody had done: for each role the earliest first-patient time
+   * it can support is its own arrival plus the work it owns, and the clinic is
+   * ready no sooner than the slowest of them.
+   */
+  it('holds the booking rule as the owner stated it', () => {
+    expect(EARLIEST_APPOINTMENT).toBe(T(9, 30));
+  });
+
+  it('finds the roster cannot be ready until 10:15, and names the binding role', () => {
+    // 09:00 + a 75-minute cycle to cooling = 10:15. The technician sets the
+    // opening time of the whole clinic and nobody had noticed, because the
+    // two numbers lived in two different documents.
+    const w = bookingWindow();
+    expect(w.deliverableFrom).toBe(T(10, 15));
+    expect(w.binding).toBe(RoleCode.STERILIZATION_TECHNICIAN);
+    expect(w.honest).toBe(false);
+    expect(w.overpromisedBy).toBe(45);
+    expect(w.because).toContain('10:15');
+  });
+
+  it('does not blame the housekeeper, whose early start is already absorbed', () => {
+    // 08:45 + 50 = 09:35. Five minutes over, and not the constraint — which
+    // is the point of measuring each role against its own hour.
+    const w = bookingWindow();
+    expect(w.binding).not.toBe(RoleCode.HOUSEKEEPING);
+  });
+
+  it('agrees with itself once the book opens late enough', () => {
+    const w = bookingWindow(T(10, 15));
+    expect(w.honest).toBe(true);
+    expect(w.overpromisedBy).toBe(0);
+    expect(w.because).toContain('can be kept');
+  });
+
+  it('refuses to pick which number gives', () => {
+    // Constitution rule 4. Three fixes are ordinary — the technician comes in
+    // at 08:15, the instruments are cycled the evening before, or the book
+    // opens at 10:15 — and they cost different things. Not KuBi's call.
+    const w = bookingWindow();
+    expect(w.bookableFrom).toBe(T(9, 30));
+    expect(w.deliverableFrom).toBe(T(10, 15));
+    // Both numbers survive. Neither is quietly overwritten by the other.
   });
 });
 

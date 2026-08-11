@@ -19,22 +19,27 @@
  * who is actually here?**
  *
  * ─────────────────────────────────────────────────────────────────────────
- * A contradiction the two standards already contain
+ * A contradiction the clinic's own standards contain
  * ─────────────────────────────────────────────────────────────────────────
  *
- * ATT-001 says *"present by 9:45 AM"* for all staff. The opening procedure
- * says the morning takes fifty minutes, and the sterilisation cycle takes
- * seventy-five to cooling. If the first patient is at 10:00, the morning had
- * to start at 09:10, and the autoclave at 08:45.
+ * Three numbers, each of them stated by the clinic, none of them controversial
+ * on its own: staff report at 09:00 and housekeeping at 08:45; the morning
+ * takes fifty minutes and the sterilisation cycle seventy-five to cooling;
+ * appointments may be booked from 09:30.
  *
- * Both cannot be true. Staff arriving at 09:45 cannot deliver a fifty-minute
- * morning by 10:00 — nobody is being careless, the two numbers simply do not
- * fit. `contradiction()` computes it rather than describing it, so the finding
- * moves on its own if either standard changes, and `REQUIRED_BY` derives a
- * per-role arrival time from what that role actually owns.
+ * They do not fit. A 09:30 patient needs the autoclave loaded at 08:15 and the
+ * rooms started at 08:40 — three quarters of an hour before the technician is
+ * due and five minutes before the housekeeper unlocks. Nobody is being
+ * careless; the arithmetic simply was never done in one place.
  *
- * Nothing here overrides ATT-001. The clinic's standard stands until the owner
- * changes it; the engine reports that it cannot be met.
+ * So it is done here. `contradiction()` measures each role against its own
+ * arrival time, and `bookingWindow()` answers the question the booking clerk
+ * is actually asking — *what is the earliest slot this roster can deliver?*
+ * Both compute rather than assert, so the finding moves on its own if any of
+ * the three numbers changes, without anybody editing a sentence.
+ *
+ * Nothing here overrides the standard. The clinic's numbers stand until the
+ * owner changes them; the engine reports that they cannot all be met.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * Where the data comes from
@@ -55,8 +60,36 @@ const T = (h: number, m = 0) => h * 60 + m;
  * The standards, as the owner wrote them
  * ---------------------------------------------------------------------- */
 
-/** ATT-001. *"Present by 9:45 AM"*, for all staff. */
-export const REPORT_BY = T(9, 45);
+/**
+ * ATT-001 — corrected twice by the owner, and now per role.
+ *
+ * The matrix said 09:45 for everybody. When the engine showed that five of six
+ * roles could not deliver the morning from there, the owner corrected the fact
+ * rather than the rule: *"staff will report at 9 am, first patient at 10."*
+ * Then: *"the house keeping staff arrives at 8.45."*
+ *
+ * That second correction is why this is no longer one number. Housekeeping
+ * arriving fifteen minutes before everybody else is not an exception to the
+ * standard, it *is* the standard for that role — and a blanket 09:00 would
+ * have marked her fifteen minutes early every single day, which is the kind of
+ * noise that teaches people to ignore the column. So `reportBy` lives on
+ * `RequiredRole`, and this constant is only the default for roles the morning
+ * does not name.
+ */
+export const REPORT_BY = T(9, 0);
+
+/**
+ * The earliest minute reception may put a patient in the book.
+ *
+ * *"Appointments can start at 9.30."*
+ *
+ * Held here rather than in the scheduler because it is a **claim about
+ * staffing** — booking a 09:30 patient asserts that every role the morning
+ * needs can be finished by 09:30, and that assertion is this file's to check.
+ * `bookingWindow()` does the arithmetic; see the note there, because as the
+ * roster stands the two numbers do not agree.
+ */
+export const EARLIEST_APPOINTMENT = T(9, 30);
 
 /** ATT-004. *"≥7 days prior whenever possible."* */
 export const LEAVE_NOTICE_DAYS = 7;
@@ -100,6 +133,15 @@ export interface RequiredRole {
   /** How many people of this role the morning needs. */
   count: number;
   minutesBefore: number;
+  /**
+   * ATT-001 for this role. The minute they are due in the building.
+   *
+   * Separate from `minutesBefore` on purpose: one is when the *work* has to
+   * start, the other is when the *person* has to be here, and the whole point
+   * of this engine is that the clinic can state both and discover they do not
+   * line up.
+   */
+  reportBy: number;
   /** What stops if nobody holds it. */
   owns: string;
   /** Whether the clinic can open at all without it. */
@@ -109,35 +151,56 @@ export interface RequiredRole {
 export const REQUIRED_ROLES: readonly RequiredRole[] = [
   {
     role: RoleCode.STERILIZATION_TECHNICIAN, count: 1, minutesBefore: 75,
+    reportBy: REPORT_BY,
     owns: 'the morning sterilisation run — 75 minutes to cooling',
     critical: true,
   },
   {
+    // *"One thing I forgot — the house keeping staff arrives at 8.45."*
     role: RoleCode.HOUSEKEEPING, count: 1, minutesBefore: 50,
+    reportBy: T(8, 45),
     owns: 'floors, pantry and washroom — 45 minutes',
     critical: true,
   },
   {
     role: RoleCode.DENTAL_ASSISTANT, count: 2, minutesBefore: 50,
+    reportBy: REPORT_BY,
     owns: 'four operatories at 15 minutes each',
     critical: true,
   },
   {
     role: RoleCode.SENIOR_ASSISTANT, count: 1, minutesBefore: 50,
+    reportBy: REPORT_BY,
     owns: 'the equipment round — nobody else may report it',
     critical: true,
   },
   {
     role: RoleCode.RECEPTION, count: 1, minutesBefore: 50,
+    reportBy: REPORT_BY,
     owns: 'the waiting and billing area, and the front door',
     critical: true,
   },
   {
     role: RoleCode.TREATING_DOCTOR, count: 1, minutesBefore: 15,
+    reportBy: REPORT_BY,
     owns: 'seeing the patients',
     critical: true,
   },
 ];
+
+/**
+ * When this person is due in, given everything they hold.
+ *
+ * The earliest of their roles' times, because somebody who is both a
+ * housekeeper and an assistant is due at the housekeeper's hour — you cannot
+ * do the 08:45 job at 09:00. A person holding no named morning role falls back
+ * to the general standard rather than to nothing: absence of a rule is not
+ * permission to arrive whenever.
+ */
+export function reportByFor(roles: readonly RoleCode[]): number {
+  const mine = REQUIRED_ROLES.filter((r) => roles.includes(r.role));
+  return mine.length === 0 ? REPORT_BY : Math.min(...mine.map((r) => r.reportBy));
+}
 
 /* -------------------------------------------------------------------------
  * The import shapes — one row of the clinic's own sheet
@@ -209,12 +272,14 @@ export interface PersonToday {
   roles: readonly RoleCode[];
   state: AttendanceState;
   inAt: number | null;
-  /** Minutes past the standard. Null when not late. */
+  /** ATT-001 for this person — their own role's hour, not a clinic-wide one. */
+  dueIn: number;
+  /** Minutes past their own standard. Null when not late. */
   lateBy: number | null;
   reason: string | null;
   /** The earliest minute any of their roles was needed. */
   neededBy: number | null;
-  /** Late against their own role's need, which is earlier than 09:45. */
+  /** In on time and still after their own work had to start. */
   lateForTheirWork: boolean;
   headline: string;
 }
@@ -256,7 +321,7 @@ export interface LeaveFinding {
 
 export interface AttendanceView {
   people: readonly PersonToday[];
-  /** ATT-001. In after 09:45. */
+  /** ATT-001. In after their own role's hour. */
   late: readonly PersonToday[];
   /** ATT-002. Late with no reason — escalates. */
   lateUnexplained: readonly PersonToday[];
@@ -318,7 +383,8 @@ export function attendance(
       || row?.status === 'LEAVE' || row?.status === 'HOLIDAY') {
       return {
         employeeCode: s.employeeCode, label: s.label, roles: s.roles,
-        state: AttendanceState.ON_LEAVE, inAt: null, lateBy: null,
+        state: AttendanceState.ON_LEAVE, inAt: null,
+        dueIn: reportByFor(s.roles), lateBy: null,
         reason: row?.reason ?? null, neededBy, lateForTheirWork: false,
         headline: 'On approved leave.',
       };
@@ -330,7 +396,8 @@ export function attendance(
     if (row === undefined || (row.inAt === null && (row.status ?? '') === '')) {
       return {
         employeeCode: s.employeeCode, label: s.label, roles: s.roles,
-        state: AttendanceState.UNKNOWN, inAt: null, lateBy: null,
+        state: AttendanceState.UNKNOWN, inAt: null,
+        dueIn: reportByFor(s.roles), lateBy: null,
         reason: null, neededBy, lateForTheirWork: neededBy !== null && now > neededBy,
         headline: 'No attendance recorded, and no absence classified. Nobody knows where they are.',
       };
@@ -339,14 +406,16 @@ export function attendance(
     if (row.inAt === null) {
       return {
         employeeCode: s.employeeCode, label: s.label, roles: s.roles,
-        state: AttendanceState.ABSENT, inAt: null, lateBy: null,
+        state: AttendanceState.ABSENT, inAt: null,
+        dueIn: reportByFor(s.roles), lateBy: null,
         reason: row.reason, neededBy,
         lateForTheirWork: false,
         headline: row.reason ? `Absent — ${row.reason}` : 'Absent, classified.',
       };
     }
 
-    const lateBy = row.inAt > REPORT_BY ? row.inAt - REPORT_BY : null;
+    const dueIn = reportByFor(s.roles);
+    const lateBy = row.inAt > dueIn ? row.inAt - dueIn : null;
     const lateForTheirWork = neededBy !== null && row.inAt > neededBy;
     const unexplained = lateBy !== null && (row.reason ?? '').trim() === '';
 
@@ -355,17 +424,20 @@ export function attendance(
       state: lateBy === null ? AttendanceState.PRESENT
         : unexplained ? AttendanceState.LATE_UNEXPLAINED : AttendanceState.LATE,
       inAt: row.inAt,
+      dueIn,
       lateBy,
       reason: row.reason,
       neededBy,
       lateForTheirWork,
       headline: lateBy === null
         ? (lateForTheirWork
-          ? `In at ${clock(row.inAt)} — inside the 09:45 standard, and after their own work had to start.`
+          ? `In at ${clock(row.inAt)} — inside their ${clock(dueIn)} standard, `
+            + 'and after their own work had to start.'
           : `In at ${clock(row.inAt)}.`)
         : unexplained
-          ? `In at ${clock(row.inAt)}, ${lateBy} minutes late, and no reason recorded.`
-          : `In at ${clock(row.inAt)}, ${lateBy} minutes late — ${row.reason}`,
+          ? `In at ${clock(row.inAt)}, ${lateBy} minutes after their ${clock(dueIn)}, `
+            + 'and no reason recorded.'
+          : `In at ${clock(row.inAt)}, ${lateBy} minutes after their ${clock(dueIn)} — ${row.reason}`,
     };
   });
 
@@ -500,30 +572,91 @@ export interface Contradiction {
 }
 
 /**
- * Which roles cannot meet the morning by arriving at 09:45.
+ * Which roles cannot deliver the morning from their own arrival time.
  *
- * Not an opinion — arithmetic on two numbers the clinic already published.
- * ATT-001 says present by 09:45; the opening procedure says the sterilisation
- * cycle is 75 minutes and the morning is 50. With a 10:00 first patient the
- * technician had to start at 08:45, which is an hour before the attendance
- * standard asks them to be here.
+ * Not an opinion — arithmetic on numbers the clinic already published. Each
+ * role is measured against *its own* ATT-001 hour, which is why housekeeping's
+ * 08:45 shows up as fifteen minutes of relief rather than as an exception
+ * somebody has to remember.
  *
  * Returned rather than resolved, because it is the owner's to settle: either
- * the arrival times differ by role, or the first patient moves, or the morning
- * starts on somebody else's shift.
+ * the arrival times move, or the first patient moves, or the morning starts on
+ * somebody else's shift.
  */
 export function contradiction(firstPatientAt: number | null): Contradiction[] {
   if (firstPatientAt === null) return [];
   return REQUIRED_ROLES
     .map((r) => ({
       role: r.role,
-      reportBy: REPORT_BY,
+      reportBy: r.reportBy,
       workStartsAt: firstPatientAt - r.minutesBefore,
-      shortMinutes: REPORT_BY - (firstPatientAt - r.minutesBefore),
+      shortMinutes: r.reportBy - (firstPatientAt - r.minutesBefore),
       owns: r.owns,
     }))
     .filter((x) => x.shortMinutes > 0)
     .sort((a, b) => b.shortMinutes - a.shortMinutes);
+}
+
+/* -------------------------------------------------------------------------
+ * What the booking book may promise
+ * ---------------------------------------------------------------------- */
+
+export interface BookingWindow {
+  /** What reception is allowed to offer today. */
+  bookableFrom: number;
+  /** The earliest slot the roster can actually be ready for. */
+  deliverableFrom: number;
+  /** The role that sets `deliverableFrom`. Move this one or nothing moves. */
+  binding: RoleCode;
+  bindingOwns: string;
+  /** Minutes by which the book runs ahead of the roster. Zero when they agree. */
+  overpromisedBy: number;
+  honest: boolean;
+  because: string;
+}
+
+/**
+ * The earliest appointment this roster can honestly be ready for.
+ *
+ * *"Appointments can start at 9.30."* That sentence is a promise made to a
+ * patient on the telephone, and this function is the only thing standing
+ * between it and the morning it depends on. For every required role, the
+ * earliest first-patient time that role can support is `reportBy +
+ * minutesBefore`; the clinic can be ready no sooner than the slowest of them.
+ *
+ * As the numbers stand the sterilisation technician is binding — a 75-minute
+ * cycle begun at 09:00 finishes at 10:15 — so a 09:30 booking is a promise the
+ * building cannot keep, by three quarters of an hour. This is not a fault in
+ * the booking rule or in the technician; it is the gap that appears the first
+ * time two separately sensible standards are laid against each other.
+ *
+ * Constitution rule 4 applies: KuBi reports the gap and refuses to pick which
+ * number gives. Three fixes are ordinary — the technician comes in at 08:15,
+ * the instruments are cycled the evening before, or the book opens at 10:15 —
+ * and they cost different things, so the choice is the owner's.
+ */
+export function bookingWindow(bookableFrom = EARLIEST_APPOINTMENT): BookingWindow {
+  const earliest = REQUIRED_ROLES
+    .map((r) => ({ at: r.reportBy + r.minutesBefore, role: r }))
+    .sort((a, b) => b.at - a.at);
+  const worst = earliest[0]!;
+  const overpromisedBy = Math.max(0, worst.at - bookableFrom);
+
+  return {
+    bookableFrom,
+    deliverableFrom: worst.at,
+    binding: worst.role.role,
+    bindingOwns: worst.role.owns,
+    overpromisedBy,
+    honest: overpromisedBy === 0,
+    because: overpromisedBy === 0
+      ? `Every role is ready by ${clock(worst.at)}, so a ${clock(bookableFrom)} `
+        + 'slot can be kept.'
+      : `The book opens at ${clock(bookableFrom)}, but the roster is not ready `
+        + `until ${clock(worst.at)} — ${overpromisedBy} minutes later. `
+        + `${clock(worst.role.reportBy)} plus ${worst.role.minutesBefore} minutes `
+        + `for ${worst.role.owns}.`,
+  };
 }
 
 const clock = (m: number) =>

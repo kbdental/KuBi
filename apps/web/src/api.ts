@@ -1129,6 +1129,60 @@ export type RecordResult =
   | { ok: true; duplicate: boolean; consequences: Array<{ kind: string }> }
   | { ok: false; refusal: { because: string; fix: string; goes: string } };
 
+/** One failing parameter, as the dashboard receives it. */
+export interface FailingRow {
+  id: string;
+  area: string;
+  severity: 'STOPS' | 'HOLDS' | 'WATCH';
+  what: string;
+  because: string;
+  ownerRole: string | null;
+  involved: Array<{ employeeCode: string; label: string; state: string; note: string }>;
+  dueAt: number | null;
+  goes: string;
+}
+
+export interface LensView {
+  now: number;
+  role: string;
+  question: string;
+  headline: string;
+  wholeClinic: boolean;
+  /** How many failures were withheld. Shown, so the count is honest. */
+  hidden: number;
+  total: number;
+  places: string[];
+  failing: FailingRow[];
+  staffing: {
+    headline: string;
+    staffed: boolean;
+    here: number;
+    expected: number;
+    late: number;
+    lateUnexplained: number;
+    unaccounted: number;
+    onLeave: number;
+    coverage: Array<{
+      role: string; needed: number; here: number; covered: boolean;
+      critical: boolean; owns: string; neededBy: number | null; because: string;
+    }>;
+    people: Array<{
+      employeeCode: string; label: string; roles: string[]; state: string;
+      inAt: number | null; dueIn: number; lateBy: number | null;
+      lateForTheirWork: boolean; headline: string;
+    }>;
+  } | null;
+  /** This person's own attendance row, for everybody who is not clinic-wide. */
+  me: {
+    label: string; state: string; inAt: number | null;
+    dueIn: number; headline: string;
+  } | null;
+  booking: {
+    bookableFrom: number; deliverableFrom: number; binding: string;
+    overpromisedBy: number; honest: boolean; because: string;
+  };
+}
+
 export const api = {
   login: (email: string, password: string) =>
     post<{ displayLabel: string; roleCodes: string[] }>('/api/v1/auth/login', { email, password }),
@@ -1192,6 +1246,13 @@ export const api = {
   now: () => call<NowView>('/api/v1/now'),
   /** One clinic, not seven modules: every decision, the board, what is late. */
   clinic: () => call<ClinicView>('/api/v1/clinic'),
+  /**
+   * What is failing, who is involved, and only the part this role may see.
+   *
+   * Narrowed on the server. What arrives here is what this person is entitled
+   * to — the screen renders it rather than choosing what to conceal.
+   */
+  lens: () => call<LensView>('/api/v1/lens'),
   /** Booked treatments, the work each one generated, and its mandatory list. */
   patientEvents: () => call<PatientEventsView>('/api/v1/patient-events'),
   /** Report one care item done. Append-only: there is no un-report. */

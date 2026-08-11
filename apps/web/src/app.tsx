@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   api, ApiError,
   type Me, type MyDay, type TaskSheet, type AttentionRow, type CheckRow, type Schedule,
@@ -23,6 +23,7 @@ import {
   IconToday, IconClinic, IconOverview, IconPatients, IconOperations,
 } from './icons.js';
 import { Shell, type RailItem } from './app/shell.js';
+import { placesFor, type RoleCode } from '@kubi/contracts';
 import { Dashboard } from './screens/dashboard.js';
 import { ClinicReadiness } from './screens/readiness.js';
 import { ClinicClosing } from './screens/closing.js';
@@ -224,25 +225,52 @@ export function App() {
   void myHome;
 
   /**
-   * The rail.
+   * The rail, which is a different rail for each role.
    *
-   * Two places are named so far — the dashboard and clinic readiness — and
-   * everything that already existed sits under More rather than being deleted:
-   * a screen somebody uses is not made obsolete by a new frame around it.
+   * *"All the task should not be seen by all, only related, so that confusion
+   * does not happen — so all the staff will have a different look of the app."*
+   *
+   * `placesFor` decides, not this file, and it lives in the contracts package
+   * beside the rest of the rules — a rail assembled from role checks scattered
+   * through a component is a rail nobody can audit. The shell draws what it is
+   * handed.
+   *
+   * Read the owner's sentence as written: a **different look**, not a smaller
+   * one. The housekeeper's app is three places, so the rail itself tells her
+   * what her job is; it is not the manager's six with three greyed out.
+   *
+   * The order never changes between roles. Muscle memory is worth more than
+   * tailoring — readiness is always left of closing, for everybody.
    */
-  const rail: RailItem[] = [
-    { id: 'DASHBOARD', label: 'Dashboard', icon: <IconOverview filled={here === 'DASHBOARD'} /> },
-    { id: 'READINESS', label: 'Clinic readiness', icon: <IconClinic filled={here === 'READINESS'} /> },
-    // Straight after readiness, on the owner's instruction: the clinic is made
-    // ready, and then the patients it was made ready for arrive.
-    { id: 'PATIENT_EVENTS', label: 'Patient events', icon: <IconPatients filled={here === 'PATIENT_EVENTS'} /> },
-    { id: 'EQUIPMENT', label: 'Equipment', icon: <IconOperations filled={here === 'EQUIPMENT'} /> },
-    { id: 'CLOSING', label: 'Clinic closing', icon: <IconToday filled={here === 'CLOSING'} /> },
-    {
-      id: 'MORE', label: 'More', icon: <IconToday filled={here === 'MORE'} />,
-      count: data.attention.length, urgent: data.attention.length > 0,
-    },
-  ];
+  const ICON: Record<string, ReactNode> = {
+    DASHBOARD: <IconOverview filled={here === 'DASHBOARD'} />,
+    READINESS: <IconClinic filled={here === 'READINESS'} />,
+    PATIENT_EVENTS: <IconPatients filled={here === 'PATIENT_EVENTS'} />,
+    EQUIPMENT: <IconOperations filled={here === 'EQUIPMENT'} />,
+    CLOSING: <IconToday filled={here === 'CLOSING'} />,
+    MORE: <IconToday filled={here === 'MORE'} />,
+  };
+  const RAIL_LABEL: Record<string, string> = {
+    DASHBOARD: 'Dashboard',
+    // Straight after the dashboard, on the owner's instruction: the clinic is
+    // made ready, and then the patients it was made ready for arrive.
+    READINESS: 'Clinic readiness',
+    PATIENT_EVENTS: 'Patient events',
+    EQUIPMENT: 'Equipment',
+    CLOSING: 'Clinic closing',
+    MORE: 'More',
+  };
+
+  const myPlaces = placesFor(data.me.roleCodes as RoleCode[]).map(String);
+
+  const rail: RailItem[] = myPlaces.map((id) => ({
+    id,
+    label: RAIL_LABEL[id] ?? id,
+    icon: ICON[id] ?? <IconToday filled={here === id} />,
+    ...(id === 'MORE'
+      ? { count: data.attention.length, urgent: data.attention.length > 0 }
+      : {}),
+  }));
 
   const TITLES: Record<string, string> = {
     DASHBOARD: 'Dashboard',
@@ -257,6 +285,17 @@ export function App() {
   const inMore = !['DASHBOARD', 'READINESS', 'PATIENT_EVENTS',
     'EQUIPMENT', 'CLOSING'].includes(here);
 
+  /**
+   * A place this role may not reach, reached anyway.
+   *
+   * Only a courtesy — constitution rule 3 puts the real check on the server,
+   * and every endpoint behind these screens already narrows by role. This is
+   * here so a stale link or a back button lands on a sentence rather than on
+   * an empty screen that looks broken.
+   */
+  const forbidden = ['READINESS', 'PATIENT_EVENTS', 'EQUIPMENT', 'CLOSING']
+    .includes(here) && !myPlaces.includes(here);
+
   return (
     <>
     {paletteEl}
@@ -269,11 +308,19 @@ export function App() {
       title={TITLES[here] ?? label(here, myDashboards)}
       onSignOut={() => { void api.logout().finally(() => { setData(null); setChosen(null); }); }}
     >
+      {forbidden && (
+        <div className="screen">
+          <p className="screen-sub">
+            That part of KuBi belongs to another role. Your work is on the
+            dashboard.
+          </p>
+        </div>
+      )}
       {here === 'DASHBOARD' && <Dashboard go={setChosen} />}
-      {here === 'READINESS' && <ClinicReadiness />}
-      {here === 'PATIENT_EVENTS' && <PatientEvents />}
-      {here === 'EQUIPMENT' && <Equipment />}
-      {here === 'CLOSING' && <ClinicClosing />}
+      {here === 'READINESS' && !forbidden && <ClinicReadiness />}
+      {here === 'PATIENT_EVENTS' && !forbidden && <PatientEvents />}
+      {here === 'EQUIPMENT' && !forbidden && <Equipment />}
+      {here === 'CLOSING' && !forbidden && <ClinicClosing />}
       {here === 'MORE' && (
         <MoreMenu
           items={[

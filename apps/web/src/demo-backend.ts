@@ -43,6 +43,7 @@ import {
   ASSETS, equipment as equipmentView, assetWorkFor, UNRATIFIED_REGISTER,
   complianceFor, readinessHorizon,
   STOCK_ITEMS, inventory as inventoryView,
+  gatherFailures, holdersFrom, lensFor, placesFor, bookingWindow,
   ClinicEvent as CE,
   type World, type Operatory, type RoleCode,
   type Booking, type PatientFacts, type Care, type CareTask, type ReadinessEvent,
@@ -1546,6 +1547,12 @@ const DEMO_STAFF: StaffMember[] = [
   { employeeCode: 'e6', label: 'Nisha', roles: ['SENIOR_ASSISTANT' as RoleCode], active: true },
   { employeeCode: 'e7', label: 'Dr Iyer', roles: ['TREATING_DOCTOR' as RoleCode], active: true },
   { employeeCode: 'e8', label: 'Anjali', roles: ['RECEPTION' as RoleCode], active: true },
+  // The manager and the stock coordinator were missing from the sheet, which
+  // meant every failure they own read "nobody is holding this role today" —
+  // the loudest sentence on the dashboard, said wrongly, about half the rows.
+  // A person absent from the roster is not the same as a role nobody holds.
+  { employeeCode: 'e9', label: 'Deepak', roles: ['CLINIC_MANAGER' as RoleCode], active: true },
+  { employeeCode: 'e10', label: 'Farida', roles: ['INVENTORY_COORDINATOR' as RoleCode], active: true },
 ];
 
 const DEMO_ATTENDANCE: AttendanceRow[] = [
@@ -1555,6 +1562,8 @@ const DEMO_ATTENDANCE: AttendanceRow[] = [
   { employeeCode: 'e4', inAt: 9 * 60 + 30, outAt: null, status: 'PRESENT', reason: null },
   { employeeCode: 'e6', inAt: 8 * 60 + 50, outAt: null, status: 'PRESENT', reason: null },
   { employeeCode: 'e7', inAt: 9 * 60 + 40, outAt: null, status: 'PRESENT', reason: null },
+  { employeeCode: 'e9', inAt: 8 * 60 + 35, outAt: null, status: 'PRESENT', reason: null },
+  { employeeCode: 'e10', inAt: 9 * 60 + 5, outAt: null, status: 'LATE', reason: 'Stock delivery at the gate' },
   // e5 is on leave; e8 is simply not in the sheet.
 ];
 
@@ -1606,6 +1615,66 @@ function attendanceFor(now: number, firstPatientAt: number | null) {
       workStartsAt: c.workStartsAt, shortMinutes: c.shortMinutes, owns: c.owns,
     })),
     reportBy: REPORT_BY,
+  };
+}
+
+/* -------------------------------------------------------------------------
+ * What is failing, who is involved, and who may see it
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Every engine's output, gathered once, for the dashboard.
+ *
+ * The owner: *"on the dashboard I see the attendance, the clinic readiness
+ * health with the failing parameters and who is involved in the failing
+ * parameters."*
+ *
+ * Note what is absent: there is no list of failures anywhere in this file.
+ * Each engine is asked what it thinks and `gatherFailures` turns the answers
+ * into rows. Fix the underlying fact — record the batch, count the burs, come
+ * in on time — and the row is gone on the next read, because the row was never
+ * stored in the first place.
+ */
+function failuresNow() {
+  const w = engineWorld();
+  const now = w.now;
+  const a = attendanceView(DEMO_STAFF, DEMO_ATTENDANCE, DEMO_LEAVE,
+    w.firstPatientAt, DEMO_TODAY, now);
+
+  const eq = equipmentView(ASSETS, assetHistory(now), now);
+  const inv = inventoryView(STOCK_ITEMS, DEMO_LOTS, stockEvents(now), now,
+    DEMO_RESERVATIONS);
+
+  const events = [...w.events, ...careProgressEvents(now, db.endOfDay), ...DEMO_REFUSALS];
+  const dependedOn = new Set(ASSETS
+    .filter((x) => x.category === 'STERILIZATION' || x.category === 'PLANT')
+    .map((x) => x.tag));
+  const unusableAssets = [...new Set([
+    ...eq.unusable.map((r) => r.asset.tag), ...eq.down.map((r) => r.asset.tag),
+  ])].filter((tag) => dependedOn.has(tag));
+  const emergencyReady = !['EMERGENCY-01', 'OXYGEN-01'].some(
+    (tag) => eq.unusable.some((r) => r.asset.tag === tag)
+      || eq.down.some((r) => r.asset.tag === tag));
+
+  const compliance = DEMO_BOOKINGS
+    .map((b) => complianceFor(b, factsFor(b.id), events, now,
+      { unusableAssets, stockVouched: inv.gateStock, emergencyReady }))
+    .filter((c): c is Compliance => c !== null);
+
+  const holders = holdersFrom(a);
+  return {
+    now,
+    attendance: a,
+    holders,
+    all: gatherFailures({
+      attendance: a,
+      readiness: readiness(w.events, w.operatories, w.firstPatientAt, now),
+      compliance,
+      equipment: eq,
+      inventory: inv,
+      closing: closing(w.events, w.operatories, w.shutAt, now),
+      now,
+    }, holders),
   };
 }
 
@@ -2365,6 +2434,80 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         node: FLOWS[f.kind].nodes[f.at]?.id ?? null,
       })),
       eventCount: w.events.length,
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     THE DASHBOARD — what is failing, and who is on it
+
+     One endpoint, and what it returns depends on who is asking. The filtering
+     happens here rather than in the screen, on constitution rule 3: if the
+     assistant's tablet receives the whole clinic's failures and hides most of
+     them, the whole clinic's failures are on the assistant's tablet.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  if (path === '/api/v1/lens') {
+    const { now, attendance: a, all } = failuresNow();
+    const roles = (db.signedIn?.roles ?? ['RECEPTION']) as RoleCode[];
+    const l = lensFor(engineRole(), all);
+
+    return json({
+      now,
+      role: l.role as string,
+      question: l.question,
+      headline: l.headline,
+      wholeClinic: l.wholeClinic,
+      hidden: l.hidden,
+      total: all.length,
+      places: placesFor(roles) as string[],
+      failing: l.failing.map((f) => ({
+        id: f.id, area: f.area, severity: f.severity,
+        what: f.what, because: f.because,
+        ownerRole: f.ownerRole as string | null,
+        involved: f.involved.map((p) => ({
+          employeeCode: p.employeeCode, label: p.label, state: p.state, note: p.note,
+        })),
+        dueAt: f.dueAt, goes: f.goes,
+      })),
+      // Attendance is shown in full to whoever can see the whole clinic, and
+      // as their own row to everybody else. A housekeeper does not need the
+      // roster; she needs to know whether she is late.
+      staffing: l.wholeClinic ? {
+        headline: a.headline,
+        staffed: a.staffed,
+        here: a.people.filter((p) => p.inAt !== null).length,
+        expected: a.people.length,
+        late: a.late.length,
+        lateUnexplained: a.lateUnexplained.length,
+        unaccounted: a.unaccounted.length,
+        onLeave: a.people.filter((p) => p.state === 'ON_LEAVE').length,
+        coverage: a.coverage.map((c) => ({
+          role: c.role as string, needed: c.needed, here: c.here,
+          covered: c.covered, critical: c.critical, owns: c.owns,
+          neededBy: c.neededBy, because: c.because,
+        })),
+        people: a.people.map((p) => ({
+          employeeCode: p.employeeCode, label: p.label, roles: p.roles as string[],
+          state: p.state, inAt: p.inAt, dueIn: p.dueIn, lateBy: p.lateBy,
+          lateForTheirWork: p.lateForTheirWork, headline: p.headline,
+        })),
+      } : null,
+      me: (() => {
+        const mine = a.people.find((p) => p.employeeCode === db.signedIn?.employeeId)
+          ?? a.people.find((p) => p.roles.includes(engineRole()));
+        return mine === undefined ? null : {
+          label: mine.label, state: mine.state, inAt: mine.inAt,
+          dueIn: mine.dueIn, headline: mine.headline,
+        };
+      })(),
+      booking: (() => {
+        const w = bookingWindow();
+        return {
+          bookableFrom: w.bookableFrom, deliverableFrom: w.deliverableFrom,
+          binding: w.binding as string, overpromisedBy: w.overpromisedBy,
+          honest: w.honest, because: w.because,
+        };
+      })(),
     });
   }
 

@@ -2978,3 +2978,69 @@ label.field-label {
 .clash-title { font-size: 13.5px; font-weight: 700; color: #7d5610; }
 .clash-row { margin-top: 5px; font-size: 13px; color: #6d5216; line-height: 1.5; }
 .clash-note { margin-top: 7px; font-size: 12px; color: #8a7448; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   The dashboard's failing parameters
+
+   A failure carrying its people. Every other list in KuBi is work somebody
+   must do; this is a fault somebody must own, so the row is built around the
+   name rather than around the tick — the left rule carries the severity, the
+   foot carries the person, and there is no chevron because pressing a fault
+   does not fix it.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.fail-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 12px; }
+
+.fail {
+  padding: 11px 14px; border-radius: 4px;
+  background: var(--paper-2, #fbfcfb);
+  border: 1px solid var(--line, #e4e8e6);
+  border-left-width: 3px;
+}
+.fail-stops { border-left-color: #b0322a; background: #fdf6f5; }
+.fail-holds { border-left-color: #b8863a; background: #fdfaf4; }
+.fail-watch { border-left-color: #9aa8a3; }
+
+.fail-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+}
+.fail-what { font-size: 14.5px; font-weight: 650; color: var(--ink-1, #17211d); }
+.fail-sev {
+  flex: none; font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
+  color: var(--ink-3, #7d8c86);
+}
+.fail-stops .fail-sev { color: #b0322a; }
+.fail-holds .fail-sev { color: #9a6f24; }
+
+.fail-why {
+  margin: 4px 0 0; font-size: 13px; line-height: 1.5;
+  color: var(--ink-2, #4a5a54);
+}
+
+.fail-foot {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  justify-content: space-between; gap: 6px 16px;
+  margin-top: 9px; padding-top: 8px;
+  border-top: 1px solid var(--line, #e9edeb);
+}
+.fail-where {
+  flex: none; font-size: 12px; color: var(--ink-3, #7d8c86);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Who is on it. The line the screen exists for. */
+.who { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; }
+.who-person { display: inline-flex; align-items: baseline; gap: 6px; }
+.who-name { font-weight: 650; color: var(--ink-1, #17211d); }
+.who-note { color: var(--ink-3, #7d8c86); }
+
+/* Nobody holds the role. Drawn as a state, not as an empty field — this is
+   the row that will still be here at six o'clock. */
+.who-nobody {
+  font-size: 12.5px; font-weight: 650; color: #b0322a;
+}
+
+/* The dashboard's own coverage strip reuses the readiness vocabulary, and
+   adds only the two verdicts a position can be in. */
+.staff-role.is-done { color: #0c5f4e; }
+.staff-role.is-bad  { color: #9d2f26; font-weight: 600; }

@@ -123,6 +123,17 @@ const LIBRARY = new Set([
   'staffing', 'staff-roles', 'staff-role', 'staff-mark', 'staff-name',
   'staff-count', 'staff-owns',
   'clash', 'clash-title', 'clash-row', 'clash-note',
+  /* ── the dashboard's failing parameters ───────────────────────────────
+     The one shape the library did not have: a failure carrying its people.
+     Every other list in KuBi is work somebody must do; this is a fault
+     somebody must own, and the owner's name is the point of the row rather
+     than a detail on it. `who-nobody` is deliberately its own class — an
+     unowned failure has to read differently from an owned one, not merely
+     have an empty field where a name would be. */
+  'fail-list', 'fail', 'fail-head', 'fail-what', 'fail-sev', 'fail-why',
+  'fail-foot', 'fail-where',
+  'fail-stops', 'fail-holds', 'fail-watch',
+  'who', 'who-nobody', 'who-person', 'who-name', 'who-note',
   // shared state modifiers
   'is-good', 'is-warn', 'is-bad', 'is-done', 'is-here', 'is-urgent',
 ]);

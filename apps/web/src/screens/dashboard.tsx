@@ -1,16 +1,44 @@
-import { useCallback, useEffect, useState } from 'react';
-import { api, type ClinicView } from '../api.js';
+import { api, type LensView, type FailingRow } from '../api.js';
+import {
+  Screen, Title, Answer, Group, Row, Tag, Fact, Facts, Empty, Notice,
+  useLoad, Loading, Failed, type Tone,
+} from '../ui.js';
 
 /**
- * DASHBOARD — where the clinic is, before what any one person owes.
+ * THE DASHBOARD — what is failing, and who is on it.
  *
- * The design principle, in one screen: *"Every screen should reinforce where
- * the clinic is in its day, not just what an individual needs to click next."*
- * So the headline is the clinic's state and the list underneath is the work,
- * worst first — never a grid of tiles whose numbers a person has to interpret.
+ * ─────────────────────────────────────────────────────────────────────────
+ * What the owner asked for, and what was wrong before
+ * ─────────────────────────────────────────────────────────────────────────
  *
- * Everything here is calculated by the engine. This file decides only which
- * sentence to show, never what is true.
+ * *"This does not show anything to me as a manager, and in the whole app also
+ * I cannot see. Clearly I want this as an operational app where on the
+ * dashboard I see the attendance, the clinic readiness health with the failing
+ * parameters and who is involved in the failing parameters."*
+ *
+ * The old screen counted things. It could tell you nine blocks were
+ * outstanding, and it could not tell you that five of them belonged to a
+ * housekeeper who was still on the bus. Counts are not operations. What a
+ * manager does at 09:15 is pick up a telephone, and to do that they need three
+ * things in one place: **what is broken, how badly, and whose name to say.**
+ *
+ * So every row here is a failing parameter carrying its people. Nothing is a
+ * tile; nothing is a percentage that has to be interpreted. If a row has
+ * nobody on it, that is drawn louder than the row itself — an unowned failure
+ * is the one still here at six o'clock.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * And each role gets a different screen
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * *"All the task should not be seen by all, only related, so that confusion
+ * does not happen."*
+ *
+ * The narrowing is done on the server — this file receives one person's share
+ * and renders it. The one thing it must do honestly is say how much it is
+ * *not* showing: `hidden` is drawn, always, because "3 outstanding" and "3 of
+ * 11, the rest are not yours" are different sentences and only the second one
+ * is true.
  */
 
 const hhmm = (m: number | null | undefined): string =>
@@ -18,152 +46,254 @@ const hhmm = (m: number | null | undefined): string =>
     ? '—'
     : `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
-export function Dashboard({ go }: { go: (id: string) => void }) {
-  const [view, setView] = useState<ClinicView | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setView(await api.clinic());
-      setProblem(null);
-    } catch (err) {
-      setProblem(err instanceof Error ? err.message : 'Could not read the clinic.');
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-    const t = setInterval(() => void load(), 30_000);
-    return () => clearInterval(t);
-  }, [load]);
-
-  if (!view) {
-    return <div className="screen">{problem
-      ? <div className="notice notice-stop" role="alert">{problem}</div>
-      : <p className="screen-sub">Reading the clinic…</p>}</div>;
+/**
+ * A due time said the way a person would say it.
+ *
+ * `hhmm` alone produced "Due -60:-30" on this screen, because a due time can
+ * be in the past — a service overdue by weeks, or a gate whose moment passed
+ * before anybody looked. A clock face cannot express that, and printing one
+ * anyway is the "never imply a state you do not have" rule broken in the
+ * smallest possible way.
+ *
+ * So: a time today, or how long ago it went by. Days rather than a date,
+ * because "29 days overdue" is a decision and "12 July" is arithmetic
+ * somebody has to do standing up.
+ */
+function dueWord(dueAt: number | null, now: number): string | null {
+  if (dueAt === null) return null;
+  if (dueAt >= 0 && dueAt < 24 * 60) {
+    return dueAt < now ? `Due ${hhmm(dueAt)}, passed` : `Due ${hhmm(dueAt)}`;
   }
+  const days = Math.round((now - dueAt) / (24 * 60));
+  if (days >= 1) return `${days} day${days === 1 ? '' : 's'} overdue`;
+  const mins = now - dueAt;
+  return mins > 0 ? `${mins} minutes overdue` : `Due in ${-mins} minutes`;
+}
 
-  const { readiness: r, closing: c, decisions } = view;
-  const late = decisions.filter((d) => d.lateBy > 0);
-  const blocked = decisions.filter((d) => d.verdict === 'BLOCKED');
+const SEVERITY_WORD: Record<FailingRow['severity'], string> = {
+  STOPS: 'STOPS WORK', HOLDS: 'HOLDS', WATCH: 'WATCH',
+};
 
-  // What the clinic is, said once. Deliberately a single sentence rather than
-  // four tiles: a person walking in should not have to assemble the state of
-  // their own clinic out of numbers.
-  const headline =
-    r.unconfigured.length > 0 ? 'The clinic is not set up yet'
-      : !view.unlocked ? 'The clinic has not been unlocked'
-        : !r.ready ? `${r.outstanding.length} thing${r.outstanding.length === 1 ? '' : 's'} before the clinic can open`
-        : c.clear ? 'The day is closed down'
-          : c.closingNow ? `${c.outstanding.length} thing${c.outstanding.length === 1 ? '' : 's'} before the team can leave`
-            : blocked.length > 0 ? `${blocked.length} blocked, and ${late.length} late`
-              : late.length > 0 ? `${late.length} thing${late.length === 1 ? '' : 's'} running late`
-                : 'The clinic is running to plan';
+/**
+ * Spelled out rather than built from the severity.
+ *
+ * `fail-${sev.toLowerCase()}` reads better and defeats the library test, which
+ * can only check class names it can see. A class name assembled at runtime is
+ * a class name nobody can grep for — so the map is the honest form.
+ */
+const SEVERITY_CLASS: Record<FailingRow['severity'], string> = {
+  STOPS: 'fail fail-stops', HOLDS: 'fail fail-holds', WATCH: 'fail fail-watch',
+};
 
-  const tone = r.unconfigured.length > 0 || blocked.length > 0 || r.overdue || c.runningLate
-    ? 'is-bad'
-    : (!view.unlocked || !r.ready || late.length > 0) ? 'is-warn' : 'is-good';
+const AREA_WORD: Record<string, string> = {
+  ATTENDANCE: 'Staffing',
+  READINESS: 'Clinic readiness',
+  PATIENT: 'Patients today',
+  EQUIPMENT: 'Equipment',
+  STOCK: 'Stock',
+  CLOSING: 'Closing',
+};
 
+/**
+ * Who is on it — the line the whole screen exists for.
+ *
+ * Three cases, and the middle one is the one that matters: somebody is here
+ * and can be asked; somebody is here and is themselves the problem; or nobody
+ * holds the role at all, which is not a blank field but the most useful
+ * sentence on the page.
+ */
+function Involved({ row }: { row: FailingRow }) {
+  if (row.involved.length === 0) {
+    return (
+      <span className="who who-nobody">
+        Nobody is holding {row.ownerRole ? roleWord(row.ownerRole) : 'this'} today
+      </span>
+    );
+  }
   return (
-    <div className="screen screen-wide">
-      {problem && <div className="notice notice-stop" role="alert">{problem}</div>}
+    <span className="who">
+      {row.involved.map((p) => (
+        <span className="who-person" key={p.employeeCode}>
+          <b className="who-name">{p.label}</b>
+          <span className="who-note">{p.note}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
 
-      <div className="dash-kicker">THE CLINIC, NOW</div>
-      <h2 className={`dash-headline ${tone}`}>{headline}</h2>
-      <p className="dash-sub">
-        {hhmm(view.now)}
-        {r.targetAt !== null && ` · first patient ${hhmm(r.targetAt)}`}
-        {c.shutAt !== null && ` · shuts ${hhmm(c.shutAt)}`}
-      </p>
-
-      <div className="dash-cards">
-        <StateCard
-          title="Opening"
-          state={r.unconfigured.length > 0 ? 'Not set up'
-            : r.ready ? 'Ready' : `${r.outstanding.length} left`}
-          detail={r.ready && r.readyAt !== null
-            ? `Ready at ${hhmm(r.readyAt)}`
-            : r.startBy !== null ? `Start by ${hhmm(r.startBy)}` : 'No first patient booked'}
-          percent={Math.round(r.compliance * 100)}
-          tone={r.ready ? 'good' : r.overdue ? 'bad' : 'warn'}
-          onOpen={() => go('READINESS')}
-        />
-        <StateCard
-          title="Closing"
-          state={c.clear ? 'Closed down' : `${c.outstanding.length} left`}
-          detail={c.clear && c.closedAt !== null
-            ? `Out at ${hhmm(c.closedAt)}`
-            : c.expectedCloseAt !== null ? `Out by ${hhmm(c.expectedCloseAt)}` : 'No shut time set'}
-          percent={Math.round(c.compliance * 100)}
-          tone={c.clear ? 'good' : c.runningLate ? 'bad' : 'warn'}
-          onOpen={() => go('CLOSING')}
-        />
+function Failing({ row, now }: { row: FailingRow; now: number }) {
+  const due = dueWord(row.dueAt, now);
+  return (
+    <div className={SEVERITY_CLASS[row.severity]}>
+      <div className="fail-head">
+        <span className="fail-what">{row.what}</span>
+        <span className="fail-sev">{SEVERITY_WORD[row.severity]}</span>
       </div>
-
-      <h3 className="dash-section">What needs doing — most serious first</h3>
-      {decisions.length === 0 ? (
-        <div className="empty">
-          {/* An empty list means two opposite things, and saying the wrong one
-              is a small daily lie about the state of the clinic. */}
-          <div className="empty-big">
-            {view.unlocked ? 'Nothing outstanding' : 'The day has not started'}
-          </div>
-          <div>
-            {view.unlocked
-              ? 'Every open piece of work has been done.'
-              : 'Reception unlocks the clinic, and the morning appears here.'}
-          </div>
-        </div>
-      ) : (
-        <div className="dash-list">
-          {decisions.slice(0, 12).map((d) => (
-            <div key={d.id} className="dash-row">
-              <span className={`tag ${
-                d.verdict === 'BLOCKED' ? 'tag-stop'
-                  : d.verdict === 'ESCALATE' ? 'tag-warn'
-                    : 'tag-calm'
-              }`}>
-                {d.verdict === 'BLOCKED' ? 'Blocked'
-                  : d.verdict === 'ESCALATE' ? 'Late' : 'To do'}
-              </span>
-              <div className="dash-row-body">
-                <div className="dash-row-title">{d.question}</div>
-                <div className="dash-row-meta">
-                  {who(d.owner)}
-                  {d.lateBy > 0 ? ` · ${d.lateBy} min over` : ''}
-                  {d.because ? ` · ${d.because}` : ''}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <p className="fail-why">{row.because}</p>
+      <div className="fail-foot">
+        <Involved row={row} />
+        <span className="fail-where">
+          {due === null ? row.goes : `${due} · ${row.goes}`}
+        </span>
+      </div>
     </div>
   );
 }
 
-function StateCard({
-  title, state, detail, percent, tone, onOpen,
-}: {
-  title: string;
-  state: string;
-  detail: string;
-  percent: number;
-  tone: 'good' | 'warn' | 'bad';
-  onOpen: () => void;
-}) {
-  const toneClass = tone === 'good' ? 'is-good' : tone === 'warn' ? 'is-warn' : 'is-bad';
+/**
+ * The roster, for whoever runs the clinic.
+ *
+ * A count of heads would be cheaper and would answer nothing. What a manager
+ * needs is which *positions* are held, because the morning is a set of jobs
+ * and not a headcount — five people in the building with nobody on the
+ * autoclave is a clinic that cannot open.
+ */
+function Staffing({ s }: { s: NonNullable<LensView['staffing']> }) {
   return (
-    <button className={`state-card ${toneClass}`} type="button" onClick={onOpen}>
-      <div className="state-card-title">{title}</div>
-      <div className="state-card-state">{state}</div>
-      <div className="state-card-detail">{detail}</div>
-      <div className="state-card-bar" aria-hidden="true">
-        <span style={{ width: `${percent}%` }} />
+    <Group title="Attendance" note={s.headline} tone={s.staffed ? 'good' : 'stop'}>
+      <Facts>
+        <Fact value={`${s.here}/${s.expected}`} label="In the building"
+          tone={s.here === s.expected ? 'good' : 'warn'} />
+        <Fact value={s.unaccounted} label="Unaccounted for"
+          tone={s.unaccounted > 0 ? 'stop' : 'good'} />
+        <Fact value={s.lateUnexplained} label="Late, no reason"
+          tone={s.lateUnexplained > 0 ? 'warn' : 'good'} />
+        <Fact value={s.onLeave} label="On leave" />
+      </Facts>
+
+      <div className="staff-roles">
+        {s.coverage.map((c) => (
+          <div className={`staff-role${c.covered ? ' is-done' : ' is-bad'}`} key={c.role}>
+            <span className="staff-mark">{c.covered ? '✓' : '—'}</span>
+            <span className="staff-name">{roleWord(c.role)}</span>
+            <span className="staff-count">{c.here}/{c.needed}</span>
+            <span className="staff-owns">
+              {c.owns}{c.neededBy === null ? '' : ` · from ${hhmm(c.neededBy)}`}
+            </span>
+          </div>
+        ))}
       </div>
-    </button>
+    </Group>
   );
 }
 
-const who = (role: string) =>
-  role.replace(/_/g, ' ').toLowerCase().replace(/^./, (ch) => ch.toUpperCase());
+/**
+ * The one row for somebody who is not running the clinic.
+ *
+ * They do not get the roster — a housekeeper does not need to know who else is
+ * late. They get their own line, because "am I on time" is a real question and
+ * the app should not make them guess.
+ */
+function Me({ me }: { me: NonNullable<LensView['me']> }) {
+  const late = me.inAt !== null && me.inAt > me.dueIn;
+  return (
+    <Group title="You today" tone={late ? 'warn' : 'good'}>
+      <Row
+        title={me.label}
+        note={me.headline}
+        tone={late ? 'warn' : 'good'}
+        tags={<Tag tone={late ? 'warn' : 'good'} mono>Due {hhmm(me.dueIn)}</Tag>}
+      />
+    </Group>
+  );
+}
+
+export function Dashboard({ go }: { go: (id: string) => void }) {
+  const { data, failed, reload } = useLoad<LensView>(() => api.lens(), []);
+
+  if (failed) return <Failed what="Could not read the clinic." back={reload} />;
+  if (!data) return <Loading />;
+
+  const worst = data.failing[0]?.severity;
+  const tone: Tone = worst === 'STOPS' ? 'stop'
+    : worst === 'HOLDS' ? 'warn'
+      : worst === 'WATCH' ? 'calm' : 'good';
+
+  // Grouped by area, in the order the day happens: staffing, then the
+  // morning, then the patients it was made ready for.
+  const ORDER = ['ATTENDANCE', 'READINESS', 'PATIENT', 'EQUIPMENT', 'STOCK', 'CLOSING'];
+  const byArea = ORDER
+    .map((area) => ({ area, rows: data.failing.filter((f) => f.area === area) }))
+    .filter((g) => g.rows.length > 0);
+
+  const stops = data.failing.filter((f) => f.severity === 'STOPS').length;
+
+  return (
+    <Screen wide>
+      <Title question={data.question}>Dashboard</Title>
+
+      <Answer
+        verdict={stops > 0 ? 'WORK IS STOPPED' : data.failing.length > 0 ? 'RUNNING, WITH PROBLEMS' : 'CLEAR'}
+        why={data.headline}
+        tone={tone}
+      />
+
+      {/* The book against the roster. Not a failing parameter — nothing is
+          broken today — but a standing promise the building cannot keep, and
+          the manager is the only person who can settle it. */}
+      {!data.booking.honest && data.wholeClinic && (
+        <Notice tone="warn" title="The appointment book promises more than the roster can deliver">
+          {data.booking.because}
+          {' '}KuBi will not choose between them: either somebody comes in earlier,
+          the instruments are cycled the evening before, or the book opens later.
+        </Notice>
+      )}
+
+      {data.staffing ? <Staffing s={data.staffing} /> : data.me ? <Me me={data.me} /> : null}
+
+      {byArea.map(({ area, rows }) => (
+        <Group
+          key={area}
+          title={AREA_WORD[area] ?? area}
+          count={rows.length}
+          tone={rows.some((r) => r.severity === 'STOPS') ? 'stop' : 'warn'}
+        >
+          <div className="fail-list">
+            {rows.map((r) => <Failing row={r} now={data.now} key={r.id} />)}
+          </div>
+          <button className="btn btn-quiet" type="button" onClick={() => go(placeOf(area))}>
+            Open {AREA_WORD[area] ?? area}
+          </button>
+        </Group>
+      ))}
+
+      {data.failing.length === 0 && (
+        <Empty big={data.wholeClinic ? 'Nothing is failing.' : 'Nothing outstanding for you.'}>
+          {data.wholeClinic
+            ? 'Every position is covered, the morning is reported, and no booking is held.'
+            : 'The clinic may still have work on it — none of it is yours.'}
+        </Empty>
+      )}
+
+      {/* Said out loud, always. A short list that does not admit it is short
+          teaches people they are seeing everything, which is worse than
+          showing them nothing. */}
+      {data.hidden > 0 && (
+        <p className="screen-sub">
+          Showing {data.failing.length} of {data.total}. The other {data.hidden} belong to
+          other roles and are not yours to act on.
+        </p>
+      )}
+    </Screen>
+  );
+}
+
+/** Which place on the rail deals with this kind of failure. */
+function placeOf(area: string): string {
+  switch (area) {
+    case 'ATTENDANCE':
+    case 'READINESS': return 'READINESS';
+    case 'PATIENT': return 'PATIENT_EVENTS';
+    case 'EQUIPMENT':
+    case 'STOCK': return 'EQUIPMENT';
+    case 'CLOSING': return 'CLOSING';
+    default: return 'MORE';
+  }
+}
+
+/** A role code as a person would say it. */
+function roleWord(code: string): string {
+  return code.toLowerCase().replace(/_/g, ' ')
+    .replace(/^./, (c) => c.toUpperCase());
+}
