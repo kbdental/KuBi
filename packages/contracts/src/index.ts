@@ -30,6 +30,7 @@ export * from './attendance.js';
 export * from './emergency.js';
 export * from './housekeeping.js';
 export * from './assignment.js';
+export * from './clinical.js';
 export * from './reception.js';
 export * from './lens.js';
 export * from './engine.js';

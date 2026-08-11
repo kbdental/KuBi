@@ -229,6 +229,27 @@ const universal = (): CareItem[] => [
   item('MEAL_INSTRUCTIONS', 'Eating and drinking instructions given', REC,
     Objective.PATIENT_HAPPY, CareStage.BEFORE, days(1), CareGate.ADVISE,
     'The patient has not been told whether to eat before this appointment'),
+  // CLN-002. Allergies had no gate of their own — they were checked inside the
+  // anaesthetic review and again before a prescription, both of which are
+  // specific treatments. The matrix makes it PS on *every patient visit*, and
+  // it is right to: the drug that kills somebody is more often the one nobody
+  // thought to check against than the one nobody prescribed.
+  item('ALLERGY', 'Allergies reviewed with the patient', DOC,
+    Objective.PATIENT_SAFE, CareStage.BEFORE, days(1), CareGate.BLOCK,
+    'Nobody has reviewed this patient’s allergies for today'),
+  // CLN-006. A signed implant plan already existed; a documented plan for
+  // everything else did not. A filling with no written plan is a filling
+  // nobody can be shown to have agreed to.
+  item('TREATMENT_PLAN', 'Treatment plan documented', DOC,
+    Objective.RECORDS_COMPLETE, CareStage.BEFORE, days(1), CareGate.BLOCK,
+    'No documented treatment plan for what is about to be done'),
+  // CLN-007. Advisory, because the matrix marks it I — and because a patient
+  // who has not been given a figure is a complaint rather than a clinical
+  // failure. It still holds the day after treatment, which is where the
+  // argument about money actually happens.
+  item('ESTIMATE', 'Estimate explained and accepted', REC,
+    Objective.PATIENT_HAPPY, CareStage.BEFORE, days(1), CareGate.ADVISE,
+    'The patient has not been given a figure for this treatment'),
   item('CONSENT', 'Consent taken', DOC, Objective.RECORDS_COMPLETE,
     CareStage.BEFORE, mins(15), CareGate.BLOCK,
     'Consent has not been signed'),
@@ -280,6 +301,20 @@ const bleeding = (): CareItem[] => [
  * protocol does not apply, which is the place it matters most.
  */
 const emergencyPrep = (): CareItem[] => [
+  // CLN-002, at ten minutes instead of a day. An emergency patient is the one
+  // most likely to be given an antibiotic or an analgesic on the spot, and the
+  // least likely to have a history anybody has read — so this is the visit
+  // where an unchecked allergy actually kills somebody.
+  //
+  // The treatment plan (CLN-006) deliberately does *not* follow it here. An
+  // emergency is "treat the cause of the pain now"; the plan is the DEFINITIVE
+  // follow-up this treatment already requires, and blocking pain relief at
+  // five o'clock on a documented plan is a rule a clinic would route around by
+  // the end of the week.
+  item('ALLERGY', 'Allergies reviewed with the patient', DOC,
+    Objective.PATIENT_SAFE, CareStage.BEFORE, mins(10), CareGate.BLOCK,
+    'Nobody has reviewed this patient’s allergies, and they are about to be '
+    + 'given something'),
   item('PREOP_DOC', 'Records made at the time, not afterwards', DOC,
     Objective.RECORDS_COMPLETE, CareStage.BEFORE, mins(0), CareGate.BLOCK,
     'There is no record of the presenting complaint and examination'),
@@ -341,6 +376,16 @@ const imaging = (what: string, leadDays: number): CareItem[] => [
   item('IMAGING', `${what} taken and reported`, DOC, Objective.PATIENT_SAFE,
     CareStage.BEFORE, days(leadDays), CareGate.BLOCK,
     `The ${what.toLowerCase()} this treatment is planned from does not exist`),
+  // CLN-004, and it moved here from the CBCT treatment when the clinical
+  // matrix was checked against the catalogue. Justification was on one
+  // treatment while `imaging()` was used by fifteen — and an exposure without
+  // a written justification is not a paperwork gap, it is an unjustified dose
+  // and a statutory one. Every treatment that exposes a patient carries it.
+  item('JUSTIFY', 'Exposure justified in writing against the question asked',
+    DOC, Objective.PATIENT_SAFE, CareStage.BEFORE, days(leadDays),
+    CareGate.BLOCK,
+    `A ${what.toLowerCase()} is planned and the clinical question it answers `
+    + 'is not recorded'),
   item('PREGNANCY_IMAGING', 'Pregnancy confirmed before exposure', ASST,
     Objective.PATIENT_SAFE, CareStage.BEFORE, mins(30), CareGate.BLOCK,
     'Pregnancy status is not established and this treatment exposes the patient',
@@ -461,10 +506,9 @@ export const TREATMENTS: readonly Treatment[] = [
   treatment('CBCT', 'Cone-beam CT',
     TreatmentCategory.DIAGNOSTIC, 20, 1,
     universal(),
+    // `imaging()` carries the justification now, so the CBCT no longer
+    // declares its own — one surface, one rule.
     imaging('Cone-beam CT', 0),
-    [item('JUSTIFY', 'Exposure justified in writing against the question asked',
-      DOC, Objective.PATIENT_SAFE, CareStage.BEFORE, days(1), CareGate.BLOCK,
-      'A CBCT has been booked and the justification for the dose is not recorded')],
     [item('REPORT', 'Radiology report written', DOC, Objective.RECORDS_COMPLETE,
       CareStage.AFTER, days(2), CareGate.BLOCK,
       'The scan has been taken and not reported')]),

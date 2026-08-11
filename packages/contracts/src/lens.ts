@@ -54,6 +54,7 @@ import { ItemVerdict, type EmergencyReadiness } from './emergency.js';
 import type { InventoryView } from './inventory.js';
 import type { HygieneView } from './housekeeping.js';
 import type { ReceptionView } from './reception.js';
+import type { ClinicalView } from './clinical.js';
 
 /* -------------------------------------------------------------------------
  * A failing parameter
@@ -66,6 +67,8 @@ export const FailureArea = {
   /** The appointment book and the front desk — APT and PAT. */
   BOOK: 'BOOK',
   PATIENT: 'PATIENT',
+  /** CLN-001 to CLN-010 — may this patient be treated at all. */
+  CLINICAL: 'CLINICAL',
   EQUIPMENT: 'EQUIPMENT',
   STOCK: 'STOCK',
   CLOSING: 'CLOSING',
@@ -77,6 +80,7 @@ export const AREA_LABEL: Readonly<Record<FailureArea, string>> = {
   READINESS: 'Clinic readiness',
   BOOK: 'Reception',
   PATIENT: 'Patients today',
+  CLINICAL: 'Pre-treatment',
   EQUIPMENT: 'Equipment',
   STOCK: 'Stock',
   CLOSING: 'Closing',
@@ -303,6 +307,8 @@ export interface FailureInputs {
   hygiene?: HygieneView;
   /** APT-001 to APT-012 and PAT-001 to PAT-009. See `reception`. */
   book?: ReceptionView;
+  /** CLN-001 to CLN-010. See `clinicalControls`. */
+  clinical?: ClinicalView;
   /** The minute now, for due-time wording. */
   now: number;
 }
@@ -576,6 +582,44 @@ export function gatherFailures(
     });
   }
 
+  /* ── CLN-009 · treated without consent ────────────────────────────── */
+  //
+  // The owner: *"the target is simply 100%. No averaging away consent
+  // failures."* So this is one row per patient, never a rate — and it goes
+  // above everything else on the dashboard, because nothing a clinic does in a
+  // day outranks having treated somebody who did not agree to it.
+  for (const f of input.clinical?.consent.failures ?? []) {
+    out.push({
+      id: `CLN:CONSENT:${f.bookingId}:${f.gateId}`,
+      area: FailureArea.CLINICAL,
+      severity: FailureSeverity.STOPS,
+      what: `${f.patientLabel} was treated without consent — ${f.label}`,
+      because: f.because,
+      ownerRole: RoleCode.QUALITY_COMPLIANCE,
+      involved: people(RoleCode.QUALITY_COMPLIANCE),
+      dueAt: f.deliveredAt,
+      goes: 'Pre-treatment',
+    });
+  }
+  // CLN-010, before the chair rather than at it. One row per patient who is
+  // not ready, named by the control that is holding them.
+  for (const r of input.clinical?.notReady ?? []) {
+    const worst = r.controls.find(
+      (c) => c.priority === 'PS' && (c.verdict === 'MISSING' || c.verdict === 'UNKNOWN'));
+    out.push({
+      id: `CLN:NOT_READY:${r.bookingId}`,
+      area: FailureArea.CLINICAL,
+      severity: worst ? FailureSeverity.STOPS : FailureSeverity.HOLDS,
+      what: `${r.patientLabel} — ${r.treatmentName} has not passed its `
+        + 'pre-treatment controls',
+      because: worst ? `${worst.id} ${worst.activity}: ${worst.because}` : r.headline,
+      ownerRole: RoleCode.TREATING_DOCTOR,
+      involved: people(RoleCode.TREATING_DOCTOR),
+      dueAt: r.at,
+      goes: 'Pre-treatment',
+    });
+  }
+
   /* ── Patients booked today ────────────────────────────────────────── */
   for (const c of input.compliance ?? []) {
     // A breach is not a failing parameter to be chased — it is a thing that
@@ -791,8 +835,8 @@ export function gatherFailures(
  * front of staffing is answering a question that has not been asked yet.
  */
 const AREA_ORDER: Record<FailureArea, number> = {
-  ATTENDANCE: 0, READINESS: 1, BOOK: 2, PATIENT: 3,
-  EQUIPMENT: 4, STOCK: 5, CLOSING: 6,
+  ATTENDANCE: 0, READINESS: 1, BOOK: 2, CLINICAL: 3, PATIENT: 4,
+  EQUIPMENT: 5, STOCK: 6, CLOSING: 7,
 };
 
 /**
@@ -867,6 +911,15 @@ export const Place = {
   // ready, then the patient arrives, then the patient event happens.
   RECEPTION: 'RECEPTION',
   PATIENT_EVENTS: 'PATIENT_EVENTS',
+  /**
+   * CLN-001 to CLN-010 — the pre-treatment controls.
+   *
+   * A tab of its own on the owner's instruction, and it earns one: patient
+   * events answers *what work does this treatment create*, and this answers
+   * *may this patient be treated at all*. Two different questions, asked by
+   * two different people at two different moments.
+   */
+  CLINICAL: 'CLINICAL',
   EQUIPMENT: 'EQUIPMENT',
   CLOSING: 'CLOSING',
   MORE: 'MORE',
@@ -892,24 +945,28 @@ export type Place = (typeof Place)[keyof typeof Place];
 const PLACES: Partial<Record<RoleCode, readonly Place[]>> = {
   [RoleCode.OWNER_DIRECTOR]: [
     Place.DASHBOARD, Place.READINESS, Place.RECEPTION, Place.PATIENT_EVENTS,
-    Place.EQUIPMENT, Place.CLOSING, Place.MORE,
+    Place.CLINICAL, Place.EQUIPMENT, Place.CLOSING, Place.MORE,
   ],
   [RoleCode.CLINIC_HEAD]: [
     Place.DASHBOARD, Place.READINESS, Place.RECEPTION, Place.PATIENT_EVENTS,
-    Place.EQUIPMENT, Place.CLOSING, Place.MORE,
+    Place.CLINICAL, Place.EQUIPMENT, Place.CLOSING, Place.MORE,
   ],
   [RoleCode.CLINIC_MANAGER]: [
     Place.DASHBOARD, Place.READINESS, Place.RECEPTION, Place.PATIENT_EVENTS,
-    Place.EQUIPMENT, Place.CLOSING, Place.MORE,
+    Place.CLINICAL, Place.EQUIPMENT, Place.CLOSING, Place.MORE,
   ],
+  // CLN-009 is a compliance officer's whole job in one number, so this is the
+  // one place they are more entitled to than the manager.
   [RoleCode.QUALITY_COMPLIANCE]: [
-    Place.DASHBOARD, Place.READINESS, Place.PATIENT_EVENTS, Place.MORE,
+    Place.DASHBOARD, Place.READINESS, Place.PATIENT_EVENTS,
+    Place.CLINICAL, Place.MORE,
   ],
   // The doctor's day is patients, and now also the book — APT-001.b assigns
   // them to slots and PAT-005 puts medical risks in front of them, so the
   // front desk is no longer somewhere they never look.
+  // Every one of CLN-001 to CLN-010 names the doctor as doer or checker.
   [RoleCode.TREATING_DOCTOR]: [
-    Place.DASHBOARD, Place.RECEPTION, Place.PATIENT_EVENTS,
+    Place.DASHBOARD, Place.RECEPTION, Place.PATIENT_EVENTS, Place.CLINICAL,
   ],
   // Reception owns the book outright — every one of APT-001 to APT-012 and
   // PAT-001 to PAT-009 names them as Doer or Checker.
@@ -920,13 +977,15 @@ const PLACES: Partial<Record<RoleCode, readonly Place[]>> = {
   // it, so she is the only assistant with Equipment on her rail.
   [RoleCode.SENIOR_ASSISTANT]: [
     Place.DASHBOARD, Place.READINESS, Place.RECEPTION, Place.PATIENT_EVENTS,
-    Place.EQUIPMENT, Place.CLOSING,
+    Place.CLINICAL, Place.EQUIPMENT, Place.CLOSING,
   ],
   // PAT-001.a: assistants "must be aware of all appointments for the day in
   // their assigned operatory". They cannot be aware of a book they cannot see.
+  // CLN-004, CLN-005, CLN-008 and CLN-009 name the assistant as doer or
+  // checker, so the pre-treatment list is hers to work through.
   [RoleCode.DENTAL_ASSISTANT]: [
     Place.DASHBOARD, Place.READINESS, Place.RECEPTION, Place.PATIENT_EVENTS,
-    Place.CLOSING,
+    Place.CLINICAL, Place.CLOSING,
   ],
   [RoleCode.STERILIZATION_TECHNICIAN]: [
     Place.DASHBOARD, Place.READINESS, Place.EQUIPMENT, Place.CLOSING,
@@ -952,7 +1011,7 @@ export function placesFor(roles: readonly RoleCode[]): Place[] {
   for (const r of roles) for (const p of PLACES[r] ?? []) seen.add(p);
   const order: Place[] = [
     Place.DASHBOARD, Place.READINESS, Place.RECEPTION, Place.PATIENT_EVENTS,
-    Place.EQUIPMENT, Place.CLOSING, Place.MORE,
+    Place.CLINICAL, Place.EQUIPMENT, Place.CLOSING, Place.MORE,
   ];
   return order.filter((p) => seen.has(p));
 }

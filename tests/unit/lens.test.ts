@@ -370,8 +370,10 @@ describe('a different look, not a smaller one', () => {
     // APT-001.b assigns them to slots and PAT-005 puts medical risks in front
     // of them. The equipment register is still a place they would only visit
     // to complain.
+    // Pre-treatment joined when CLN arrived: every one of CLN-001 to CLN-010
+    // names the doctor as doer or checker.
     expect(placesFor([RoleCode.TREATING_DOCTOR]))
-      .toEqual(['DASHBOARD', 'RECEPTION', 'PATIENT_EVENTS']);
+      .toEqual(['DASHBOARD', 'RECEPTION', 'PATIENT_EVENTS', 'CLINICAL']);
   });
 
   it('keeps the dashboard for everybody', () => {

@@ -46,6 +46,7 @@ import {
   STOCK_ITEMS, inventory as inventoryView,
   gatherFailures, holdersFrom, lensFor, placesFor, bookingWindow,
   reception as receptionView, Confirmation,
+  clinicalControls, CLINICAL_CONTROLS, CLINICAL_QUESTIONS,
   chairCover, assistantForRoom, UNRATIFIED_ASSIGNMENT, ASSIGNMENT_QUESTIONS,
   type RoomAssignment,
   REGISTRATION_FORM, CHECK_IN_SCRIPT, HOSPITALITY_STANDARDS,
@@ -2053,6 +2054,38 @@ function bookNow(now: number) {
   );
 }
 
+/**
+ * CLN-001 to CLN-010 for today's list.
+ *
+ * A view over what compliance already decided, never a second evaluation — a
+ * screen saying CLN-001 is met while the mandatory list says otherwise would
+ * be the two-answers problem this project keeps having to fix.
+ */
+function clinicalNow(now: number) {
+  const w = engineWorld();
+  const events = [...w.events, ...careProgressEvents(now, db.endOfDay), ...DEMO_REFUSALS];
+  const eq = equipmentView(ASSETS, assetHistory(now), now);
+  const inv = inventoryView(STOCK_ITEMS, DEMO_LOTS, stockEvents(now), now,
+    DEMO_RESERVATIONS);
+  const dependedOn = new Set(ASSETS
+    .filter((x) => x.category === 'STERILIZATION' || x.category === 'PLANT')
+    .map((x) => x.tag));
+  const unusableAssets = [...new Set([
+    ...eq.unusable.map((r) => r.asset.tag), ...eq.down.map((r) => r.asset.tag),
+  ])].filter((tag) => dependedOn.has(tag));
+  const em = emergencyNow(now);
+
+  const compliances = DEMO_BOOKINGS
+    .map((b) => complianceFor(b, factsFor(b.id), events, now, {
+      unusableAssets, stockVouched: inv.gateStock, emergencyReady: em.safe,
+    }))
+    .filter((c): c is Compliance => c !== null);
+
+  return clinicalControls(
+    compliances,
+    (id) => DEMO_BOOKINGS.find((b) => b.id === id)?.at ?? 0);
+}
+
 function failuresNow() {
   const w = engineWorld();
   const now = w.now;
@@ -2105,6 +2138,7 @@ function failuresNow() {
       hygiene: hygieneNow(now,
         w.events.find((e) => e.type === ClinicEvent.CLINIC_UNLOCKED)?.at ?? null),
       book: bookNow(now),
+      clinical: clinicalNow(now),
       now,
     }, holders),
   };
@@ -2988,6 +3022,73 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
           honest: w.honest, because: w.because,
         };
       })(),
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     PRE-TREATMENT — CLN-001 to CLN-010
+
+     May this patient be treated at all. A different question from "what work
+     does this treatment create", which is what patient events answers.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  if (path === '/api/v1/clinical') {
+    const now = engineWorld().now;
+    const v = clinicalNow(now);
+
+    return json({
+      now,
+      role: engineRole() as string,
+      headline: v.headline,
+      // CLN-009. No percentage is sent, because there is none to send — the
+      // engine does not compute one and the screen therefore cannot show one.
+      consent: {
+        delivered: v.consent.delivered,
+        withConsent: v.consent.withConsent,
+        met: v.consent.met,
+        headline: v.consent.headline,
+        failures: v.consent.failures.map((f) => ({
+          patientLabel: f.patientLabel,
+          treatmentName: f.treatmentName,
+          label: f.label,
+          deliveredAt: f.deliveredAt,
+          metLateAt: f.metLateAt,
+          because: f.because,
+        })),
+      },
+      notReady: v.notReady.length,
+      rows: v.rows.map((r) => ({
+        bookingId: r.bookingId,
+        patientLabel: r.patientLabel,
+        treatmentName: r.treatmentName,
+        at: r.at,
+        ready: r.ready,
+        delivered: r.delivered,
+        consent: r.consent,
+        headline: r.headline,
+        controls: r.controls.map((c) => ({
+          id: c.id, activity: c.activity,
+          priority: c.priority as string,
+          verdict: c.verdict, because: c.because,
+        })),
+      })),
+      failing: v.failing.map((f) => ({
+        id: f.control.id,
+        activity: f.control.activity,
+        priority: f.control.priority as string,
+        count: f.count,
+      })),
+      // The traceability table itself, because "where does this control live"
+      // is a question the owner asks and a screen can answer.
+      controls: CLINICAL_CONTROLS.map((c) => ({
+        id: c.id, activity: c.activity, standard: c.standard,
+        trigger: c.trigger,
+        doer: c.doer as string,
+        checker: (c.checker ?? null) as string | null,
+        priority: c.priority as string,
+        covers: c.covers, why: c.why,
+      })),
+      openQuestions: [...CLINICAL_QUESTIONS],
     });
   }
 

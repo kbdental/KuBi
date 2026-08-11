@@ -147,6 +147,15 @@ const LIBRARY = new Set([
      is never "is it covered" alone: it is who, in what state, carrying what. */
   'chair-list', 'chair', 'chair-room', 'chair-who', 'chair-state',
   'chair-load', 'chair-why',
+  /* ── CLN-001 to CLN-010 · pre-treatment ───────────────────────────────
+     All ten controls shown per patient, met ones included: a list that only
+     showed failures could not be used as the pre-treatment check itself.
+     Consent gets its own line above the rest because it is the one with a
+     100% target and the one whose failure cannot be undone. */
+  'pt-list', 'pt', 'pt-head', 'pt-time', 'pt-who', 'pt-name', 'pt-what',
+  'pt-state', 'pt-consent', 'pt-fail',
+  'cln-list', 'cln', 'cln-id', 'cln-what', 'cln-std', 'cln-verdict', 'cln-why',
+  'is-quiet',
   /* attendance, which lives inside readiness rather than in a tab of its own */
   'staffing', 'staff-roles', 'staff-role', 'staff-mark', 'staff-name',
   'staff-count', 'staff-owns',
@@ -190,6 +199,7 @@ const CONVERTED = [
   'patient-events.tsx',
   'readiness.tsx',
   'reception.tsx',
+  'clinical.tsx',
   'retention.tsx',
   'rules.tsx',
   'today.tsx',

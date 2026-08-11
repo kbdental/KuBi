@@ -1,0 +1,13 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const ctx = await b.newContext({ viewport: { width: 1240, height: 1400 }, deviceScaleFactor: 1.5 });
+const page = await ctx.newPage();
+page.on('pageerror', e => console.log('PAGEERROR', e.message));
+await page.goto('http://127.0.0.1:5199/demo.html', { waitUntil: 'networkidle' });
+await page.click('.gate-enter');
+await page.waitForTimeout(700);
+await page.getByText('Pre-treatment', { exact: true }).first().click();
+await page.waitForTimeout(1200);
+await page.screenshot({ path: process.argv[2] + '/clinical.png', fullPage: true });
+console.log(await page.innerText('.screen'));
+await b.close();

@@ -989,6 +989,68 @@ export interface ReceptionScreenView {
   openQuestions: string[];
 }
 
+/* -------------------------------------------------------------------------
+ * CLN-001 to CLN-010 — clinical pre-treatment controls
+ * ---------------------------------------------------------------------- */
+
+export interface ControlStateView {
+  id: string;
+  activity: string;
+  priority: string;
+  verdict: string;
+  because: string;
+}
+
+export interface PreTreatmentRowView {
+  bookingId: string;
+  patientLabel: string;
+  treatmentName: string;
+  at: number;
+  ready: boolean;
+  delivered: boolean;
+  consent: 'MET' | 'MISSING' | 'BREACHED' | 'NOT_APPLICABLE';
+  headline: string;
+  controls: ControlStateView[];
+}
+
+/**
+ * CLN-009, and note what is not here.
+ *
+ * There is no `percent`. The owner's target is 100% with no averaging away of
+ * failures, and the strongest way to hold that is for the number not to exist
+ * — a screen cannot display a rate it was never given.
+ */
+export interface ConsentIntegrityView {
+  delivered: number;
+  withConsent: number;
+  met: boolean;
+  headline: string;
+  failures: Array<{
+    patientLabel: string;
+    treatmentName: string;
+    label: string;
+    deliveredAt: number;
+    metLateAt: number | null;
+    because: string;
+  }>;
+}
+
+export interface ClinicalScreenView {
+  now: number;
+  role: string;
+  headline: string;
+  consent: ConsentIntegrityView;
+  notReady: number;
+  rows: PreTreatmentRowView[];
+  failing: Array<{ id: string; activity: string; priority: string; count: number }>;
+  controls: Array<{
+    id: string; activity: string; standard: string; trigger: string;
+    doer: string; checker: string | null; priority: string;
+    covers: string; why: string;
+  }>;
+  openQuestions: string[];
+}
+
 export interface ClosingView {
   blocks: DayBlock[];
   outstanding: DayBlock[];
@@ -1419,6 +1481,8 @@ export const api = {
   patientEvents: () => call<PatientEventsView>('/api/v1/patient-events'),
   /** The appointment book and the front desk — APT-001..012, PAT-001..009. */
   reception: () => call<ReceptionScreenView>('/api/v1/reception'),
+  /** May this patient be treated at all — CLN-001 to CLN-010. */
+  clinical: () => call<ClinicalScreenView>('/api/v1/clinical'),
   /** Report one care item done. Append-only: there is no un-report. */
   reportCareItem: (bookingId: string, itemId: string) =>
     call<{ ok: true }>('/api/v1/care-item', {

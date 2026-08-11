@@ -3282,3 +3282,87 @@ label.field-label {
   .chair { grid-template-columns: 1fr 1fr; row-gap: 2px; }
   .chair-why { grid-column: 1 / -1; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CLN-001 to CLN-010 — pre-treatment
+
+   All ten controls per patient, met ones included. A list that only showed
+   failures could not be used as the pre-treatment check itself: the assistant
+   working down it before the chair needs to see what she has already done.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.pt-list { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
+
+.pt {
+  padding: 11px 14px; border-radius: 4px;
+  background: var(--paper-2, #fbfcfb);
+  border: 1px solid var(--line, #e4e8e6);
+  border-left: 3px solid #0c5f4e;
+}
+.pt.is-bad { border-left-color: #b0322a; background: #fdf9f8; }
+
+.pt-head { display: flex; align-items: baseline; gap: 12px; }
+.pt-time {
+  flex: none; width: 46px; font-weight: 700; font-size: 14px;
+  font-variant-numeric: tabular-nums; color: var(--ink-1, #17211d);
+}
+.pt-who {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px;
+}
+.pt-name { font-size: 14.5px; font-weight: 650; color: var(--ink-1, #17211d); }
+.pt-what { font-size: 12.5px; color: var(--ink-3, #7d8c86); }
+.pt-state {
+  flex: none; font-size: 11px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.pt-state.is-done { color: #0c5f4e; }
+.pt-state.is-bad  { color: #b0322a; }
+
+/* Consent, on its own line above everything else. */
+.pt-consent {
+  margin-top: 7px; padding: 5px 9px; border-radius: 3px;
+  font-size: 12px; font-weight: 650; display: inline-block;
+}
+.pt-consent.is-done { color: #0c5f4e; background: #eef7f3; }
+.pt-consent.is-bad  { color: #fff; background: #b0322a; letter-spacing: .04em; }
+.pt-consent.is-dim  { color: var(--ink-3, #7d8c86); background: var(--paper-2, #f4f6f5); }
+
+.pt-fail {
+  margin-top: 5px; font-size: 13px; line-height: 1.5; color: #9d2f26;
+}
+
+/* The ten controls, as a five-column line. */
+.cln-list {
+  display: flex; flex-direction: column; gap: 1px;
+  margin-top: 9px; border-top: 1px solid var(--line, #eef1f0);
+}
+.cln {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 210px) 96px 1fr;
+  gap: 10px; align-items: baseline;
+  padding: 5px 2px; font-size: 12.5px;
+  border-bottom: 1px solid var(--line, #f1f4f3);
+}
+.cln-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; color: var(--ink-3, #7d8c86);
+}
+.cln-what { color: var(--ink-1, #17211d); }
+.cln-std {
+  display: block; font-size: 11.5px; color: var(--ink-3, #7d8c86);
+}
+.cln-verdict { font-size: 11.5px; font-weight: 600; }
+.cln-why { font-size: 11.5px; color: var(--ink-3, #7d8c86); line-height: 1.5; }
+
+.cln.is-done .cln-verdict { color: #0c5f4e; }
+.cln.is-bad  .cln-verdict { color: #b0322a; }
+.cln.is-bad  .cln-what    { font-weight: 650; }
+.cln.is-warn .cln-verdict { color: #9a6f24; }
+.cln.is-dim  { opacity: .5; }
+
+@media (max-width: 720px) {
+  .cln { grid-template-columns: 58px 1fr; }
+  .cln-verdict, .cln-why { grid-column: 2; }
+}
+.cln.is-quiet .cln-verdict { color: var(--ink-3, #7d8c86); font-weight: 500; }

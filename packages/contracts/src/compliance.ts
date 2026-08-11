@@ -144,6 +144,9 @@ export const GATE_EVIDENCE: Readonly<Record<string, GateSpec>> = {
 
   /* ── Safety: the patient ─────────────────────────────────────────────── */
   HISTORY: g('A medical history reviewed and signed off for today, not a form filled in last year', GateBasis.SAFETY, null),
+  ALLERGY: g('Allergies reviewed with the patient today and recorded — including “none known”, which is a finding rather than a blank', GateBasis.SAFETY, DOC),
+  TREATMENT_PLAN: g('A written treatment plan for what is about to be done, dated and attributed', GateBasis.RECORD, DOC),
+  ESTIMATE: g('A figure given to the patient and their acceptance recorded', GateBasis.RECORD, DOC),
   LA_REVIEW: g('The anaesthetic agent, dose and allergy status recorded against this appointment', GateBasis.SAFETY, DOC),
   ANTICOAG: g('A written plan agreed with the prescribing physician, naming the drug and whether it is being held', GateBasis.SAFETY, DOC),
   PROPHYLAXIS: g('The drug, dose and the clock time it was given — at least an hour before', GateBasis.SAFETY, DOC),

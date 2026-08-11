@@ -29,6 +29,7 @@ import { ClinicReadiness } from './screens/readiness.js';
 import { ClinicClosing } from './screens/closing.js';
 import { PatientEvents } from './screens/patient-events.js';
 import { Reception } from './screens/reception.js';
+import { Clinical } from './screens/clinical.js';
 import { Equipment } from './screens/equipment.js';
 
 /**
@@ -248,6 +249,7 @@ export function App() {
     READINESS: <IconClinic filled={here === 'READINESS'} />,
     RECEPTION: <IconPatients filled={here === 'RECEPTION'} />,
     PATIENT_EVENTS: <IconPatients filled={here === 'PATIENT_EVENTS'} />,
+    CLINICAL: <IconClinic filled={here === 'CLINICAL'} />,
     EQUIPMENT: <IconOperations filled={here === 'EQUIPMENT'} />,
     CLOSING: <IconToday filled={here === 'CLOSING'} />,
     MORE: <IconToday filled={here === 'MORE'} />,
@@ -262,6 +264,10 @@ export function App() {
     // event happens.
     RECEPTION: 'Reception',
     PATIENT_EVENTS: 'Patient events',
+    // CLN-001 to CLN-010. A tab of its own on the owner's instruction, and it
+    // earns one: patient events answers what work a treatment creates, this
+    // answers whether the patient may be treated at all.
+    CLINICAL: 'Pre-treatment',
     EQUIPMENT: 'Equipment',
     CLOSING: 'Clinic closing',
     MORE: 'More',
@@ -286,6 +292,10 @@ export function App() {
     // event happens.
     RECEPTION: 'Reception',
     PATIENT_EVENTS: 'Patient events',
+    // CLN-001 to CLN-010. A tab of its own on the owner's instruction, and it
+    // earns one: patient events answers what work a treatment creates, this
+    // answers whether the patient may be treated at all.
+    CLINICAL: 'Pre-treatment',
     EQUIPMENT: 'Equipment',
     CLOSING: 'Clinic closing',
     MORE: 'More',
@@ -293,7 +303,7 @@ export function App() {
 
   // Everything under More is the previous shell's set, reached by its own id.
   const inMore = !['DASHBOARD', 'READINESS', 'RECEPTION', 'PATIENT_EVENTS',
-    'EQUIPMENT', 'CLOSING'].includes(here);
+    'CLINICAL', 'EQUIPMENT', 'CLOSING'].includes(here);
 
   /**
    * A place this role may not reach, reached anyway.
@@ -303,8 +313,8 @@ export function App() {
    * here so a stale link or a back button lands on a sentence rather than on
    * an empty screen that looks broken.
    */
-  const forbidden = ['READINESS', 'RECEPTION', 'PATIENT_EVENTS', 'EQUIPMENT', 'CLOSING']
-    .includes(here) && !myPlaces.includes(here);
+  const forbidden = ['READINESS', 'RECEPTION', 'PATIENT_EVENTS', 'CLINICAL',
+    'EQUIPMENT', 'CLOSING'].includes(here) && !myPlaces.includes(here);
 
   return (
     <>
@@ -330,6 +340,7 @@ export function App() {
       {here === 'READINESS' && !forbidden && <ClinicReadiness />}
       {here === 'RECEPTION' && !forbidden && <Reception />}
       {here === 'PATIENT_EVENTS' && !forbidden && <PatientEvents />}
+      {here === 'CLINICAL' && !forbidden && <Clinical />}
       {here === 'EQUIPMENT' && !forbidden && <Equipment />}
       {here === 'CLOSING' && !forbidden && <ClinicClosing />}
       {here === 'MORE' && (
