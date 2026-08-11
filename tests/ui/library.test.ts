@@ -143,6 +143,10 @@ const LIBRARY = new Set([
   'script', 'script-head', 'script-col', 'script-row', 'script-line',
   'form-list', 'ff', 'ff-num', 'ff-label', 'ff-opt', 'ff-why',
   'standards', 'standard',
+  /* PAT-001.a — who covers which chair. Five columns, because the question
+     is never "is it covered" alone: it is who, in what state, carrying what. */
+  'chair-list', 'chair', 'chair-room', 'chair-who', 'chair-state',
+  'chair-load', 'chair-why',
   /* attendance, which lives inside readiness rather than in a tab of its own */
   'staffing', 'staff-roles', 'staff-role', 'staff-mark', 'staff-name',
   'staff-count', 'staff-owns',

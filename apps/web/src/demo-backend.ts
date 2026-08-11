@@ -46,6 +46,8 @@ import {
   STOCK_ITEMS, inventory as inventoryView,
   gatherFailures, holdersFrom, lensFor, placesFor, bookingWindow,
   reception as receptionView, Confirmation,
+  chairCover, assistantForRoom, UNRATIFIED_ASSIGNMENT, ASSIGNMENT_QUESTIONS,
+  type RoomAssignment,
   REGISTRATION_FORM, CHECK_IN_SCRIPT, HOSPITALITY_STANDARDS,
   RECEPTION_QUESTIONS, GREETING, CONSULTATION_FEE,
   type Appointment,
@@ -1846,9 +1848,29 @@ function hygieneScreen(now: number, w: World) {
  * having no medical history. Two lists of the same patients is exactly the
  * disease this engine exists to cure, and the demo had it within an hour.
  */
+/**
+ * PAT-001.a — who covers which chair today.
+ *
+ * Priya takes the two rooms nearest reception, Meera the two at the back, and
+ * Nisha stands in for either. Plausible and not the clinic's: two assistants
+ * and four rooms admits several sensible splits and `UNRATIFIED_ASSIGNMENT`
+ * says nobody has signed this one.
+ *
+ * Note what it produces without anybody arranging it. Meera is 65 minutes
+ * late, so both her rooms fall to Nisha — and Nisha then holds two chairs that
+ * run at the same time in the afternoon.
+ */
+const DEMO_ASSIGNMENT: RoomAssignment[] = [
+  { operatoryId: 'op-1', assistantEmployeeCode: 'e1', standInEmployeeCode: 'e6' },
+  { operatoryId: 'op-2', assistantEmployeeCode: 'e1', standInEmployeeCode: 'e6' },
+  { operatoryId: 'op-3', assistantEmployeeCode: 'e2', standInEmployeeCode: 'e6' },
+  { operatoryId: 'op-4', assistantEmployeeCode: 'e2', standInEmployeeCode: 'e6' },
+];
+
 const SLOT_DETAIL: Record<string, {
   operatoryId: string | null;
   doctor: string | null;
+  /** Null everywhere but a deliberate swap — the room carries the assignment. */
   assistant: string | null;
   buffer: number;
   isNew: boolean;
@@ -1861,14 +1883,14 @@ const SLOT_DETAIL: Record<string, {
   complaint: string;
 }> = {
   'bk-1': {
-    operatoryId: 'op-1', doctor: 'e7', assistant: 'e1', buffer: 30, isNew: false,
+    operatoryId: 'op-1', doctor: 'e7', assistant: null, buffer: 30, isNew: false,
     special: 'Implant surgery — components and sterile kit must be laid out',
     confirmation: Confirmation.CONFIRMED, contactedAt: 8 * 60 + 20, attempts: 1,
     cancellationReason: null,
     contact: '98200 00001', complaint: 'Missing lower left first molar',
   },
   'bk-2': {
-    operatoryId: 'op-2', doctor: 'e7', assistant: 'e2', buffer: 0, isNew: false,
+    operatoryId: 'op-2', doctor: 'e7', assistant: null, buffer: 0, isNew: false,
     special: 'On an anticoagulant — the prescriber’s plan is needed first',
     // Contacted at 07:10 and nothing came back. Past the two-hour window, so
     // APT-004's retry is due rather than merely pending.
@@ -1878,7 +1900,7 @@ const SLOT_DETAIL: Record<string, {
   },
   'bk-3': {
     // Operatory 3, whose chair is down. OPEN-004 reaching a real patient.
-    operatoryId: 'op-3', doctor: 'e7', assistant: 'e1', buffer: 15, isNew: false,
+    operatoryId: 'op-3', doctor: 'e7', assistant: null, buffer: 15, isNew: false,
     special: null,
     confirmation: Confirmation.CONFIRMED, contactedAt: 8 * 60 + 25, attempts: 1,
     cancellationReason: null,
@@ -1886,7 +1908,7 @@ const SLOT_DETAIL: Record<string, {
   },
   'bk-4': {
     // APT-009: cancelled, and nobody wrote down why.
-    operatoryId: 'op-2', doctor: 'e7', assistant: 'e1', buffer: 0, isNew: false,
+    operatoryId: 'op-2', doctor: 'e7', assistant: null, buffer: 0, isNew: false,
     special: null,
     confirmation: Confirmation.CANCELLED, contactedAt: 8 * 60 + 40, attempts: 1,
     cancellationReason: null,
@@ -1894,7 +1916,7 @@ const SLOT_DETAIL: Record<string, {
   },
   'bk-5': {
     // No room assigned. APT-001.c's other failure mode.
-    operatoryId: null, doctor: 'e7', assistant: 'e2', buffer: 0, isNew: false,
+    operatoryId: null, doctor: 'e7', assistant: null, buffer: 0, isNew: false,
     special: 'Crown fit — the laboratory case must be back and checked',
     confirmation: Confirmation.CONFIRMED, contactedAt: 8 * 60 + 45, attempts: 1,
     cancellationReason: null,
@@ -1902,7 +1924,7 @@ const SLOT_DETAIL: Record<string, {
   },
   'bk-6': {
     // Walked in, never registered, never contacted: PAT-002 and APT-002 at once.
-    operatoryId: 'op-4', doctor: 'e7', assistant: 'e2', buffer: 0, isNew: true,
+    operatoryId: 'op-4', doctor: 'e7', assistant: null, buffer: 0, isNew: true,
     special: null,
     confirmation: Confirmation.NOT_CONTACTED, contactedAt: null, attempts: 0,
     cancellationReason: null,
@@ -1948,6 +1970,41 @@ const DEMO_APPOINTMENTS: Appointment[] = DEMO_BOOKINGS.map((b) => {
  * take a patient, and compliance decides whether a special patient's
  * preparation is done. Reception asks all three; it answers none of them.
  */
+/**
+ * PAT-001.a — chair cover, standing on attendance.
+ *
+ * Separate from `bookNow` because reception reads it: the appointment book
+ * asks who staffs each chair rather than deciding it, the same way it asks the
+ * equipment register whether a room may take a patient.
+ */
+function coverNow(now: number) {
+  const w = engineWorld();
+  const a = attendanceView(DEMO_STAFF, DEMO_ATTENDANCE, DEMO_LEAVE,
+    w.firstPatientAt, DEMO_TODAY, now);
+  const present = new Set(a.people
+    .filter((p) => p.inAt !== null).map((p) => p.employeeCode));
+
+  return {
+    present,
+    view: chairCover(
+      w.operatories,
+      DEMO_ASSIGNMENT,
+      DEMO_APPOINTMENTS.map((ap) => ({
+        id: ap.id,
+        patientLabel: ap.patientLabel,
+        operatoryId: ap.operatoryId,
+        at: ap.at,
+        endsAt: ap.at
+          + (ap.minutes ?? TREATMENTS.find((t) => t.code === ap.treatmentCode)?.minutes ?? 30)
+          + ap.bufferMinutes,
+        namedAssistant: ap.assistantEmployeeCode,
+      })),
+      present,
+      now,
+    ),
+  };
+}
+
 function bookNow(now: number) {
   const w = engineWorld();
   const a = attendanceView(DEMO_STAFF, DEMO_ATTENDANCE, DEMO_LEAVE,
@@ -1979,6 +2036,11 @@ function bookNow(now: number) {
       roomsWithdrawn: new Set(rooms.unavailable.map((r) => r.operatoryId)),
       knownRooms: new Set(w.operatories.map((o) => o.id)),
       historyMissing,
+      // PAT-001.a. Reception asks who staffs the chair rather than deciding
+      // it, the same way it asks the equipment register whether the room may
+      // take a patient at all.
+      assistantForRoom: (operatoryId) =>
+        assistantForRoom(operatoryId, DEMO_ASSIGNMENT, present),
       // PAT-005, read off the same facts the mandatory gates use rather than
       // from a second list — a risk the front desk knows and the chair does
       // not is the failure this control exists to prevent.
@@ -2976,6 +3038,43 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
           what: p.what, ownerRole: p.ownerRole as string,
         })),
       })),
+      // PAT-001.a. Who is on which chair, and where that falls apart.
+      cover: (() => {
+        const c = coverNow(now).view;
+        const label = (code: string | null) => code === null ? null
+          : DEMO_STAFF.find((p) => p.employeeCode === code)?.label ?? code;
+        return {
+          headline: c.headline,
+          unratified: UNRATIFIED_ASSIGNMENT,
+          rooms: c.rooms.map((r) => ({
+            operatoryId: r.operatoryId,
+            label: r.label,
+            state: r.state,
+            coveredBy: label(r.coveredBy),
+            assignedTo: label(r.assignedTo),
+            standIn: label(r.standInEmployeeCode),
+            slots: r.slots.length,
+            bookedMinutes: r.bookedMinutes,
+            because: r.because,
+          })),
+          clashes: c.clashes.map((x) => ({
+            assistant: label(x.assistantEmployeeCode) ?? x.assistantEmployeeCode,
+            overlapMinutes: x.overlapMinutes,
+            because: x.because,
+          })),
+          load: c.load.map((l) => ({
+            label: label(l.employeeCode) ?? l.employeeCode,
+            present: l.present,
+            rooms: l.rooms.length,
+            slots: l.slots,
+            bookedMinutes: l.bookedMinutes,
+          })),
+          findings: c.findings.map((f) => ({
+            control: f.control, priority: f.priority as string,
+            what: f.what, ownerRole: f.ownerRole as string,
+          })),
+        };
+      })(),
       unconfirmed: v.unconfirmed.length,
       retryDue: v.retryDue.length,
       special: v.special.length,
@@ -2997,7 +3096,7 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
       form: REGISTRATION_FORM.map((f) => ({ ...f, priority: f.priority as string })),
       hospitality: [...HOSPITALITY_STANDARDS],
       consultationFee: CONSULTATION_FEE,
-      openQuestions: [...RECEPTION_QUESTIONS],
+      openQuestions: [...RECEPTION_QUESTIONS, ...ASSIGNMENT_QUESTIONS],
     });
   }
 

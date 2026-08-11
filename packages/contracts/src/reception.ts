@@ -156,8 +156,21 @@ export interface Appointment {
 
   /** APT-001.c. The room this slot needs. Null is a finding, not a default. */
   operatoryId: string | null;
-  /** APT-001.b. The two people the slot names. */
+  /** APT-001.b. The doctor this slot names. */
   doctorEmployeeCode: string | null;
+  /**
+   * An assistant named on the booking itself, where the day has a swap.
+   *
+   * Normally null, and that is the point. The **room** carries the assignment
+   * — see assignment.ts — and a booking inherits its assistant from the chair
+   * it is in. Two hundred bookings a month each naming a person is two hundred
+   * places for the roster to be wrong, and nobody edits two hundred rows when
+   * somebody calls in sick.
+   *
+   * A value here is a deliberate swap, and it is reported as an override
+   * rather than absorbed: a swap nobody can see is a roster that has quietly
+   * stopped describing the clinic.
+   */
   assistantEmployeeCode: string | null;
 
   /** New patients need registration before anything clinical. */
@@ -213,6 +226,13 @@ export interface SlotProblem {
 
 export interface Slot {
   appointment: Appointment;
+  /**
+   * Who is actually staffing it — the booking's own name, or the room's.
+   *
+   * Resolved here so no screen has to work out the precedence for itself, and
+   * so "who is with this patient" has exactly one answer.
+   */
+  assistantEmployeeCode: string | null;
   state: SlotState;
   /** Chair time plus buffer — what the diary actually consumes. */
   endsAt: number;
@@ -265,6 +285,14 @@ export interface ReceptionInputs {
   historyMissing?: ReadonlySet<string>;
   /** Patient ids carrying a risk the clinical team must see. PAT-005. */
   risks?: ReadonlyMap<string, readonly string[]>;
+  /**
+   * Who covers which chair today, from `chairCover`.
+   *
+   * PAT-001.a. A slot's assistant is worked out from this when the booking
+   * does not name one — which is almost always, because the room owns the
+   * assignment and the booking inherits it.
+   */
+  assistantForRoom?: (operatoryId: string | null) => string | null;
 }
 
 /* -------------------------------------------------------------------------
@@ -438,6 +466,8 @@ function judge(
 
   return {
     appointment: a,
+    assistantEmployeeCode:
+      a.assistantEmployeeCode ?? inputs.assistantForRoom?.(a.operatoryId) ?? null,
     state,
     endsAt,
     arrivedAt: arrived,
@@ -514,7 +544,12 @@ function problemsWith(
       + (inputs.onLeave?.has(code) ? 'on approved leave' : 'not in the building'));
   };
   away(a.doctorEmployeeCode, 'doctor', 'APT-001.b');
-  away(a.assistantEmployeeCode, 'assistant', 'APT-001.b');
+  // The assistant comes from the chair unless the booking names one. Where
+  // neither exists, `away` reports the slot as unassigned — which is PAT-001.a
+  // arriving at a specific patient rather than staying a policy sentence.
+  away(
+    a.assistantEmployeeCode ?? inputs.assistantForRoom?.(a.operatoryId) ?? null,
+    'assistant', 'APT-001.b');
 
   /* ── APT-001.c · the room ─────────────────────────────────────────── */
   if (a.operatoryId === null) {
@@ -801,9 +836,6 @@ export const RECEPTION_QUESTIONS: readonly string[] = [
   '"High-value" appointments get a 48-hour call. Is that a fee threshold or a '
   + 'named list of treatments? Guessing would either over-call or miss the '
   + 'ones that matter.',
-  'Which assistant is assigned to which operatory? PAT-001.a says assistants '
-  + 'must be aware of all appointments in their assigned operatory, and no '
-  + 'assignment exists — two assistants and four rooms.',
   'Is the Rs. 500 consultation charged to every new patient, or waived when '
   + 'treatment proceeds the same day?',
   'PAT-003 asks for contact details to be re-checked at a “defined interval”. '

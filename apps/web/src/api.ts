@@ -929,6 +929,32 @@ export interface SlotView {
   problems: SlotProblemView[];
 }
 
+export interface RoomCoverView {
+  operatoryId: string;
+  label: string;
+  state: 'COVERED' | 'STOOD_IN' | 'UNCOVERED' | 'UNUSED';
+  coveredBy: string | null;
+  assignedTo: string | null;
+  standIn: string | null;
+  slots: number;
+  bookedMinutes: number;
+  because: string;
+}
+
+/** PAT-001.a — who covers which chair, and where that falls apart. */
+export interface CoverScreenView {
+  headline: string;
+  /** True while the split is KuBi's rather than the clinic's. */
+  unratified: boolean;
+  rooms: RoomCoverView[];
+  clashes: Array<{ assistant: string; overlapMinutes: number; because: string }>;
+  load: Array<{
+    label: string; present: boolean; rooms: number;
+    slots: number; bookedMinutes: number;
+  }>;
+  findings: SlotProblemView[];
+}
+
 export interface ReceptionScreenView {
   now: number;
   role: string;
@@ -938,6 +964,7 @@ export interface ReceptionScreenView {
   reviewScore: number;
   headline: string;
   slots: SlotView[];
+  cover: CoverScreenView;
   unconfirmed: number;
   retryDue: number;
   special: number;

@@ -471,10 +471,11 @@ describe('what these matrices do not settle', () => {
     expect(RECEPTION_QUESTIONS.join(' ')).toContain('fee threshold');
   });
 
-  it('names the operatory assignment nobody has made', () => {
-    // PAT-001.a assumes assistants have assigned operatories. Two assistants,
-    // four rooms, and no assignment exists.
-    expect(RECEPTION_QUESTIONS.join(' ')).toContain('two assistants and four rooms');
+  it('no longer asks who covers which operatory, because that is built', () => {
+    // PAT-001.a used to be listed here as an unanswered question. It has an
+    // engine now — assignment.ts — and what remains open is which split the
+    // clinic actually uses, which is ASSIGNMENT_QUESTIONS' to ask.
+    expect(RECEPTION_QUESTIONS.join(' ')).not.toContain('no assignment exists');
   });
 
   it('names the columns the clinic’s sheet must carry', () => {
@@ -482,5 +483,45 @@ describe('what these matrices do not settle', () => {
       'cancellation_reason', 'buffer_minutes']) {
       expect(APPOINTMENT_SHEET_COLUMNS).toContain(c);
     }
+  });
+});
+
+describe('PAT-001.a · the assistant comes from the chair', () => {
+  const rooms = (m: Record<string, string | null>) =>
+    (operatoryId: string | null) => (operatoryId === null ? null : m[operatoryId] ?? null);
+
+  it('inherits the assistant from the room the patient is booked into', () => {
+    // The room owns the assignment and the booking inherits it. Two hundred
+    // bookings a month each naming a person is two hundred places for the
+    // roster to be wrong.
+    const v = view([appt({ assistantEmployeeCode: null, operatoryId: 'op-3' })], [],
+      ok({ assistantForRoom: rooms({ 'op-3': 'e2' }) }));
+    expect(v.slots[0]!.assistantEmployeeCode).toBe('e2');
+  });
+
+  it('lets a booking name somebody else, which is a real swap', () => {
+    const v = view([appt({ assistantEmployeeCode: 'e6', operatoryId: 'op-3' })], [],
+      ok({ assistantForRoom: rooms({ 'op-3': 'e2' }) }));
+    expect(v.slots[0]!.assistantEmployeeCode).toBe('e6');
+  });
+
+  it('reports a slot whose room has nobody against it', () => {
+    // PAT-001.a arriving at a specific patient rather than staying a policy
+    // sentence in a document.
+    const v = view([appt({ assistantEmployeeCode: null })], [],
+      ok({ assistantForRoom: rooms({}) }));
+    expect(v.slots[0]!.assistantEmployeeCode).toBeNull();
+    expect(v.problems.some((p) => p.what.includes('has no assistant assigned')))
+      .toBe(true);
+  });
+
+  it('checks the inherited assistant against attendance, not just the named one', () => {
+    // The whole value of the join: the room says Meera, Meera is not in, and
+    // the slot says so — without anybody having typed Meera on the booking.
+    const v = view([appt({ assistantEmployeeCode: null, operatoryId: 'op-3' })], [],
+      ok({ present: new Set(['e7']), assistantForRoom: rooms({ 'op-3': 'e2' }) }));
+    expect(v.problems.some(
+      (p) => p.control === 'APT-001.b' && p.what.includes('assistant is not in the building')))
+      .toBe(true);
   });
 });

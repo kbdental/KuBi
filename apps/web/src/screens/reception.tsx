@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { api, type ReceptionScreenView, type SlotView } from '../api.js';
+import {
+  api, type ReceptionScreenView, type SlotView, type CoverScreenView,
+} from '../api.js';
 import {
   Screen, Title, Answer, Group, Fact, Facts, Notice, Switch,
   useLoad, Loading, Failed, type Tone,
@@ -62,6 +64,20 @@ const STATE_WORD: Record<SlotView['state'], string> = {
   NO_SHOW: 'Did not arrive',
 };
 
+const COVER_CLASS: Record<CoverScreenView['rooms'][number]['state'], string> = {
+  COVERED: 'chair is-done',
+  STOOD_IN: 'chair is-warn',
+  UNCOVERED: 'chair is-bad',
+  UNUSED: 'chair is-dim',
+};
+
+const COVER_WORD: Record<CoverScreenView['rooms'][number]['state'], string> = {
+  COVERED: 'Covered',
+  STOOD_IN: 'Stand-in',
+  UNCOVERED: 'Nobody',
+  UNUSED: 'Not in use',
+};
+
 const PRIORITY_CLASS: Record<string, string> = {
   PS: 'slot-why is-bad',
   C: 'slot-why is-bad',
@@ -115,6 +131,87 @@ function Slot({ s }: { s: SlotView }) {
 
       {s.problems.length === 0 && <div className="slot-why">{s.because}</div>}
     </div>
+  );
+}
+
+/**
+ * PAT-001.a — who covers which chair.
+ *
+ * *"Dental assistants must be aware of all appointments for the day in their
+ * assigned operatory."* The clinic has four operatories and two assistants,
+ * and until now no assignment existed anywhere in KuBi — so that sentence had
+ * nothing to stand on.
+ *
+ * The room carries the assistant and a booking inherits it. Typing a name on
+ * every booking would be two hundred places a month for the roster to be
+ * wrong, and nobody edits two hundred rows when somebody calls in sick.
+ */
+function Chairs({ c }: { c: CoverScreenView }) {
+  return (
+    <>
+      <Group
+        title="Chair cover"
+        note={c.headline}
+        tone={c.clashes.length > 0 ? 'stop'
+          : c.rooms.some((r) => r.state === 'UNCOVERED') ? 'stop' : 'good'}
+      >
+        <div className="chair-list">
+          {c.rooms.map((r) => (
+            <div key={r.operatoryId} className={COVER_CLASS[r.state]}>
+              <span className="chair-room">{r.label}</span>
+              <span className="chair-who">{r.coveredBy ?? '—'}</span>
+              <span className="chair-state">{COVER_WORD[r.state]}</span>
+              <span className="chair-load">
+                {r.slots === 0 ? 'nothing booked'
+                  : `${r.slots} booked · ${r.bookedMinutes} min`}
+              </span>
+              <span className="chair-why">{r.because}</span>
+            </div>
+          ))}
+        </div>
+
+        {c.unratified && (
+          <p className="screen-sub">
+            This split is KuBi’s, not the clinic’s. Two assistants and four
+            rooms admits several sensible answers and they are not equivalent —
+            putting both surgical rooms under one person is what creates a
+            clash when two long cases run together.
+          </p>
+        )}
+      </Group>
+
+      {/* The finding nothing else in KuBi could produce. Arithmetic on two
+          intervals, and the kind of thing a clinic discovers at 11:05 when the
+          second patient is already in the chair. */}
+      {c.clashes.length > 0 && (
+        <Notice
+          tone="stop"
+          title={`${c.clashes.length} time${c.clashes.length === 1 ? '' : 's'} today one assistant is needed in two rooms at once`}
+        >
+          {c.clashes.map((x) => (
+            <div key={x.because} className="slot-why is-bad">
+              <b>{x.assistant}</b> — {x.because}
+            </div>
+          ))}
+        </Notice>
+      )}
+
+      <Group title="What each assistant is carrying">
+        <div className="chair-list">
+          {c.load.map((l) => (
+            <div key={l.label} className={l.present ? 'chair' : 'chair is-dim'}>
+              <span className="chair-room">{l.label}</span>
+              <span className="chair-who">{l.present ? 'In' : 'Not in'}</span>
+              <span className="chair-state">{l.rooms} room{l.rooms === 1 ? '' : 's'}</span>
+              <span className="chair-load">
+                {l.slots} patient{l.slots === 1 ? '' : 's'} · {l.bookedMinutes} min
+              </span>
+              <span className="chair-why" />
+            </div>
+          ))}
+        </div>
+      </Group>
+    </>
   );
 }
 
@@ -174,7 +271,7 @@ function Form({ v }: { v: ReceptionScreenView }) {
 export function Reception() {
   const { data: v, failed, reload } = useLoad<ReceptionScreenView>(
     () => api.reception(), []);
-  const [tab, setTab] = useState<'BOOK' | 'DESK'>('BOOK');
+  const [tab, setTab] = useState<'BOOK' | 'CHAIRS' | 'DESK'>('BOOK');
 
   if (failed) return <Failed what="Could not read the appointment book." back={reload} />;
   if (!v) return <Loading />;
@@ -234,6 +331,7 @@ export function Reception() {
         onChange={setTab}
         options={[
           { value: 'BOOK', label: `Today’s book · ${v.slots.length}` },
+          { value: 'CHAIRS', label: 'Who is on which chair' },
           { value: 'DESK', label: 'The front desk' },
         ]}
       />
@@ -273,6 +371,8 @@ export function Reception() {
           )}
         </>
       )}
+
+      {tab === 'CHAIRS' && <Chairs c={v.cover} />}
 
       {tab === 'DESK' && (
         <>

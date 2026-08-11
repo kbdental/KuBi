@@ -3246,3 +3246,39 @@ label.field-label {
   content: '·'; position: absolute; left: 2px;
   color: var(--ink-3, #7d8c86); font-weight: 700;
 }
+
+/* ── PAT-001.a · who covers which chair ─────────────────────────────────
+   Five columns, because "is it covered" is never the whole question: who,
+   in what state, and carrying how much. A room with an assistant against it
+   and nothing booked is dimmed rather than green — it is not in use. */
+
+.chair-list {
+  display: flex; flex-direction: column; gap: 1px;
+  margin-top: 10px; border-top: 1px solid var(--line, #e4e8e6);
+}
+.chair {
+  display: grid;
+  grid-template-columns: 118px 116px 88px 148px 1fr;
+  gap: 10px; align-items: baseline;
+  padding: 8px 2px; font-size: 13px;
+  border-bottom: 1px solid var(--line, #eef1f0);
+}
+.chair-room { font-weight: 650; color: var(--ink-1, #17211d); }
+.chair-who { color: var(--ink-1, #17211d); }
+.chair-state { font-size: 12px; font-weight: 600; }
+.chair-load {
+  font-size: 12px; color: var(--ink-3, #7d8c86);
+  font-variant-numeric: tabular-nums;
+}
+.chair-why { font-size: 12px; color: var(--ink-3, #7d8c86); line-height: 1.5; }
+
+.chair.is-done .chair-state { color: #0c5f4e; }
+.chair.is-warn .chair-state { color: #9a6f24; }
+.chair.is-bad  .chair-state { color: #b0322a; }
+.chair.is-bad  .chair-room  { color: #9d2f26; }
+.chair.is-dim  { opacity: .55; }
+
+@media (max-width: 720px) {
+  .chair { grid-template-columns: 1fr 1fr; row-gap: 2px; }
+  .chair-why { grid-column: 1 / -1; }
+}
