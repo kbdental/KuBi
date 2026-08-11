@@ -77,6 +77,20 @@ export const ClinicEvent = {
   EQUIPMENT_VERIFIED: 'EQUIPMENT_VERIFIED',
   STOCK_VERIFIED: 'STOCK_VERIFIED',
 
+  /* ── OPEN-012, and why it is two events ──────────────────────────────
+   * The matrix names a Doer and a Checker — *Assistant* and *Doctor* — and
+   * one event cannot carry two signatures without one of them being a
+   * field somebody could set. So the check and the countersignature are
+   * separate facts in the log, and the engine refuses a signature by the
+   * person who did the check.
+   *
+   * Both carry `employeeCode#ROLE` as the subject, the same compound
+   * convention as `SKU#qty` and `tag#cycle`: an event has no payload, and
+   * *who* is the whole point of this control.
+   * ------------------------------------------------------------------ */
+  EMERGENCY_CHECKED: 'EMERGENCY_CHECKED',
+  EMERGENCY_VERIFIED: 'EMERGENCY_VERIFIED',
+
   /* ── Closing ─────────────────────────────────────────────────────────
    * The owner's closing drill, one event per section of it. The day ends
    * with `CLINIC_LOCKED`, which is refused until these are reported — the

@@ -60,6 +60,11 @@ function openClinic(now = T(9, 0)): World {
   w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
     w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
   w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
+  // OPEN-012. Added when the emergency kit became a mandatory block, and the
+  // engine was right to start refusing: a clinic that has not checked whether
+  // it could handle a collapse is not a clinic that should be seating people.
+  w = must(w, ClinicEvent.EMERGENCY_CHECKED, 'e1#DENTAL_ASSISTANT',
+    RoleCode.DENTAL_ASSISTANT);
   w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
   // The huddle too. Leaving it out made the first escalation test fail, and
   // the engine was right: a clinic that unlocked at 08:30 and had not held its

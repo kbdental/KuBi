@@ -45,6 +45,9 @@ import {
   complianceFor, readinessHorizon,
   STOCK_ITEMS, inventory as inventoryView,
   gatherFailures, holdersFrom, lensFor, placesFor, bookingWindow,
+  EMERGENCY_KIT, emergencyReadiness, checkFrom, verificationFrom,
+  UNRATIFIED_EMERGENCY_KIT, EmergencyKind,
+  type EmergencyCheckRow,
   ClinicEvent as CE,
   type World, type Operatory, type RoleCode,
   type Booking, type PatientFacts, type Care, type CareTask, type ReadinessEvent,
@@ -1636,6 +1639,74 @@ function attendanceFor(now: number, firstPatientAt: number | null) {
  * in on time — and the row is gone on the next read, because the row was never
  * stored in the first place.
  */
+/* -------------------------------------------------------------------------
+ * OPEN-012 — this morning's emergency-kit checklist
+ *
+ * Uneven on purpose, because a demo where the kit is perfect never shows the
+ * rule that matters:
+ *
+ *   Adrenaline   expired eight days ago      the clinic cannot treat
+ *   Airways      nobody counted them         UNCHECKED, which is not a pass
+ *   AED pads     expire in 12 days           reorder now, day continues
+ *   Glucose gel  present, cupboard locked    as absent as an empty box
+ *   Spacer       missing, and not critical   fetched, not a blocker
+ * ---------------------------------------------------------------------- */
+
+const DEMO_KIT_DAY = 400;
+
+function emergencyRows(): EmergencyCheckRow[] {
+  const perishable = (i: { kind: string }) =>
+    i.kind !== EmergencyKind.DEVICE && i.kind !== EmergencyKind.INFORMATION;
+
+  return EMERGENCY_KIT.map((i) => {
+    const base: EmergencyCheckRow = {
+      itemId: i.id,
+      found: i.required,
+      earliestExpiryDay: perishable(i) ? DEMO_KIT_DAY + 300 : null,
+      accessible: true,
+      note: null,
+    };
+    switch (i.id) {
+      case 'ADRENALINE':
+        return { ...base, earliestExpiryDay: DEMO_KIT_DAY - 8 };
+      case 'AIRWAYS':
+        return { ...base, found: null };
+      case 'AED':
+        return { ...base, earliestExpiryDay: DEMO_KIT_DAY + 12 };
+      case 'GLUCOSE_ORAL':
+        return { ...base, accessible: false,
+          note: 'Cupboard locked and the key is not on the board' };
+      case 'SPACER':
+        return { ...base, found: 0 };
+      default:
+        return base;
+    }
+  });
+}
+
+/**
+ * The kit as of `now`, read the way the real one will be.
+ *
+ * The check event is in the log; the rows travel beside it, because a
+ * ReadinessEvent carries no payload and twenty rows of counts and dates do not
+ * belong in a subject string. Nobody has countersigned it — which is the
+ * AWAITING_VERIFICATION state, and is exactly what a manager should see at
+ * 09:15 on a morning when the doctor came in at 09:40.
+ */
+function emergencyNow(now: number) {
+  const events: ReadinessEvent[] = [
+    { type: CE.EMERGENCY_CHECKED, subjectId: 'e1#DENTAL_ASSISTANT', at: 8 * 60 + 55 },
+  ];
+  const rows = new Map([[8 * 60 + 55, emergencyRows()]]);
+  return emergencyReadiness(
+    EMERGENCY_KIT,
+    checkFrom(events, rows, 0),
+    verificationFrom(events, 0),
+    DEMO_KIT_DAY,
+    now,
+  );
+}
+
 function failuresNow() {
   const w = engineWorld();
   const now = w.now;
@@ -1653,13 +1724,20 @@ function failuresNow() {
   const unusableAssets = [...new Set([
     ...eq.unusable.map((r) => r.asset.tag), ...eq.down.map((r) => r.asset.tag),
   ])].filter((tag) => dependedOn.has(tag));
-  const emergencyReady = !['EMERGENCY-01', 'OXYGEN-01'].some(
-    (tag) => eq.unusable.some((r) => r.asset.tag === tag)
-      || eq.down.some((r) => r.asset.tag === tag));
+  // OPEN-012 decides this now, not the two-asset proxy it used to be. A
+  // register saying EMERGENCY-01 is not overdue cannot tell you the
+  // adrenaline expired in June.
+  const em = emergencyNow(now);
 
   const compliance = DEMO_BOOKINGS
     .map((b) => complianceFor(b, factsFor(b.id), events, now,
-      { unusableAssets, stockVouched: inv.gateStock, emergencyReady }))
+      {
+        unusableAssets, stockVouched: inv.gateStock,
+        emergencyReady: em.safe,
+        ...(em.stopping[0]
+          ? { emergencyBecause: `${em.stopping[0].item.name}. ${em.stopping[0].because}` }
+          : {}),
+      }))
     .filter((c): c is Compliance => c !== null);
 
   const holders = holdersFrom(a);
@@ -1677,6 +1755,7 @@ function failuresNow() {
       // OPEN-004's consequence: a room whose chair failed must reach whoever
       // is holding the appointment book, not only the equipment screen.
       rooms: roomAvailability(w.operatories, eq),
+      emergency: em,
       now,
     }, holders),
   };
@@ -2496,6 +2575,24 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
           lateForTheirWork: p.lateForTheirWork, headline: p.headline,
         })),
       } : null,
+      // OPEN-012, and the sentence that must travel with it. KuBi runs the
+      // control against a contents list it wrote itself, and it says so on
+      // the screen rather than letting a made-up list pass as the clinic's.
+      emergency: (() => {
+        const em = emergencyNow(now);
+        return {
+          state: em.state,
+          safe: em.safe,
+          complete: em.complete,
+          headline: em.headline,
+          checkedAt: em.checkedAt,
+          checkedBy: em.checkedBy,
+          verifiedBy: em.verifiedBy,
+          stopping: em.stopping.length,
+          watch: em.watch.length,
+          unratified: UNRATIFIED_EMERGENCY_KIT,
+        };
+      })(),
       me: (() => {
         const mine = a.people.find((p) => p.employeeCode === db.signedIn?.employeeId)
           ?? a.people.find((p) => p.roles.includes(engineRole()));
@@ -2552,14 +2649,22 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
     // The emergency kit is one fact about the clinic, read off the same asset
     // register — a medical emergency is no likelier during an implant than
     // during a scaling.
-    const emergencyReady = !['EMERGENCY-01', 'OXYGEN-01'].some(
-      (tag) => eq.unusable.some((r) => r.asset.tag === tag)
-        || eq.down.some((r) => r.asset.tag === tag));
+    // OPEN-012 decides this, not the asset register. The proxy that used to
+    // live here — are EMERGENCY-01 and OXYGEN-01 neither down nor overdue —
+    // could not tell you the adrenaline expired in June, which is the fact
+    // that stops the procedure.
+    const em = emergencyNow(now);
 
     const gatesFor = new Map(DEMO_BOOKINGS.map((b) => [
       b.id,
       complianceFor(b, factsFor(b.id), events, now,
-        { unusableAssets, stockVouched: inv.gateStock, emergencyReady }),
+        {
+          unusableAssets, stockVouched: inv.gateStock,
+          emergencyReady: em.safe,
+          ...(em.stopping[0]
+            ? { emergencyBecause: `${em.stopping[0].item.name}. ${em.stopping[0].because}` }
+            : {}),
+        }),
     ]));
 
     // "This should appear before the patient reaches the chair, not when the

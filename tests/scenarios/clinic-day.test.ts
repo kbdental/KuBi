@@ -68,6 +68,10 @@ function openTheClinic(now = T(8, 45)): World {
   w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
     w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
   w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
+  // OPEN-012 — the emergency kit. A mandatory block since it was built, so a
+  // clinic that has not checked it may not seat anybody.
+  w = must(w, ClinicEvent.EMERGENCY_CHECKED, 'e1#DENTAL_ASSISTANT',
+    RoleCode.DENTAL_ASSISTANT);
   w = must(w, ClinicEvent.ROOMS_READY, 'today', RoleCode.DENTAL_ASSISTANT);
   return must(w, ClinicEvent.HUDDLE_HELD, 'today', RoleCode.CLINIC_MANAGER);
 }
@@ -125,7 +129,13 @@ describe('Scenario 1 · 08:45, clinic opening', () => {
 
     // Four people, four different mornings, from one unlock.
     const assistant = decisionsFor(w, RoleCode.DENTAL_ASSISTANT, T(8, 46)).map((d) => d.question);
-    expect(assistant).toEqual(['Prepare Operatory 1', 'Prepare Operatory 2']);
+    // The emergency kit joined this list when OPEN-012 got its block. It is
+    // hers by the matrix — Doer: Assistant — and it comes after the rooms
+    // because a room takes fifteen minutes and the kit takes five.
+    expect(assistant).toEqual([
+      'Prepare Operatory 1', 'Prepare Operatory 2',
+      'Check the emergency kit and oxygen',
+    ]);
     // The stock check is not here on purpose. It is done "as per requirement",
     // so it is listed in the readiness picture and never pushed at somebody as
     // today's work — putting it on her list every morning would invent a daily

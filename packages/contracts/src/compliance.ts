@@ -598,13 +598,27 @@ export interface ComplianceInputs {
    */
   stockVouched?: Readonly<Record<string, boolean>>;
   /**
-   * Whether the emergency kit and oxygen are in date, from the asset register.
+   * Whether the clinic could handle a collapse in the chair.
    *
    * Absent is UNKNOWN, like the other two. One fact about the clinic, applied
    * to every treatment — a medical emergency is no likelier during an implant
    * than during a scaling.
+   *
+   * It used to be read off the asset register: *are `EMERGENCY-01` and
+   * `OXYGEN-01` neither down nor overdue?* That is a statement about a
+   * register and not about a kit — it could not tell you the adrenaline
+   * expired in June, that there are no paediatric masks, or that the cupboard
+   * is locked. It now comes from `emergencyReadiness().safe` (see
+   * emergency.ts), which is a twenty-item checklist counted this morning.
+   *
+   * `safe`, not `complete`: a kit that is checked and whole keeps patients
+   * safe while the doctor's countersignature is still outstanding. The
+   * signature is a control failure, not a clinical one, and blocking every
+   * treatment on it would be the kind of rule a clinic learns to route around.
    */
   emergencyReady?: boolean;
+  /** Said in the kit's own words, so the gate can name the item rather than the register. */
+  emergencyBecause?: string;
 }
 
 /**
@@ -803,13 +817,17 @@ function emergencyGate(m: MustGate, inputs: ComplianceInputs, dueAt: number): Ga
   if (inputs.emergencyReady === undefined) {
     return {
       ...m, verdict: GateOutcome.UNKNOWN, metAt: null, dueAt,
-      because: 'Nobody has asked whether the emergency kit and oxygen are in date',
+      because: 'Nobody has checked the emergency kit this morning',
     };
   }
   if (!inputs.emergencyReady) {
     return {
       ...m, verdict: GateOutcome.MISSING, metAt: null, dueAt,
-      because: 'The emergency kit or the oxygen is out of date, and no treatment should start',
+      // The kit's own sentence where there is one — "Adrenaline 1:1000
+      // ampoules. Expired 12 days ago" beats "the emergency kit is not
+      // ready" by exactly the amount of walking it saves.
+      because: inputs.emergencyBecause
+        ?? 'The emergency kit is not ready, and no treatment should start',
     };
   }
   return { ...m, verdict: GateOutcome.MET, metAt: null, dueAt, because: m.label };

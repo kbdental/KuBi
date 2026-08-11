@@ -56,7 +56,10 @@ function fullMorning(ops: Operatory[] = FOUR): World {
   w = sterilise(w);
   w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
     w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
-  return must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
+  w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
+  // OPEN-012 — the emergency kit, mandatory since it got a block.
+  return must(w, ClinicEvent.EMERGENCY_CHECKED, 'e1#DENTAL_ASSISTANT',
+    RoleCode.DENTAL_ASSISTANT);
 }
 
 const read = (w: World) => readiness(w.events, w.operatories, w.firstPatientAt, w.now);
@@ -186,9 +189,11 @@ describe('who owns which part of the morning', () => {
   it('puts the rooms on the dental assistant, and the stock check with her', () => {
     const r = read(world());
     const hers = r.blocks.filter((b) => b.owner === RoleCode.DENTAL_ASSISTANT).map((b) => b.id);
+    // The emergency kit is hers too — the matrix names the Doer as Assistant.
+    // The doctor's countersignature is a separate fact and not a block.
     expect(hers).toEqual([
       'OPERATORY:op-1', 'OPERATORY:op-2', 'OPERATORY:op-3', 'OPERATORY:op-4',
-      'STOCK',
+      'EMERGENCY', 'STOCK',
     ]);
   });
 
@@ -244,11 +249,11 @@ describe('the owner’s two readiness measures', () => {
     for (const o of FOUR) {
       w = must(w, ClinicEvent.OPERATORY_READY, o.id, RoleCode.DENTAL_ASSISTANT, o.label);
     }
-    // Nine blocks listed; eight of them mandatory. Compliance is four of the
-    // eight — the stock check is real work and is not part of "may the clinic
-    // open", so counting it would make a complete morning read as 88%.
-    expect(read(w).blocks).toHaveLength(9);
-    expect(read(w).compliance).toBe(4 / 8);
+    // Ten blocks listed; nine of them mandatory. Compliance is four of the
+    // nine — the stock check is real work and is not part of "may the clinic
+    // open", so counting it would make a complete morning read as 90%.
+    expect(read(w).blocks).toHaveLength(10);
+    expect(read(w).compliance).toBe(4 / 9);
     expect(read(fullMorning()).compliance).toBe(1);
   });
 
@@ -438,6 +443,8 @@ describe('a day with nobody booked has no deadline, and says so', () => {
     w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
         w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
     w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
+    w = must(w, ClinicEvent.EMERGENCY_CHECKED, 'e1#DENTAL_ASSISTANT',
+      RoleCode.DENTAL_ASSISTANT);
 
     const r = read(w);
     expect(r.ready).toBe(true);
@@ -456,6 +463,8 @@ describe('a day with nobody booked has no deadline, and says so', () => {
     w = must(w, ClinicEvent.EQUIPMENT_VERIFIED, 'today', RoleCode.SENIOR_ASSISTANT);
         w = must(w, ClinicEvent.RECEPTION_READY, 'today', RoleCode.RECEPTION);
     w = must(w, ClinicEvent.COMMON_AREAS_READY, 'today', RoleCode.HOUSEKEEPING);
+    w = must(w, ClinicEvent.EMERGENCY_CHECKED, 'e1#DENTAL_ASSISTANT',
+      RoleCode.DENTAL_ASSISTANT);
     expect(record(w, {
       type: ClinicEvent.ROOMS_READY, subjectId: 'today', by: RoleCode.DENTAL_ASSISTANT,
     }).ok).toBe(true);
@@ -521,15 +530,14 @@ describe('every one of the matrix’s thirteen opening controls is accounted for
     }
   });
 
-  it('names the seven nothing covers, rather than quietly dropping them', () => {
-    // Six of the seven are one thing wearing six matrix rows: opening the
-    // building. Neither source document has that section — the closing drill
-    // switches all of it off in the evening, and the opening procedure begins
-    // with people already inside a working building. The clinic plainly does
-    // it; KuBi has no block for it and nobody has said whose job it is.
+  it('names the six nothing covers, rather than quietly dropping them', () => {
+    // All six are one thing wearing six matrix rows: opening the building.
+    // Neither source document has that section — the closing drill switches
+    // all of it off in the evening, and the opening procedure begins with
+    // people already inside a working building. The clinic plainly does it;
+    // KuBi has no block for it and nobody has said whose job it is.
     expect(UNCOVERED_OPENING_CONTROLS).toEqual([
       'OPEN-001', 'OPEN-007', 'OPEN-008', 'OPEN-009', 'OPEN-010', 'OPEN-011',
-      'OPEN-012',
     ]);
   });
 
@@ -543,11 +551,12 @@ describe('every one of the matrix’s thirteen opening controls is accounted for
     expect(UNCOVERED_OPENING_CONTROLS).toContain('OPEN-010');
   });
 
-  it('keeps emergency readiness apart from the light switches', () => {
-    // OPEN-012 is the emergency kit, the drugs and their expiry. It is in the
-    // same uncovered list as the ACs and the fans and it is not the same kind
-    // of thing, so its reason has to say so — a gap that reads like a fan
-    // switch will be filled like one.
-    expect(OPENING_CONTROLS['OPEN-012']!.why).toContain('Patient safety');
+  it('gave emergency readiness a block rather than leaving it with the fans', () => {
+    // OPEN-012 sat in the uncovered list next to the ACs and the air diffuser
+    // and was never the same kind of thing. It has its own block and its own
+    // engine now; what makes it different is that "accessible" is twenty
+    // separate facts rather than one tick.
+    expect(OPENING_CONTROLS['OPEN-012']!.covers).toBe('EMERGENCY');
+    expect(OPENING_CONTROLS['OPEN-012']!.why).toContain('checklist rather than a tick');
   });
 });

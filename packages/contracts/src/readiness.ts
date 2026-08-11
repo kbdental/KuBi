@@ -158,11 +158,10 @@ export const STERILIZATION_MINUTES = 75;
  * building. So the clinic certainly does it; KuBi simply has no block for it,
  * and nobody has said whose job it is.
  *
- * The seventh is `OPEN-012`, morning emergency readiness, and it is not part
- * of that cluster. It is patient safety — the emergency kit, the drugs and
- * their expiry, the oxygen — and it is absent from both documents and from
- * every block. That one is worth its own line rather than being counted in
- * with the light switches.
+ * `OPEN-012` was the seventh and is now covered. It never belonged with the
+ * light switches: it is patient safety, and the failure mode is a patient
+ * going into anaphylaxis while somebody looks for a key. It has the
+ * `EMERGENCY` block and its own engine — see emergency.ts.
  *
  * Nothing here invents an owner for any of the seven. Naming them is the
  * point; `UNCOVERED_OPENING_CONTROLS` is what stops them being forgotten.
@@ -182,7 +181,7 @@ export const OPENING_CONTROLS: Readonly<Record<string, {
   'OPEN-009': { covers: null, why: 'water availability — part of opening the building, which no block covers' },
   'OPEN-010': { covers: null, why: 'the water pump — the owner ruled this belongs to opening rather than closing, and the morning has no block for it yet' },
   'OPEN-011': { covers: null, why: 'lights and fans — part of opening the building, which no block covers' },
-  'OPEN-012': { covers: null, why: 'morning emergency readiness — the kit, the drugs and their expiry. Patient safety, in neither document and in no block' },
+  'OPEN-012': { covers: 'EMERGENCY', why: 'morning emergency readiness — the kit, the drugs, their expiry and whether anybody can actually reach them. A twenty-item checklist rather than a tick, because "required emergency resources accessible" is twenty separate facts' },
   // The one control with no doer, and that is the point of it.
   'OPEN-013': { covers: 'DERIVED', why: 'opening complete — the matrix gives the doer as “System” and the evidence as “Auto”. `readiness().ready` is that control: it is computed from the mandatory blocks every time it is read, and there is no event, field or permission that can set it' },
 };
@@ -370,6 +369,19 @@ function planFor(operatories: readonly Operatory[]): Array<Omit<ReadinessBlock, 
       RoleCode.SENIOR_ASSISTANT, Objective.PATIENT_SAFE,
       ClinicEvent.EQUIPMENT_VERIFIED, null, null,
       'The equipment has not been checked, so a fault would be found on a patient'),
+    // OPEN-012. The seventh uncovered control, and the only one of the seven
+    // that was never about light switches: it is patient safety, and it now
+    // has a block like everything else the morning cannot open without.
+    //
+    // Owned by the assistant because the matrix says so. The doctor's
+    // countersignature is a separate fact and does not hold the door — see
+    // `emergencyReadiness`, which reports a checked-and-complete kit as safe
+    // while the signature is still outstanding.
+    block('EMERGENCY', 'Check the emergency kit and oxygen',
+      RoleCode.DENTAL_ASSISTANT, Objective.PATIENT_SAFE,
+      ClinicEvent.EMERGENCY_CHECKED, null, null,
+      'Nobody has checked the emergency kit today, so KuBi cannot say the '
+      + 'clinic could handle a collapse in the chair'),
     block('COMMON_AREAS', 'Clean the floors, pantry and washroom',
       RoleCode.HOUSEKEEPING, Objective.PATIENT_SAFE,
       ClinicEvent.COMMON_AREAS_READY, null, HOUSEKEEPING_MINUTES,

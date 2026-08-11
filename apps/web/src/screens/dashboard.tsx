@@ -242,6 +242,44 @@ export function Dashboard({ go }: { go: (id: string) => void }) {
 
       {data.staffing ? <Staffing s={data.staffing} /> : data.me ? <Me me={data.me} /> : null}
 
+      {/* OPEN-012, priority PS. It gets its own line above the failure list
+          because "could this clinic handle a collapse in the chair" is not a
+          question anybody should have to scroll for. */}
+      {data.emergency && (
+        <Group
+          title="Emergency kit"
+          tone={data.emergency.safe ? (data.emergency.complete ? 'good' : 'warn') : 'stop'}
+          note={data.emergency.headline}
+        >
+          <Facts>
+            <Fact
+              value={data.emergency.safe ? 'SAFE' : 'NOT READY'}
+              label="Could we handle a collapse"
+              tone={data.emergency.safe ? 'good' : 'stop'}
+            />
+            <Fact value={data.emergency.stopping} label="Stopping treatment"
+              tone={data.emergency.stopping > 0 ? 'stop' : 'good'} />
+            <Fact value={data.emergency.watch} label="To reorder"
+              tone={data.emergency.watch > 0 ? 'warn' : 'good'} />
+            <Fact
+              value={data.emergency.verifiedBy ?? '—'}
+              label="Countersigned by"
+              tone={data.emergency.complete ? 'good' : 'warn'}
+            />
+          </Facts>
+          {/* Said every time it is shown. KuBi is running this control against
+              a contents list it wrote itself, and a made-up list must never
+              pass as the clinic's own. */}
+          {data.emergency.unratified && (
+            <p className="screen-sub">
+              Checked against KuBi’s own contents list. No doctor has signed off
+              what this clinic’s kit should contain, so “complete” means
+              complete against that list and not against yours.
+            </p>
+          )}
+        </Group>
+      )}
+
       {byArea.map(({ area, rows }) => (
         <Group
           key={area}

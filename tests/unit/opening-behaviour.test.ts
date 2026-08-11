@@ -204,14 +204,14 @@ describe('OPEN-004 · a failed chair withdraws its room', () => {
   });
 });
 
-describe('the seven opening controls still uncovered', () => {
+describe('the six opening controls still uncovered', () => {
   it('names them rather than letting them be forgotten', () => {
-    // Six are one thing wearing six matrix rows — opening the building — and
-    // the seventh is morning emergency readiness, which is patient safety and
-    // belongs on its own line.
+    // All six are one thing wearing six matrix rows: opening the building.
+    // OPEN-012 used to be the seventh and never belonged with them — it was
+    // patient safety, and it now has a block and an engine of its own.
     expect(UNCOVERED_OPENING_CONTROLS).toEqual([
       'OPEN-001', 'OPEN-007', 'OPEN-008', 'OPEN-009',
-      'OPEN-010', 'OPEN-011', 'OPEN-012',
+      'OPEN-010', 'OPEN-011',
     ]);
   });
 

@@ -1181,6 +1181,15 @@ export interface LensView {
     bookableFrom: number; deliverableFrom: number; binding: string;
     overpromisedBy: number; honest: boolean; because: string;
   };
+  /** OPEN-012. Null on a server that does not run the control yet. */
+  emergency: {
+    state: string; safe: boolean; complete: boolean; headline: string;
+    checkedAt: number | null; checkedBy: string | null;
+    verifiedBy: string | null;
+    stopping: number; watch: number;
+    /** True while the contents list is KuBi's rather than the clinic's. */
+    unratified: boolean;
+  } | null;
 }
 
 export const api = {

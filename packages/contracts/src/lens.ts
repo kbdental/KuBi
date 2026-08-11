@@ -50,6 +50,7 @@ import type { Readiness } from './readiness.js';
 import type { Closing } from './closing.js';
 import type { Compliance } from './compliance.js';
 import type { EquipmentView, RoomLinkage } from './equipment.js';
+import { ItemVerdict, type EmergencyReadiness } from './emergency.js';
 import type { InventoryView } from './inventory.js';
 
 /* -------------------------------------------------------------------------
@@ -291,6 +292,8 @@ export interface FailureInputs {
   closing?: Closing;
   /** Which rooms may take a patient. See `roomAvailability`. */
   rooms?: RoomLinkage;
+  /** OPEN-012. See `emergencyReadiness`. */
+  emergency?: EmergencyReadiness;
   /** The minute now, for due-time wording. */
   now: number;
 }
@@ -436,6 +439,71 @@ export function gatherFailures(
         involved: people(b.owner),
         dueAt: null,
         goes: 'Clinic readiness',
+      });
+    }
+  }
+
+  /* ── OPEN-012 · emergency readiness ───────────────────────────────── */
+  //
+  // Priority PS in the matrix, and it earns it. Everything else on this list
+  // costs the clinic time; this one costs somebody their life, so it is one
+  // row per failing item rather than one row for the kit — "the emergency kit
+  // is not ready" sends nobody anywhere, and "Adrenaline: expired 12 days
+  // ago" sends somebody to a cupboard.
+  const em = input.emergency;
+  if (em) {
+    for (const r of em.stopping) {
+      out.push({
+        id: `EMG:${r.item.id}`,
+        area: FailureArea.READINESS,
+        severity: FailureSeverity.STOPS,
+        what: `Emergency kit — ${r.item.name}`,
+        because: `${r.because} For: ${r.item.forWhat}.`,
+        ownerRole: RoleCode.DENTAL_ASSISTANT,
+        involved: people(RoleCode.DENTAL_ASSISTANT),
+        dueAt: null,
+        goes: 'Clinic readiness → Emergency kit',
+      });
+    }
+    // The signature, and only once the kit itself is whole. A clinic that is
+    // safe and unsigned is a control failure; saying it in the same breath as
+    // a missing drug would flatten a distinction that matters.
+    if (em.state === 'AWAITING_VERIFICATION') {
+      out.push({
+        id: 'EMG:VERIFY',
+        area: FailureArea.READINESS,
+        severity: FailureSeverity.HOLDS,
+        what: 'Emergency kit is not countersigned',
+        because: em.verificationRefusedBecause
+          ?? 'Checked and complete. OPEN-012 names the doctor as Checker, and '
+            + 'the person who checked it may not sign it off.',
+        ownerRole: RoleCode.TREATING_DOCTOR,
+        involved: people(RoleCode.TREATING_DOCTOR),
+        dueAt: null,
+        goes: 'Clinic readiness → Emergency kit',
+      });
+    }
+    // Two different things sit in `watch` and the row must not blur them. An
+    // item running out of date is a reorder and belongs to whoever orders; a
+    // non-critical item that is simply absent is a walk to the cupboard and
+    // belongs to the assistant. "Spacer needs reordering" when the spacer is
+    // missing sends the wrong person to the wrong place.
+    for (const r of em.watch) {
+      const expiring = r.verdict === ItemVerdict.EXPIRING;
+      out.push({
+        id: `EMG:SOON:${r.item.id}`,
+        area: FailureArea.READINESS,
+        severity: FailureSeverity.WATCH,
+        what: expiring
+          ? `Emergency kit — ${r.item.name} needs reordering`
+          : `Emergency kit — ${r.item.name}`,
+        because: r.because,
+        ownerRole: expiring
+          ? RoleCode.INVENTORY_COORDINATOR : RoleCode.DENTAL_ASSISTANT,
+        involved: people(expiring
+          ? RoleCode.INVENTORY_COORDINATOR : RoleCode.DENTAL_ASSISTANT),
+        dueAt: null,
+        goes: 'Clinic readiness → Emergency kit',
       });
     }
   }
