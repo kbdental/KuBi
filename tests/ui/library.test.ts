@@ -142,6 +142,7 @@ const LIBRARY = new Set([
   'slot-ok', 'slot-open', 'slot-off', 'slot-here', 'slot-late', 'slot-bad',
   'script', 'script-head', 'script-col', 'script-row', 'script-line',
   'form-list', 'ff', 'ff-num', 'ff-label', 'ff-opt', 'ff-why',
+  'standards', 'standard',
   /* attendance, which lives inside readiness rather than in a tab of its own */
   'staffing', 'staff-roles', 'staff-role', 'staff-mark', 'staff-name',
   'staff-count', 'staff-owns',

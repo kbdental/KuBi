@@ -280,12 +280,12 @@ export function Reception() {
           <Form v={v} />
 
           <Group title="How the waiting area should feel">
-            <div className="form-list">
+            {/* A plain list, not the registration grid. These are sentences to
+                read, and squeezing them into a column sized for "Full name"
+                made them wrap three deep and look like fields. */}
+            <div className="standards">
               {v.hospitality.map((h) => (
-                <div key={h} className="ff">
-                  <span className="ff-num">·</span>
-                  <span className="ff-label">{h}</span>
-                </div>
+                <p key={h} className="standard">{h}</p>
               ))}
             </div>
             <p className="screen-sub">

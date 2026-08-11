@@ -791,21 +791,23 @@ export const HOSPITALITY_STANDARDS: readonly string[] = [
  * than one defensible answer.
  */
 export const RECEPTION_QUESTIONS: readonly string[] = [
-  'APT-004 — *"defined retry protocol"* and *"escalate after attempts"*: how '
+  // Plain sentences, not doc-comment markdown: these are rendered on a screen,
+  // and asterisks that were emphasis in a source file are litter on a wall.
+  'APT-004 says “defined retry protocol” and “escalate after attempts”. How '
   + 'many attempts, how far apart, and to whom? KuBi retries after two hours '
   + 'because the SOP says so, and cannot escalate without the rest.',
-  'APT-012 — *"defined cutoff"*: the morning review has no hour. KuBi scores '
-  + 'it continuously and cannot say it is late.',
+  'APT-012 says “defined cutoff”, and the morning review has no hour. KuBi '
+  + 'scores it continuously and cannot say it is late.',
   '"High-value" appointments get a 48-hour call. Is that a fee threshold or a '
   + 'named list of treatments? Guessing would either over-call or miss the '
   + 'ones that matter.',
   'Which assistant is assigned to which operatory? PAT-001.a says assistants '
-  + '"must be aware of all appointments in their assigned operatory", and no '
+  + 'must be aware of all appointments in their assigned operatory, and no '
   + 'assignment exists — two assistants and four rooms.',
   'Is the Rs. 500 consultation charged to every new patient, or waived when '
   + 'treatment proceeds the same day?',
-  'PAT-003 — *"defined interval"* for re-checking contact details. Every '
-  + 'visit, or every six months?',
+  'PAT-003 asks for contact details to be re-checked at a “defined interval”. '
+  + 'Every visit, or every six months?',
 ];
 
 /** The columns the appointment sheet must carry. */

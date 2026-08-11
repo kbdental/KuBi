@@ -456,7 +456,11 @@ describe('what these matrices do not settle', () => {
     // APT-004 says "defined retry protocol" and "escalate after attempts".
     // KuBi retries after two hours because the SOP says so, and cannot
     // escalate without knowing how many attempts or to whom.
-    expect(RECEPTION_QUESTIONS.join(' ')).toContain('how many attempts');
+    //
+    // These strings are rendered on a screen, so they are plain sentences —
+    // doc-comment asterisks were showing up as litter on the wall.
+    expect(RECEPTION_QUESTIONS.join(' ')).not.toContain('*');
+    expect(RECEPTION_QUESTIONS.join(' ')).toContain('How many attempts');
   });
 
   it('names the missing cutoff, so the score cannot pretend to be late', () => {

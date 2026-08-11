@@ -3232,3 +3232,17 @@ label.field-label {
   .ff { grid-template-columns: 28px 1fr; }
   .ff-why { grid-column: 2; }
 }
+
+/* Standards to read rather than fields to fill. A sentence squeezed into a
+   column sized for "Full name" wraps three deep and reads as a form. */
+.standards { margin-top: 10px; }
+.standard {
+  margin: 0; padding: 7px 0 7px 16px;
+  font-size: 13.5px; line-height: 1.55; color: var(--ink-1, #17211d);
+  border-bottom: 1px solid var(--line, #eef1f0);
+  position: relative;
+}
+.standard::before {
+  content: '·'; position: absolute; left: 2px;
+  color: var(--ink-3, #7d8c86); font-weight: 700;
+}
