@@ -167,9 +167,11 @@ export const CLINICAL_CONTROLS: readonly ClinicalControl[] = [
     doer: SYS, checker: ASST, priority: ControlPriority.PS,
     covers: 'DERIVED',
     advisory: false,
-    why: 'The matrix gives the doer as System, and it is: `mustListFor` picks '
-      + 'the consent from the treatment, so a nerve-injury consent appears on '
-      + 'a lower third molar without anybody choosing it. There is no form '
+    // Plain prose: this text is rendered verbatim on a screen, and a backtick
+    // that meant "code" in a source file is litter on a wall.
+    why: 'The matrix gives the doer as System, and it is — the mandatory list '
+      + 'is picked from the treatment, so a nerve-injury consent appears on a '
+      + 'lower third molar without anybody choosing it. There is no form '
       + 'picker to get wrong',
   },
   {
@@ -188,9 +190,9 @@ export const CLINICAL_CONTROLS: readonly ClinicalControl[] = [
     doer: SYS, checker: DOC, priority: ControlPriority.PS,
     covers: 'DERIVED',
     advisory: false,
-    why: 'Doer System, evidence Auto: `complianceFor().ready` is computed over '
-      + 'the mandatory gates every time it is read. No event sets it and no '
-      + 'field holds it, the same rule as clinic readiness',
+    why: 'Doer System, evidence Auto. Readiness is computed over the mandatory '
+      + 'gates every time it is read: no event sets it and no field holds it, '
+      + 'the same rule as clinic readiness',
   },
 ];
 

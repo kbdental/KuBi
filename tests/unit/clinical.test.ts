@@ -494,3 +494,20 @@ describe('a consent that does not apply is not an unsigned consent', () => {
       .toContain('No consent is required');
   });
 });
+
+describe('the register is prose, because it is rendered on a wall', () => {
+  it('carries no source-code markup', () => {
+    // Same class of defect as the asterisks in the reception questions.
+    // Backticks that meant "code" in a source file render literally.
+    for (const c of CLINICAL_CONTROLS) {
+      expect(c.why, `${c.id} has markup in it`).not.toContain('`');
+      expect(c.why, `${c.id} has markup in it`).not.toContain('*');
+    }
+  });
+
+  it('gives every control a reason long enough to be one', () => {
+    for (const c of CLINICAL_CONTROLS) {
+      expect(c.why.length, `${c.id} has no reason`).toBeGreaterThan(40);
+    }
+  });
+});
