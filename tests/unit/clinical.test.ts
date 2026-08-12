@@ -511,3 +511,57 @@ describe('the register is prose, because it is rendered on a wall', () => {
     }
   });
 });
+
+describe('CLN-004 is two facts, and the gate only holds one', () => {
+  const atOf = () => T(11, 0);
+  const scans = (failed: boolean) => ({
+    results: [{
+      exposure: { bookingId: 'bk-1', what: 'Periapical', at: T(11, 20),
+        byEmployeeCode: 'e1', byRole: RoleCode.DENTAL_ASSISTANT },
+      failed,
+      because: failed
+        ? 'Periapical was justified by the person who took it.'
+        : 'Justified at 11:00, 20 minutes before the exposure.',
+    }],
+    failures: failed ? [{ because: 'x' }] : [],
+  } as never);
+
+  it('reports MISSING when the justification does not stand up, whatever the gate says', () => {
+    // The gate answers "was a justification written". This answers "did two
+    // people write and take it, in that order" — and reporting MET on a
+    // self-justified exposure would be the system agreeing with a record it
+    // should be refusing.
+    const v = clinicalControls(
+      [compliance({ gates: [gate('JUSTIFY', 'MET', 'Exposure justified')] })],
+      atOf, scans(true));
+    const c4 = v.rows[0]!.controls.find((c) => c.id === 'CLN-004')!;
+    expect(c4.verdict).toBe('MISSING');
+    expect(c4.because).toContain('justified by the person who took it');
+  });
+
+  it('reports MET when both halves hold', () => {
+    const v = clinicalControls(
+      [compliance({ gates: [gate('JUSTIFY', 'MET')] })], atOf, scans(false));
+    expect(v.rows[0]!.controls.find((c) => c.id === 'CLN-004')!.verdict).toBe('MET');
+  });
+
+  it('falls back to the gate before any exposure is taken', () => {
+    // The earlier question — has anybody written the justification — is the
+    // right one while the button has not been pressed.
+    const v = clinicalControls(
+      [compliance({ gates: [gate('JUSTIFY', 'MISSING', 'Nothing written')] })],
+      atOf, { results: [], failures: [] } as never);
+    const c4 = v.rows[0]!.controls.find((c) => c.id === 'CLN-004')!;
+    expect(c4.verdict).toBe('MISSING');
+    expect(c4.because).toBe('Nothing written');
+  });
+
+  it('reports only what the gate knows when radiography is not supplied', () => {
+    // Absent input is absent. A view built without the exposure register must
+    // not invent a pass, and must not invent a failure either.
+    const v = clinicalControls(
+      [compliance({ gates: [gate('JUSTIFY', 'MET', 'Exposure justified')] })], atOf);
+    expect(v.rows[0]!.controls.find((c) => c.id === 'CLN-004')!.verdict).toBe('MET');
+    expect(v.exposureFailures).toEqual([]);
+  });
+});

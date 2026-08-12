@@ -1035,6 +1035,30 @@ export interface ConsentIntegrityView {
   }>;
 }
 
+/** CLN-004 — one exposure, and the justification behind it. */
+export interface ScanRowView {
+  what: string;
+  bookingId: string;
+  patientLabel: string;
+  takenAt: number;
+  takenBy: string;
+  justifiedAt: number | null;
+  justifiedBy: string | null;
+  question: string | null;
+  verdict: string;
+  failed: boolean;
+  leadMinutes: number | null;
+  because: string;
+}
+
+export interface ScansScreenView {
+  met: boolean;
+  headline: string;
+  taken: number;
+  failures: number;
+  rows: ScanRowView[];
+}
+
 export interface ClinicalScreenView {
   now: number;
   role: string;
@@ -1043,6 +1067,7 @@ export interface ClinicalScreenView {
   notReady: number;
   rows: PreTreatmentRowView[];
   failing: Array<{ id: string; activity: string; priority: string; count: number }>;
+  scans: ScansScreenView;
   controls: Array<{
     id: string; activity: string; standard: string; trigger: string;
     doer: string; checker: string | null; priority: string;

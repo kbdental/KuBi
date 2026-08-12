@@ -155,6 +155,11 @@ const LIBRARY = new Set([
   'pt-list', 'pt', 'pt-head', 'pt-time', 'pt-who', 'pt-name', 'pt-what',
   'pt-state', 'pt-consent', 'pt-fail',
   'cln-list', 'cln', 'cln-id', 'cln-what', 'cln-std', 'cln-verdict', 'cln-why',
+  /* CLN-004. The row is drawn as the sequence it should have happened in —
+     justified, then taken — so a reversed one reads wrong before anybody has
+     parsed a word. */
+  'scan-list', 'scan', 'scan-head', 'scan-what', 'scan-who', 'scan-state',
+  'scan-seq', 'scan-step', 'scan-arrow', 'scan-q', 'scan-why',
   'is-quiet',
   /* attendance, which lives inside readiness rather than in a tab of its own */
   'staffing', 'staff-roles', 'staff-role', 'staff-mark', 'staff-name',

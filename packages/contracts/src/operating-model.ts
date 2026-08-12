@@ -109,6 +109,23 @@ export const ClinicEvent = {
   ROOMS_CLEANED: 'ROOMS_CLEANED',
   WASHROOM_STOCKED: 'WASHROOM_STOCKED',
 
+  /* ── CLN-004 ─────────────────────────────────────────────────────────
+   * Two events, because the matrix names a Doer and a Checker and one
+   * event cannot carry two people without one of them being a field
+   * somebody could set.
+   *
+   *   EXPOSURE_JUSTIFIED  the doctor writes the clinical question the
+   *                       exposure answers — *before* it is taken
+   *   EXPOSURE_TAKEN      the assistant presses the button
+   *
+   * Both carry `bookingId#employeeCode#ROLE`, the compound convention this
+   * codebase already uses. The engine refuses a justification written by
+   * whoever took the exposure, and one written afterwards: a justification
+   * that arrives after the dose is a rationalisation.
+   * ------------------------------------------------------------------ */
+  EXPOSURE_JUSTIFIED: 'EXPOSURE_JUSTIFIED',
+  EXPOSURE_TAKEN: 'EXPOSURE_TAKEN',
+
   /* ── Closing ─────────────────────────────────────────────────────────
    * The owner's closing drill, one event per section of it. The day ends
    * with `CLINIC_LOCKED`, which is refused until these are reported — the

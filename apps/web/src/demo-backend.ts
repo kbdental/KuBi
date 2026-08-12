@@ -47,6 +47,8 @@ import {
   gatherFailures, holdersFrom, lensFor, placesFor, bookingWindow,
   reception as receptionView, Confirmation,
   clinicalControls, CLINICAL_CONTROLS, CLINICAL_QUESTIONS,
+  radiography, RADIOGRAPHY_QUESTIONS,
+  type Exposure, type Justification,
   chairCover, assistantForRoom, UNRATIFIED_ASSIGNMENT, ASSIGNMENT_QUESTIONS,
   type RoomAssignment,
   REGISTRATION_FORM, CHECK_IN_SCRIPT, HOSPITALITY_STANDARDS,
@@ -2061,6 +2063,73 @@ function bookNow(now: number) {
  * screen saying CLN-001 is met while the mandatory list says otherwise would
  * be the two-answers problem this project keeps having to fix.
  */
+/* -------------------------------------------------------------------------
+ * CLN-004 — today's exposures and the justifications behind them
+ *
+ * Three cases, because one clean row proves nothing:
+ *
+ *   Anita Rao      justified by the doctor at 10:40, taken by Priya at 11:05
+ *                  — the ordinary case, and what the matrix describes
+ *   Farah Qureshi  justified and taken by the same assistant
+ *                  — the gap CLN-004 exists to close
+ *   Sunil Mehta    taken at 12:35, justified at 12:50
+ *                  — the rule the matrix does not state: fifteen minutes
+ *                    afterwards is a rationalisation, not a justification
+ * ---------------------------------------------------------------------- */
+
+const DEMO_EXPOSURES: Exposure[] = [
+  {
+    bookingId: 'bk-1', what: 'Cone-beam CT, lower left',
+    at: 11 * 60 + 5, byEmployeeCode: 'e1',
+    byRole: 'DENTAL_ASSISTANT' as RoleCode,
+  },
+  {
+    bookingId: 'bk-3', what: 'Periapical, lower right',
+    at: 13 * 60 + 50, byEmployeeCode: 'e1',
+    byRole: 'DENTAL_ASSISTANT' as RoleCode,
+  },
+  {
+    bookingId: 'bk-2', what: 'Periapical, upper right',
+    at: 12 * 60 + 35, byEmployeeCode: 'e2',
+    byRole: 'DENTAL_ASSISTANT' as RoleCode,
+  },
+];
+
+const DEMO_JUSTIFICATIONS: Justification[] = [
+  {
+    bookingId: 'bk-1',
+    question: 'Assess bone height and the position of the inferior alveolar '
+      + 'canal before placing a lower left implant',
+    at: 10 * 60 + 40, byEmployeeCode: 'e7',
+    byRole: 'TREATING_DOCTOR' as RoleCode,
+  },
+  {
+    // Written by the same assistant who took it. CLN-004's Doer and Checker
+    // collapsed into one person, which is exactly what this closes.
+    bookingId: 'bk-3',
+    question: 'Check the apex before starting the root canal',
+    at: 13 * 60 + 40, byEmployeeCode: 'e1',
+    byRole: 'DENTAL_ASSISTANT' as RoleCode,
+  },
+  {
+    // Fifteen minutes after the dose. Nobody was being careless — the
+    // paperwork simply followed the work, which is the habit this catches.
+    bookingId: 'bk-2',
+    question: 'Confirm the extent of the fracture before extracting',
+    at: 12 * 60 + 50, byEmployeeCode: 'e7',
+    byRole: 'TREATING_DOCTOR' as RoleCode,
+  },
+];
+
+function scansNow(now: number) {
+  // Only what has actually happened by now — an exposure booked for two
+  // o'clock is not a finding at half past nine.
+  return radiography(
+    DEMO_EXPOSURES.filter((e) => e.at <= now),
+    DEMO_JUSTIFICATIONS.filter((j) => j.at <= now),
+  );
+}
+
 function clinicalNow(now: number) {
   const w = engineWorld();
   const events = [...w.events, ...careProgressEvents(now, db.endOfDay), ...DEMO_REFUSALS];
@@ -2083,7 +2152,8 @@ function clinicalNow(now: number) {
 
   return clinicalControls(
     compliances,
-    (id) => DEMO_BOOKINGS.find((b) => b.id === id)?.at ?? 0);
+    (id) => DEMO_BOOKINGS.find((b) => b.id === id)?.at ?? 0,
+    scansNow(now));
 }
 
 function failuresNow() {
@@ -3088,7 +3158,37 @@ function handle(url: string, method: string, body: Record<string, unknown>): Res
         priority: c.priority as string,
         covers: c.covers, why: c.why,
       })),
-      openQuestions: [...CLINICAL_QUESTIONS],
+      // CLN-004, on its own because it is the one control with a preventive
+      // half: the engine refuses the exposure before the button, not only
+      // reports it after.
+      scans: (() => {
+        const r = scansNow(now);
+        const label = (code: string) =>
+          DEMO_STAFF.find((p) => p.employeeCode === code)?.label ?? code;
+        return {
+          met: r.met,
+          headline: r.headline,
+          taken: r.results.length,
+          failures: r.failures.length,
+          rows: r.results.map((x) => ({
+            what: x.exposure.what,
+            bookingId: x.exposure.bookingId,
+            patientLabel: DEMO_BOOKINGS.find(
+              (b) => b.id === x.exposure.bookingId)?.patientLabel ?? '',
+            takenAt: x.exposure.at,
+            takenBy: label(x.exposure.byEmployeeCode),
+            justifiedAt: x.justification?.at ?? null,
+            justifiedBy: x.justification === null
+              ? null : label(x.justification.byEmployeeCode),
+            question: x.justification?.question ?? null,
+            verdict: x.verdict as string,
+            failed: x.failed,
+            leadMinutes: x.leadMinutes,
+            because: x.because,
+          })),
+        };
+      })(),
+      openQuestions: [...CLINICAL_QUESTIONS, ...RADIOGRAPHY_QUESTIONS],
     });
   }
 

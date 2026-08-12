@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { api, type ClinicalScreenView, type PreTreatmentRowView } from '../api.js';
+import {
+  api, type ClinicalScreenView, type PreTreatmentRowView, type ScanRowView,
+} from '../api.js';
 import {
   Screen, Title, Answer, Group, Fact, Facts, Notice, Switch,
   useLoad, Loading, Failed, type Tone,
@@ -107,6 +109,100 @@ function Patient({ r }: { r: PreTreatmentRowView }) {
   );
 }
 
+/**
+ * CLN-004 — every exposure, and the justification behind it.
+ *
+ * Two questions per row, and the second is the one the matrix does not state:
+ * *did two people do this*, and *did they do it in that order*. A
+ * justification written after the dose is a rationalisation, and it is worse
+ * than nothing because it looks like compliance.
+ *
+ * The row is laid out as the sequence it should have happened in — justified,
+ * then taken — so a reversed one reads wrong before anybody has parsed a word.
+ */
+function Scans({ v }: { v: ClinicalScreenView }) {
+  return (
+    <>
+      <Group
+        title="Exposures today"
+        note={v.scans.headline}
+        tone={v.scans.met ? 'good' : 'stop'}
+      >
+        <div className="scan-list">
+          {v.scans.rows.map((r) => <Scan r={r} key={r.bookingId + r.takenAt} />)}
+        </div>
+        {v.scans.rows.length === 0 && (
+          <p className="screen-sub">
+            No exposure has been taken today. Nothing to report, and that is
+            not the same as everything being justified.
+          </p>
+        )}
+      </Group>
+
+      <Notice tone="calm" title="How KuBi decides">
+        <p className="screen-sub">
+          A justification must be written by a doctor, before the exposure, and
+          not by the person who takes it. All three are checked before the
+          button is offered as well as afterwards — the refusal happens while
+          somebody can still fetch the doctor, rather than in a report a week
+          later. This is the same rule sterilisation has always had: an
+          operator may not release their own batch.
+        </p>
+      </Notice>
+    </>
+  );
+}
+
+const SCAN_CLASS: Record<string, string> = {
+  JUSTIFIED: 'scan is-done',
+  UNJUSTIFIED: 'scan is-bad',
+  SELF_JUSTIFIED: 'scan is-bad',
+  NOT_A_DOCTOR: 'scan is-bad',
+  JUSTIFIED_AFTER: 'scan is-bad',
+  NO_QUESTION: 'scan is-bad',
+};
+
+const SCAN_WORD: Record<string, string> = {
+  JUSTIFIED: 'Justified',
+  UNJUSTIFIED: 'No justification',
+  SELF_JUSTIFIED: 'Justified by whoever took it',
+  NOT_A_DOCTOR: 'Not justified by a doctor',
+  JUSTIFIED_AFTER: 'Justified after the dose',
+  NO_QUESTION: 'No clinical question',
+};
+
+function Scan({ r }: { r: ScanRowView }) {
+  return (
+    <div className={SCAN_CLASS[r.verdict] ?? 'scan'}>
+      <div className="scan-head">
+        <span className="scan-what">{r.what}</span>
+        <span className="scan-who">{r.patientLabel}</span>
+        <span className="scan-state">{SCAN_WORD[r.verdict] ?? r.verdict}</span>
+      </div>
+
+      {/* The sequence, drawn as a sequence. A reversed one reads wrong before
+          anybody has parsed a word. */}
+      <div className="scan-seq">
+        <span className={r.justifiedAt === null ? 'scan-step is-bad' : 'scan-step'}>
+          <b>{hhmm(r.justifiedAt)}</b> justified
+          {r.justifiedBy !== null && ` · ${r.justifiedBy}`}
+        </span>
+        <span className={r.failed ? 'scan-arrow is-bad' : 'scan-arrow'}>
+          {r.leadMinutes === null ? '→'
+            : r.leadMinutes >= 0 ? `→ ${r.leadMinutes} min →`
+              : `← ${-r.leadMinutes} min later ←`}
+        </span>
+        <span className="scan-step">
+          <b>{hhmm(r.takenAt)}</b> taken · {r.takenBy}
+        </span>
+      </div>
+
+      {r.question !== null && <div className="scan-q">“{r.question}”</div>}
+      <div className={r.failed ? 'scan-why is-bad' : 'scan-why'}>{r.because}</div>
+    </div>
+  );
+}
+
 /** The traceability table — where each control actually lives. */
 function Register({ v }: { v: ClinicalScreenView }) {
   return (
@@ -136,7 +232,7 @@ function Register({ v }: { v: ClinicalScreenView }) {
 export function Clinical() {
   const { data: v, failed, reload } = useLoad<ClinicalScreenView>(
     () => api.clinical(), []);
-  const [tab, setTab] = useState<'TODAY' | 'CONTROLS'>('TODAY');
+  const [tab, setTab] = useState<'TODAY' | 'SCANS' | 'CONTROLS'>('TODAY');
 
   if (failed) return <Failed what="Could not read the pre-treatment controls." back={reload} />;
   if (!v) return <Loading />;
@@ -194,6 +290,7 @@ export function Clinical() {
         onChange={setTab}
         options={[
           { value: 'TODAY', label: `Today’s patients · ${v.rows.length}` },
+          { value: 'SCANS', label: `Exposures · ${v.scans.taken}` },
           { value: 'CONTROLS', label: 'The ten controls' },
         ]}
       />
@@ -224,6 +321,8 @@ export function Clinical() {
           </Group>
         </>
       )}
+
+      {tab === 'SCANS' && <Scans v={v} />}
 
       {tab === 'CONTROLS' && <Register v={v} />}
 

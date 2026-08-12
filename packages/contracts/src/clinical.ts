@@ -54,6 +54,7 @@
 import { RoleCode } from './enums.js';
 import { ControlPriority } from './housekeeping.js';
 import type { Compliance } from './compliance.js';
+import type { RadiographyView, ExposureResult } from './radiography.js';
 
 /* -------------------------------------------------------------------------
  * Traceability: the matrix's ten controls, and what carries each
@@ -352,6 +353,8 @@ export interface ControlState {
 
 export interface ClinicalView {
   rows: readonly PreTreatmentRow[];
+  /** CLN-004. Doses given whose justification does not stand up. */
+  exposureFailures: readonly ExposureResult[];
   /** CLN-010. Booked, not delivered, and not ready. */
   notReady: readonly PreTreatmentRow[];
   consent: ConsentIntegrity;
@@ -370,6 +373,16 @@ export interface ClinicalView {
 export function clinicalControls(
   compliances: readonly Compliance[],
   atOf: (bookingId: string) => number,
+  /**
+   * CLN-004's second half, from `radiography`.
+   *
+   * The JUSTIFY gate answers *was a justification written*. This answers *did
+   * two people write and take it, in that order* — and where they did not, the
+   * gate reading MET is a record that looks like compliance. Optional, and
+   * absent means the engine reports only what the gate knows rather than
+   * inventing a pass.
+   */
+  scans?: RadiographyView,
 ): ClinicalView {
   const rows: PreTreatmentRow[] = compliances.map((c) => {
     const byGate = new Map(c.gates.map((g) => [g.id, g]));
@@ -411,6 +424,35 @@ export function clinicalControls(
       }
 
       const g = byGate.get(control.covers);
+
+      // CLN-004 is two facts, and the gate only holds one of them. A
+      // justification written by the person who took the exposure passes
+      // JUSTIFY and fails the control, and reporting MET there would be the
+      // system agreeing with a record it should be refusing.
+      if (control.id === 'CLN-004' && scans !== undefined) {
+        const mine = scans.results.filter(
+          (r) => r.exposure.bookingId === c.bookingId);
+        const failed = mine.filter((r) => r.failed);
+        if (failed.length > 0) {
+          return {
+            id: control.id, activity: control.activity,
+            priority: control.priority,
+            verdict: 'MISSING',
+            because: failed.map((r) => r.because).join(' '),
+          };
+        }
+        if (mine.length > 0) {
+          return {
+            id: control.id, activity: control.activity,
+            priority: control.priority,
+            verdict: 'MET',
+            because: mine.map((r) => r.because).join(' '),
+          };
+        }
+        // No exposure taken yet. Fall through to the gate, which is asking
+        // the earlier question — has anybody written the justification.
+      }
+
       if (g !== undefined) {
         return {
           id: control.id, activity: control.activity,
@@ -478,6 +520,7 @@ export function clinicalControls(
 
   return {
     rows,
+    exposureFailures: scans?.failures ?? [],
     notReady,
     consent,
     failing,
