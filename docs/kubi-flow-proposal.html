@@ -1,0 +1,272 @@
+<title>The Clinic Right Now</title>
+<style>
+  :root {
+    --ground:  #EBEEEC;
+    --surface: #FFFFFF;
+    --sunk:    #E1E6E3;
+    --ink:     #101A16;
+    --quiet:   #616D68;
+    --hair:    #CFD8D4;
+    --green:   #0C5844;
+    --amber:   #8A5300;
+    --amber-bg:#FBF0DC;
+    --red:     #9C3220;
+    --red-bg:  #F8E4DF;
+    --free:    #8A948F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #0A0F0D;
+      --surface: #141B18;
+      --sunk:    #1C2521;
+      --ink:     #DEE6E2;
+      --quiet:   #8C9А94;
+      --quiet:   #8C9994;
+      --hair:    #2A3531;
+      --green:   #5FBFA0;
+      --amber:   #D9A34A;
+      --amber-bg:#2A2113;
+      --red:     #E08063;
+      --red-bg:  #2C1813;
+      --free:    #6E7A75;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:  #0A0F0D;
+    --surface: #141B18;
+    --sunk:    #1C2521;
+    --ink:     #DEE6E2;
+    --quiet:   #8C9994;
+    --hair:    #2A3531;
+    --green:   #5FBFA0;
+    --amber:   #D9A34A;
+    --amber-bg:#2A2113;
+    --red:     #E08063;
+    --red-bg:  #2C1813;
+    --free:    #6E7A75;
+  }
+
+  :root {
+    --ui: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --voice: "Iowan Old Style", Charter, "Palatino Linotype", Palatino, Georgia, serif;
+    --num: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    color-scheme: light dark;
+  }
+
+  body { background: var(--ground); color: var(--ink); font-family: var(--ui); line-height: 1.5; }
+  .wrap { max-width: 74rem; margin: 0 auto; padding: clamp(1rem, 3vw, 2.25rem) clamp(0.9rem, 3vw, 2rem) 5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+
+  /* ---- the bar ---- */
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.9rem; border-bottom: 1px solid var(--hair); padding-bottom: 1rem; }
+  .brand { font-weight: 700; letter-spacing: -0.02em; font-size: 1.1rem; color: var(--green); }
+  .where { color: var(--quiet); font-size: 0.85rem; }
+  .spacer { flex: 1 1 auto; }
+  .clock { font-family: var(--num); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+  .whobox { font-size: 0.85rem; color: var(--quiet); }
+
+  .moments { display: inline-flex; border: 1px solid var(--hair); border-radius: 999px; overflow: hidden; background: var(--surface); }
+  .moments button { font: inherit; font-size: 0.82rem; padding: 0.35rem 0.85rem; border: 0; background: transparent; color: var(--quiet); cursor: pointer; font-family: var(--num); }
+  .moments button[aria-pressed="true"] { background: var(--green); color: var(--surface); }
+  .moments button:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+  /* ---- the sentence ---- */
+  .say { font-family: var(--voice); font-size: clamp(1.35rem, 3.4vw, 1.95rem); line-height: 1.28; text-wrap: balance; max-width: 34ch; margin: 0; }
+  .say em { font-style: normal; color: var(--green); }
+  .say.warn em { color: var(--amber); }
+  .say.stop em { color: var(--red); }
+  .sub { color: var(--quiet); font-size: 0.95rem; margin: 0.35rem 0 0; max-width: 52ch; }
+
+  /* ---- the board ---- */
+  h2.lab { font-size: 0.7rem; font-family: var(--num); letter-spacing: 0.14em; text-transform: uppercase; color: var(--quiet); margin: 0 0 0.6rem; font-weight: 500; }
+  .board { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+  .chair { background: var(--surface); border: 1px solid var(--hair); border-radius: 0.4rem; padding: 0.85rem 0.95rem; display: flex; flex-direction: column; gap: 0.35rem; min-height: 9.5rem; border-top: 3px solid var(--hair); }
+  .chair.busy  { border-top-color: var(--green); }
+  .chair.soon  { border-top-color: var(--amber); }
+  .chair.stop  { border-top-color: var(--red); }
+  .chair.shut  { background: var(--sunk); }
+  .room { font-family: var(--num); font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--quiet); }
+  .who { font-size: 1.08rem; font-weight: 600; letter-spacing: -0.01em; }
+  .who.none { color: var(--free); font-weight: 500; }
+  .what { font-size: 0.88rem; color: var(--quiet); }
+  .bar-time { margin-top: auto; display: flex; align-items: center; gap: 0.45rem; font-size: 0.78rem; font-family: var(--num); color: var(--quiet); }
+  .meter { height: 4px; flex: 1 1 auto; background: var(--sunk); border-radius: 2px; overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--green); }
+  .team { font-size: 0.8rem; color: var(--quiet); }
+  .flag { font-size: 0.8rem; color: var(--red); }
+  .flag.amber { color: var(--amber); }
+
+  /* ---- arrivals ---- */
+  .next { display: flex; flex-direction: column; gap: 0; background: var(--surface); border: 1px solid var(--hair); border-radius: 0.4rem; }
+  .arr { display: grid; grid-template-columns: 4.2rem 1fr auto; gap: 0.9rem; align-items: baseline; padding: 0.7rem 0.95rem; border-bottom: 1px solid var(--hair); }
+  .arr:last-child { border-bottom: 0; }
+  .arr .t { font-family: var(--num); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+  .arr .n { font-weight: 600; font-size: 0.95rem; }
+  .arr .n small { display: block; font-weight: 400; font-size: 0.83rem; color: var(--quiet); }
+  .tag { font-family: var(--num); font-size: 0.65rem; letter-spacing: 0.09em; text-transform: uppercase; padding: 0.18rem 0.45rem; border-radius: 0.2rem; white-space: nowrap; }
+  .tag.ok { color: var(--green); background: var(--sunk); }
+  .tag.warn { color: var(--amber); background: var(--amber-bg); }
+  .tag.stop { color: var(--red); background: var(--red-bg); }
+
+  /* ---- needs you ---- */
+  .needs { display: flex; flex-direction: column; gap: 0.6rem; }
+  .need { background: var(--surface); border: 1px solid var(--hair); border-left: 3px solid var(--red); border-radius: 0.3rem; padding: 0.8rem 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: baseline; }
+  .need.amber { border-left-color: var(--amber); }
+  .need p { margin: 0; flex: 1 1 20rem; font-size: 0.95rem; }
+  .need .fix { font-size: 0.83rem; color: var(--quiet); font-family: var(--num); }
+  .need strong { font-weight: 600; }
+
+  .cols { display: grid; gap: 1.5rem; grid-template-columns: 1fr; }
+  @media (min-width: 62rem) { .cols { grid-template-columns: 1.15fr 1fr; } }
+
+  .note { border-top: 1px solid var(--hair); padding-top: 1.1rem; color: var(--quiet); font-size: 0.9rem; display: flex; flex-direction: column; gap: 0.6rem; }
+  .note b { color: var(--ink); font-weight: 600; }
+  .note ul { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.35rem; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <div class="bar">
+    <span class="brand">KuBi</span>
+    <span class="where">SYNTHETIC KB Dental Andheri</span>
+    <span class="spacer"></span>
+    <div class="moments" role="group" aria-label="Moment in the day">
+      <button type="button" data-m="a" aria-pressed="true">09:15</button>
+      <button type="button" data-m="b" aria-pressed="false">12:40</button>
+    </div>
+    <span class="clock" id="clock">09:15</span>
+    <span class="whobox">Clinic manager</span>
+  </div>
+
+  <div>
+    <p class="say" id="say"></p>
+    <p class="sub" id="sub"></p>
+  </div>
+
+  <div>
+    <h2 class="lab">The four chairs</h2>
+    <div class="board" id="board"></div>
+  </div>
+
+  <div class="cols">
+    <div>
+      <h2 class="lab" id="nextlab">Coming in</h2>
+      <div class="next" id="next"></div>
+    </div>
+    <div>
+      <h2 class="lab">Needs you</h2>
+      <div class="needs" id="needs"></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>What changed, and why</b>
+    <ul>
+      <li>One screen. No dashboard that repeats the other screens in different words.</li>
+      <li>No control numbers on the face of it. CLN-004 and OPEN-012 still run underneath — they surface as a sentence about a person, at the moment they block something, and never as a row to tick.</li>
+      <li>No percentage. Twenty-seven per cent ready did not tell anybody what to do; “the first patient is at 11:00 and two chairs are not set up” does.</li>
+      <li>Needs you is capped at three. Everything else waits its turn rather than being listed at you.</li>
+      <li>Move the clock and the whole screen moves. That is the thing a checklist could never show.</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+  const DATA = {
+    a: {
+      clock: '09:15',
+      tone: 'warn',
+      say: ['The clinic is not open to patients yet. ', 'Two chairs are still to set up', ' and the first patient is at 11:00.'],
+      sub: 'One hour forty-five minutes. Everything below is what stands between now and that appointment.',
+      chairs: [
+        { room: 'Operatory 1', state: 'soon', who: 'Ready', whoNone: true, what: 'Set up at 08:50 · holding for Anita Rao at 11:00', team: 'Priya' },
+        { room: 'Operatory 2', state: 'soon', who: 'Ready', whoNone: true, what: 'Set up at 08:50 · holding for Sunil Mehta at 12:30', team: 'Priya' },
+        { room: 'Operatory 3', state: 'stop', who: 'Not set up', whoNone: true, what: 'Farah Qureshi is booked in here at 14:00', flag: 'Nobody has started it — 15 minutes of work' },
+        { room: 'Operatory 4', state: 'shut', who: 'Not set up', whoNone: true, what: 'Nothing booked in here today', team: 'Meera' },
+      ],
+      nextLab: 'Coming in',
+      next: [
+        { t: '11:00', n: 'Anita Rao', s: 'Implant placement · Operatory 1 · 2 hours', tag: 'ok', tagText: 'Confirmed' },
+        { t: '12:30', n: 'Sunil Mehta', s: 'Simple extraction · Operatory 2', tag: 'stop', tagText: 'Blocked' },
+        { t: '14:00', n: 'Farah Qureshi', s: 'Root canal · Operatory 3', tag: 'warn', tagText: 'Room not ready' },
+        { t: '16:15', n: 'Imran Shaikh', s: 'Crown fit · no room assigned', tag: 'warn', tagText: 'No room' },
+      ],
+      needs: [
+        { tone: 'red', p: '<strong>Nobody is running the morning sterilisation.</strong> It takes 75 minutes and the first patient is at 11:00. Lakshmi is on approved leave and nobody was named to cover.', fix: 'Name a cover' },
+        { tone: 'red', p: '<strong>The adrenaline in the emergency kit expired eight days ago.</strong> Until it is replaced KuBi will not let a treatment start.', fix: 'Order · Clinic manager' },
+        { tone: 'amber', p: '<strong>Sunil Mehta is on an anticoagulant and his prescriber has sent no plan.</strong> He is at 12:30. The clinical team has to see this before he is in a chair.', fix: 'Call the prescriber' },
+      ],
+    },
+    b: {
+      clock: '12:40',
+      tone: 'stop',
+      say: ['Two chairs are running. ', 'A scan was just taken with nothing written about why', '.'],
+      sub: 'The exposure went ahead five minutes ago. This is the one thing on the screen that cannot be undone later.',
+      chairs: [
+        { room: 'Operatory 1', state: 'busy', who: 'Anita Rao', what: 'Implant placement · started 11:00', team: 'Dr Iyer with Priya', pct: 82, timeText: '20 min left' },
+        { room: 'Operatory 2', state: 'stop', who: 'Sunil Mehta', what: 'Simple extraction · seated 12:32', team: 'Dr Iyer with Meera', flag: 'The periapical taken at 12:35 has no justification written' },
+        { room: 'Operatory 3', state: 'soon', who: 'Free', whoNone: true, what: 'Farah Qureshi at 14:00 · 1 hour 20 minutes', flag: 'Room still not verified for a patient', flagAmber: true },
+        { room: 'Operatory 4', state: 'shut', who: 'Free', whoNone: true, what: 'Nothing booked in here today' },
+      ],
+      nextLab: 'Still to come',
+      next: [
+        { t: '14:00', n: 'Farah Qureshi', s: 'Root canal · Operatory 3', tag: 'warn', tagText: 'Room not ready' },
+        { t: '15:30', n: 'Devika Nair', s: 'Scaling and polishing', tag: 'stop', tagText: 'Cancelled' },
+        { t: '16:15', n: 'Imran Shaikh', s: 'Crown fit · no room assigned', tag: 'warn', tagText: 'No room' },
+      ],
+      needs: [
+        { tone: 'red', p: '<strong>Sunil Mehta’s periapical was taken at 12:35 and nothing says why.</strong> Dr Iyer has to write the clinical question. Written now it is a justification; written after he leaves the chair it is not.', fix: 'Dr Iyer · now' },
+        { tone: 'red', p: '<strong>Farah Qureshi is in Operatory 3 at 14:00 and that room may not take a patient.</strong> Nobody has verified it since the morning. She needs the room cleared or moving.', fix: 'Move or verify' },
+        { tone: 'amber', p: '<strong>Anita Rao is 20 minutes from finishing and Operatory 1 is her room until 13:00.</strong> Nothing needs doing yet — this is here so the turnaround is not a surprise.', fix: 'Watch' },
+      ],
+    },
+  };
+
+  const el = (id) => document.getElementById(id);
+
+  function render(key) {
+    const d = DATA[key];
+    el('clock').textContent = d.clock;
+    const say = el('say');
+    say.className = 'say ' + d.tone;
+    say.innerHTML = d.say[0] + '<em>' + d.say[1] + '</em>' + d.say[2];
+    el('sub').textContent = d.sub;
+    el('nextlab').textContent = d.nextLab;
+
+    el('board').innerHTML = d.chairs.map((c) => `
+      <div class="chair ${c.state}">
+        <span class="room">${c.room}</span>
+        <span class="who${c.whoNone ? ' none' : ''}">${c.who}</span>
+        <span class="what">${c.what}</span>
+        ${c.team ? `<span class="team">${c.team}</span>` : ''}
+        ${c.flag ? `<span class="flag${c.flagAmber ? ' amber' : ''}">${c.flag}</span>` : ''}
+        ${c.pct !== undefined
+          ? `<span class="bar-time"><span class="meter"><i style="width:${c.pct}%"></i></span>${c.timeText}</span>`
+          : ''}
+      </div>`).join('');
+
+    el('next').innerHTML = d.next.map((a) => `
+      <div class="arr">
+        <span class="t">${a.t}</span>
+        <span class="n">${a.n}<small>${a.s}</small></span>
+        <span class="tag ${a.tag}">${a.tagText}</span>
+      </div>`).join('');
+
+    el('needs').innerHTML = d.needs.map((n) => `
+      <div class="need${n.tone === 'amber' ? ' amber' : ''}">
+        <p>${n.p}</p>
+        <span class="fix">${n.fix}</span>
+      </div>`).join('');
+  }
+
+  document.querySelectorAll('.moments button').forEach((b) => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.moments button')
+        .forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      render(b.dataset.m);
+    });
+  });
+
+  render('a');
+</script>
