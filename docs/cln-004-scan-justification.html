@@ -1,0 +1,505 @@
+<title>Two People, In That Order</title>
+<style>
+  :root {
+    --ground:   #E6EAEA;
+    --surface:  #F5F7F6;
+    --sunk:     #DCE1E1;
+    --ink:      #15191C;
+    --quiet:    #667174;
+    --hair:     #C6CDCD;
+    --slate:    #2C4A58;
+    --fault:    #A2371F;
+    --fault-bg: #F0E0DA;
+    --pass:     #3D5F4F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #0D1113;
+      --surface:  #161B1E;
+      --sunk:     #1E2528;
+      --ink:      #DEE4E4;
+      --quiet:    #8B9699;
+      --hair:     #303A3E;
+      --slate:    #83AABA;
+      --fault:    #E0805C;
+      --fault-bg: #2A1A15;
+      --pass:     #7FA895;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:   #0D1113;
+    --surface:  #161B1E;
+    --sunk:     #1E2528;
+    --ink:      #DEE4E4;
+    --quiet:    #8B9699;
+    --hair:     #303A3E;
+    --slate:    #83AABA;
+    --fault:    #E0805C;
+    --fault-bg: #2A1A15;
+    --pass:     #7FA895;
+  }
+
+  :root {
+    --serif: "Iowan Old Style", "Charter", "Palatino Linotype", Palatino, Georgia, serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+    color-scheme: light dark;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 47rem;
+    margin: 0 auto;
+    padding: clamp(2.5rem, 6vw, 5rem) clamp(1.1rem, 4vw, 2.5rem) 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.25rem;
+  }
+
+  h1, h2, h3 { text-wrap: balance; font-weight: 600; line-height: 1.18; }
+  h1 { font-size: clamp(2.1rem, 6vw, 3.1rem); letter-spacing: -0.015em; margin: 0; }
+  h2 { font-size: 1.5rem; margin: 0; letter-spacing: -0.008em; }
+  h3 { font-size: 1.12rem; margin: 0; }
+  p { margin: 0; max-width: 63ch; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--quiet);
+  }
+
+  header.masthead { display: flex; flex-direction: column; gap: 1.1rem; }
+  header.masthead .standfirst { font-size: 1.2rem; color: var(--quiet); max-width: 54ch; }
+  .rule-line { height: 1px; background: var(--hair); border: 0; margin: 0; }
+
+  section { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  /* The two clauses */
+  .clauses { display: grid; gap: 1px; background: var(--hair); border: 1px solid var(--hair); }
+  @media (min-width: 40rem) { .clauses { grid-template-columns: 1fr 1fr; } }
+  .clause { background: var(--surface); padding: 1.4rem 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .clause h3 { color: var(--slate); font-size: 1.25rem; }
+  .clause p { font-size: 0.97rem; color: var(--quiet); }
+
+  /* Before / after */
+  .swap { display: flex; flex-direction: column; gap: 0.9rem; }
+  .swap-row { display: grid; grid-template-columns: 7.5rem 1fr; gap: 1rem; align-items: baseline; }
+  .swap-row .k { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--quiet); }
+  .swap-row .v { font-size: 1rem; }
+  .swap-row.now .v { color: var(--ink); }
+  .swap-row.was .v { color: var(--quiet); }
+
+  /* Cases */
+  .cases { display: flex; flex-direction: column; gap: 2.25rem; }
+  .case { display: flex; flex-direction: column; gap: 0.85rem; }
+  .case-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.65rem; }
+  .verdict {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.11em;
+    text-transform: uppercase; padding: 0.24rem 0.55rem; border: 1px solid;
+  }
+  .verdict-pass { color: var(--pass); border-color: var(--pass); }
+  .verdict-fail { color: var(--fault); border-color: var(--fault); background: var(--fault-bg); }
+  .case-what { font-family: var(--mono); font-size: 0.8rem; color: var(--quiet); }
+
+  .track-scroll { overflow-x: auto; padding-block: 0.25rem; }
+  .track {
+    position: relative;
+    min-width: 42rem;
+    height: 11.4rem;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+  }
+  .axis { position: absolute; left: 0; right: 0; top: 4.75rem; height: 1px; background: var(--hair); }
+  .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--hair); opacity: 0.55; }
+  .tick span {
+    position: absolute; bottom: 0.35rem; left: 50%; transform: translateX(-50%);
+    font-family: var(--mono); font-size: 0.62rem; color: var(--quiet); letter-spacing: 0.06em;
+    background: var(--surface); padding: 0 0.3rem;
+  }
+
+  .span { position: absolute; top: 4.6rem; height: 3px; }
+  .span-ok { background: var(--slate); }
+  .span-bad { background: var(--fault); }
+
+  .pin { position: absolute; width: 0; }
+  .dot {
+    position: absolute; left: -6.5px; width: 9px; height: 9px; border-radius: 50%;
+    border: 2px solid var(--surface); top: 4.35rem;
+  }
+  .stem { position: absolute; left: -0.5px; width: 1px; background: var(--hair); }
+
+  .pin-just .dot { background: var(--slate); }
+  .pin-just .stem { top: 3.75rem; height: 0.68rem; }
+  .pin-just .lab { position: absolute; top: 0.5rem; }
+  .pin-exp .dot { background: var(--ink); }
+  .pin-exp .stem { top: 5.05rem; height: 0.55rem; }
+  .pin-exp .lab { position: absolute; top: 5.6rem; }
+
+  .pin.bad .dot { background: var(--fault); }
+
+  .lab {
+    left: 0; transform: translateX(-50%); text-align: center; white-space: nowrap;
+    display: flex; flex-direction: column; gap: 0.1rem;
+    background: var(--surface); padding: 0.15rem 0.4rem;
+  }
+  .lab .t { font-family: var(--mono); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+  .lab .r { font-family: var(--mono); font-size: 0.63rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--quiet); }
+  .lab .n { font-size: 0.85rem; color: var(--quiet); }
+  .pin.bad .lab .t { color: var(--fault); }
+
+  .case-read { font-size: 0.98rem; }
+  .case-read .q { color: var(--quiet); font-style: italic; }
+  .case-read .said {
+    display: block; margin-top: 0.45rem; padding-left: 0.85rem;
+    border-left: 2px solid var(--hair); color: var(--quiet); font-size: 0.93rem;
+  }
+  .case-read .said.bad { border-left-color: var(--fault); color: var(--ink); }
+
+  /* Verdict table */
+  .table-scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: 0.94rem; }
+  th, td { text-align: left; padding: 0.6rem 0.9rem 0.6rem 0; border-bottom: 1px solid var(--hair); vertical-align: top; }
+  thead th { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--quiet); font-weight: 400; }
+  td.code { font-family: var(--mono); font-size: 0.78rem; white-space: nowrap; }
+  td.code.bad { color: var(--fault); }
+  td.code.ok { color: var(--pass); }
+  td.note { color: var(--quiet); }
+
+  /* Refusal panel */
+  .refusal {
+    background: var(--sunk); border: 1px solid var(--hair);
+    padding: 1.4rem 1.5rem; display: flex; flex-direction: column; gap: 0.7rem;
+  }
+  .refusal .head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+  .refusal .msg { font-size: 1.02rem; max-width: 58ch; }
+  .refusal .who { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--quiet); }
+
+  /* Open questions */
+  ol.questions { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 1.15rem; counter-reset: q; }
+  ol.questions li { display: grid; grid-template-columns: 2rem 1fr; gap: 0.6rem; counter-increment: q; }
+  ol.questions li::before {
+    content: counter(q, decimal-leading-zero);
+    font-family: var(--mono); font-size: 0.72rem; color: var(--fault); padding-top: 0.35rem;
+  }
+  ol.questions p { font-size: 0.97rem; }
+  ol.questions .ask { display: block; color: var(--ink); }
+  ol.questions .why { display: block; color: var(--quiet); }
+
+  /* Files */
+  ul.files { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.55rem; }
+  ul.files li { display: grid; grid-template-columns: minmax(0, 22rem) 1fr; gap: 1rem; align-items: baseline; font-size: 0.92rem; }
+  ul.files .p { font-family: var(--mono); font-size: 0.78rem; color: var(--slate); overflow-wrap: anywhere; }
+  ul.files .d { color: var(--quiet); }
+  @media (max-width: 34rem) { ul.files li { grid-template-columns: 1fr; gap: 0.15rem; } }
+
+  footer { color: var(--quiet); font-size: 0.88rem; }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <span class="eyebrow">CLN-004 · Pre-treatment scan · Doer assistant · Checker doctor</span>
+    <h1>Two people, in that order.</h1>
+    <p class="standfirst">A radiograph may not be justified by the person who took it, and a
+      justification written afterwards is not a justification. KuBi now refuses both.</p>
+  </header>
+
+  <hr class="rule-line" />
+
+  <section>
+    <h2>The gap this closes</h2>
+    <p>KuBi already asked for the clinical question a scan answers, and recorded who wrote it.
+      What it never did was refuse a question written by the person who pressed the button.
+      CLN-004 names the assistant as Doer and the doctor as Checker — two columns in the matrix,
+      and until now one person in the software.</p>
+    <p>That is the rule sterilisation has had since it was built: an operator may not release
+      their own batch. This is the same rule applied to a dose.</p>
+  </section>
+
+  <section>
+    <h2>What the engine checks</h2>
+    <div class="clauses">
+      <div class="clause">
+        <h3>Two people</h3>
+        <p>Whoever justified is not whoever exposed — and the justifier is a doctor. Two
+          assistants satisfy the letter of “two people” while answering none of the question,
+          because deciding a dose is warranted is a clinical judgement.</p>
+      </div>
+      <div class="clause">
+        <h3>In that order</h3>
+        <p>The justification is timestamped before the dose. A question typed at four o’clock
+          does not make a two o’clock exposure justified. It makes a record that says it was,
+          which is worse than nothing, because it looks like compliance.</p>
+      </div>
+    </div>
+    <p>Both are judged strictly as of the minute of exposure, exactly as consent is. A
+      justification that arrived afterwards is not matched to the exposure at all — matching it
+      would be the engine doing the retro-fitting it exists to prevent. And a failure is
+      permanent: nothing written later clears it, because the patient has already had the dose.</p>
+  </section>
+
+  <section>
+    <h2>Three scans, one day</h2>
+    <p>Everything below is synthetic demo data. Justifications sit above the line, exposures
+      below it, on one shared clock — so the order reads before the words do.</p>
+
+    <div class="cases">
+
+      <!-- Scale: 10:15 (615) to 14:15 (855), 240 minutes across the track. -->
+
+      <article class="case">
+        <div class="case-head">
+          <span class="verdict verdict-pass">Justified</span>
+          <h3>Anita Rao</h3>
+          <span class="case-what">Cone-beam CT, lower left</span>
+        </div>
+        <div class="track-scroll">
+          <div class="track">
+            <div class="axis"></div>
+            <div class="tick" style="left:6.25%"><span>10:30</span></div>
+            <div class="tick" style="left:18.75%"><span>11:00</span></div>
+            <div class="tick" style="left:43.75%"><span>12:00</span></div>
+            <div class="tick" style="left:68.75%"><span>13:00</span></div>
+            <div class="tick" style="left:93.75%"><span>14:00</span></div>
+            <div class="span span-ok" style="left:10.4%; width:10.4%"></div>
+            <div class="pin pin-just" style="left:10.4%">
+              <span class="lab">
+                <span class="r">Justified</span>
+                <span class="t">10:40</span>
+                <span class="n">Dr Iyer · treating doctor</span>
+              </span>
+              <span class="stem"></span><span class="dot"></span>
+            </div>
+            <div class="pin pin-exp" style="left:20.8%">
+              <span class="stem"></span><span class="dot"></span>
+              <span class="lab">
+                <span class="t">11:05</span>
+                <span class="r">Exposed</span>
+                <span class="n">Priya · dental assistant</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <p class="case-read">Twenty-five minutes of lead, a doctor at one end and an assistant at
+          the other. This is what the control is for and it needs no attention.
+          <span class="said">Justified at 10:40, 25 minutes before the exposure — “Assess bone
+            height and the position of the inferior alveolar canal before placing a lower left
+            implant”</span></p>
+      </article>
+
+      <article class="case">
+        <div class="case-head">
+          <span class="verdict verdict-fail">Justified after</span>
+          <h3>Sunil Mehta</h3>
+          <span class="case-what">Periapical, upper right</span>
+        </div>
+        <div class="track-scroll">
+          <div class="track">
+            <div class="axis"></div>
+            <div class="tick" style="left:6.25%"><span>10:30</span></div>
+            <div class="tick" style="left:18.75%"><span>11:00</span></div>
+            <div class="tick" style="left:43.75%"><span>12:00</span></div>
+            <div class="tick" style="left:68.75%"><span>13:00</span></div>
+            <div class="tick" style="left:93.75%"><span>14:00</span></div>
+            <div class="span span-bad" style="left:58.3%; width:6.3%"></div>
+            <div class="pin pin-just bad" style="left:64.6%">
+              <span class="lab">
+                <span class="r">Justified</span>
+                <span class="t">12:50</span>
+                <span class="n">Dr Iyer · treating doctor</span>
+              </span>
+              <span class="stem"></span><span class="dot"></span>
+            </div>
+            <div class="pin pin-exp bad" style="left:58.3%">
+              <span class="stem"></span><span class="dot"></span>
+              <span class="lab">
+                <span class="t">12:35</span>
+                <span class="r">Exposed</span>
+                <span class="n">Meera · dental assistant</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <p class="case-read">The right doctor, the right question, two people — and the marks are
+          the wrong way round. Nobody here was careless; the paperwork simply followed the work,
+          which is the habit this catches. On paper this record looks better than an empty one.
+          <span class="said bad">Periapical, upper right was taken at 12:35 and justified at
+            12:50 — 15 minutes afterwards. A justification written after the dose is a
+            rationalisation.</span></p>
+      </article>
+
+      <article class="case">
+        <div class="case-head">
+          <span class="verdict verdict-fail">Self-justified</span>
+          <h3>Farah Qureshi</h3>
+          <span class="case-what">Periapical, lower right</span>
+        </div>
+        <div class="track-scroll">
+          <div class="track">
+            <div class="axis"></div>
+            <div class="tick" style="left:6.25%"><span>10:30</span></div>
+            <div class="tick" style="left:18.75%"><span>11:00</span></div>
+            <div class="tick" style="left:43.75%"><span>12:00</span></div>
+            <div class="tick" style="left:68.75%"><span>13:00</span></div>
+            <div class="tick" style="left:93.75%"><span>14:00</span></div>
+            <div class="span span-bad" style="left:85.4%; width:4.2%"></div>
+            <div class="pin pin-just bad" style="left:85.4%">
+              <span class="lab">
+                <span class="r">Justified</span>
+                <span class="t">13:40</span>
+                <span class="n">Priya · dental assistant</span>
+              </span>
+              <span class="stem"></span><span class="dot"></span>
+            </div>
+            <div class="pin pin-exp bad" style="left:89.6%">
+              <span class="stem"></span><span class="dot"></span>
+              <span class="lab">
+                <span class="t">13:50</span>
+                <span class="r">Exposed</span>
+                <span class="n">Priya · dental assistant</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <p class="case-read">In the right order, ten minutes of lead, a clinical question that
+          reads perfectly well — and the same name at both ends. This is the record that used to
+          pass.
+          <span class="said bad">Periapical, lower right was justified by the person who took it.
+            CLN-004 names the assistant as Doer and the doctor as Checker, and one person cannot
+            be both.</span></p>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Every verdict the engine can reach</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Verdict</th><th>When</th><th>Why it is its own verdict</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="code ok">JUSTIFIED</td>
+            <td>A doctor wrote a real question before the dose, and did not take it.</td>
+            <td class="note">The only one that is not a finding.</td>
+          </tr>
+          <tr>
+            <td class="code bad">UNJUSTIFIED</td>
+            <td>Nothing was written at all.</td>
+            <td class="note">A gap in the record.</td>
+          </tr>
+          <tr>
+            <td class="code bad">NO_QUESTION</td>
+            <td>Something was written and it says nothing. “Routine” is not a question.</td>
+            <td class="note">A record that is wrong, not missing. Different fix, different person.</td>
+          </tr>
+          <tr>
+            <td class="code bad">SELF_JUSTIFIED</td>
+            <td>The person who wrote it took it.</td>
+            <td class="note">Doer and Checker collapsed into one.</td>
+          </tr>
+          <tr>
+            <td class="code bad">NOT_A_DOCTOR</td>
+            <td>Two people, neither of them clinically able to make the call.</td>
+            <td class="note">Two people is not the whole rule.</td>
+          </tr>
+          <tr>
+            <td class="code bad">JUSTIFIED_AFTER</td>
+            <td>Written after the dose.</td>
+            <td class="note">To a regulator this is the same as nothing. Inside a clinic it is a
+              completely different conversation.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Five of the six are permanent. A dose was given; the record does not stand up; and the
+      only honest thing the software can do is keep saying so.</p>
+  </section>
+
+  <section>
+    <h2>The half that prevents rather than records</h2>
+    <p>A register that reports a self-justified scan a week later has helped nobody. So the same
+      rules run before the button is offered — at the moment somebody could still walk down the
+      corridor and fetch the doctor. If Priya asks to take Farah Qureshi’s periapical on her own
+      justification, the screen does not show her a button:</p>
+    <div class="refusal">
+      <div class="head">
+        <span class="verdict verdict-fail">Refused</span>
+        <span class="who">Owner · treating doctor</span>
+      </div>
+      <p class="msg">You wrote the justification for this exposure, so you may not also take it.
+        CLN-004 names the assistant as Doer and the doctor as Checker, and one person cannot be
+        both.</p>
+    </div>
+    <p>The refusal names who can clear it, so the sentence ends somewhere useful.</p>
+  </section>
+
+  <section>
+    <h2>What this still does not settle</h2>
+    <p>Three questions the matrix does not answer. KuBi has behaviour for each of them and
+      nobody has ratified it, so each is recorded as an open owner decision rather than quietly
+      resolved.</p>
+    <ol class="questions">
+      <li>
+        <p>
+          <span class="ask">How long may a justification stand before the exposure?</span>
+          <span class="why">A question written at Monday’s consultation is a reasonable basis for
+            Tuesday’s radiograph and probably not for one in six weeks. KuBi does not expire
+            them.</span>
+        </p>
+      </li>
+      <li>
+        <p>
+          <span class="ask">May one justification cover a series — four bitewings, or a trauma
+            follow-up sequence?</span>
+          <span class="why">KuBi matches each exposure to the most recent justification before
+            it, so one covers many, and nobody has said whether that is right.</span>
+        </p>
+      </li>
+      <li>
+        <p>
+          <span class="ask">Who justifies when the doctor taking the radiograph is the only
+            clinician in the building?</span>
+          <span class="why">CLN-004 assumes two people are available, and a single-handed session
+            is the case where the rule bites hardest.</span>
+        </p>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Where it lives</h2>
+    <ul class="files">
+      <li><span class="p">packages/contracts/src/radiography.ts</span>
+        <span class="d">The engine. Pure: exposures and justifications in, verdicts out. No clock,
+          no database.</span></li>
+      <li><span class="p">packages/contracts/src/clinical.ts</span>
+        <span class="d">CLN-004 reads its verdict from the register rather than from a tick.</span></li>
+      <li><span class="p">apps/web/src/screens/clinical.tsx</span>
+        <span class="d">The Scans tab, drawing the same sequence this page draws.</span></li>
+      <li><span class="p">tests/unit/radiography.test.ts</span>
+        <span class="d">Twenty-seven tests: two people, that order, refusing before the button,
+          the register across a day, reading the log.</span></li>
+    </ul>
+    <p>Two events carry it — a justification and an exposure — each holding booking, employee and
+      role in its subject, because a readiness event carries no payload. The clinical question is
+      prose and travels beside them, keyed by the same minute.</p>
+  </section>
+
+  <hr class="rule-line" />
+
+  <footer>KuBi · Clinical pre-treatment controls · All patients, staff and timings shown are
+    synthetic demo data.</footer>
+
+</div>
