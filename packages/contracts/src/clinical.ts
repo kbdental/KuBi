@@ -550,8 +550,4 @@ export const CLINICAL_QUESTIONS: readonly string[] = [
   'CLN-007 says the estimate is recorded “where applicable”. KuBi asks for it '
   + 'on every treatment as advisory, because “where applicable” with no rule '
   + 'behind it means never.',
-  'CLN-004 names the assistant as doer and the doctor as checker for a scan. '
-  + 'KuBi records who took it and who justified it; it does not yet refuse a '
-  + 'scan justified by the person who took it, the way sterilisation refuses '
-  + 'a self-released batch.',
 ];

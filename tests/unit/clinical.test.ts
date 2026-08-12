@@ -333,11 +333,13 @@ describe('CLN-010 · every patient in today’s list', () => {
 });
 
 describe('what this matrix does not settle', () => {
-  it('names the self-check the scan does not yet refuse', () => {
-    // CLN-004 names the assistant as doer and the doctor as checker. KuBi
-    // records both and does not yet refuse a scan justified by whoever took
-    // it, the way sterilisation refuses a self-released batch.
-    expect(CLINICAL_QUESTIONS.join(' ')).toContain('self-released batch');
+  it('no longer lists the self-check as an open gap, because it is closed', () => {
+    // This register used to say KuBi did not yet refuse a scan justified by
+    // whoever took it. radiography.ts refuses it, so the sentence has to go —
+    // a screen that keeps naming a gap after it is closed teaches people to
+    // stop reading the list.
+    expect(CLINICAL_QUESTIONS.join(' ')).not.toContain('self-released batch');
+    expect(CLINICAL_QUESTIONS.join(' ')).not.toContain('does not yet refuse');
   });
 
   it('names "where required" and "where applicable" as undecided', () => {
